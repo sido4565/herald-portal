@@ -10,10 +10,6 @@ rm -f herald.db herald.db-shm herald.db-wal
 
 echo "🚀 Starting server in background..."
 nohup npm start > server.log 2>&1 &
-SERVER_PID=$!
-echo "   PID: $SERVER_PID"
-
-echo "⏳ Waiting for server..."
 sleep 4
 
 if curl -s -o /dev/null -w "%{http_code}" http://localhost:3000/login.html | grep -q 200; then
@@ -30,7 +26,6 @@ if curl -s -o /dev/null -w "%{http_code}" http://localhost:3000/login.html | gre
 else
   echo ""
   echo "❌ SERVER FAILED TO START"
-  echo ""
   echo "─── server.log ───"
   cat server.log
 fi
