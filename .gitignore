@@ -1,0 +1,24 @@
+cat > .gitignore << 'EOF'
+# Dependencies
+node_modules/
+
+# Database files (local data)
+*.db
+*.db-shm
+*.db-wal
+herald.db*
+
+# Environment variables
+.env
+.env.local
+
+# Logs
+*.log
+npm-debug.log*
+
+# OS / Editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+EOF
