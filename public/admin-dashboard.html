@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Herald Admin — Dashboard</title>
+  <link rel="stylesheet" href="style.css" />
+  <script>
+    // Apply saved theme BEFORE paint to avoid flash
+    (function () {
+      try {
+        if (localStorage.getItem('theme') === 'dark') {
+          document.documentElement.classList.add('dark-preload');
+        }
+      } catch (e) {}
+    })();
+  </script>
+  <style>
+    /* Preload prevents white flash before body loads */
+    .dark-preload body { background: #0f172a; }
+  </style>
+</head>
+<body class="admin-body">
+  <header class="topbar admin-topbar">
+    <div class="brand">🛡️ Herald Admin</div>
+    <div class="user-box">
+      <span id="adminName">…</span>
+      <span class="role-badge" id="adminRole"></span>
+      <button class="theme-toggle" id="themeToggle" title="Toggle dark mode" type="button">🌓</button>
+      <button id="adminLogoutBtn" class="btn-ghost" type="button">Logout</button>
+    </div>
+  </header>
+
+  <main class="container">
+    <nav class="admin-tabs">
+      <button class="admin-tab active" data-panel="overview" type="button">📊 Overview</button>
+      <button class="admin-tab" data-panel="students" type="button">👥 Students</button>
+      <button class="admin-tab" data-panel="courses" type="button">📚 Courses</button>
+      <button class="admin-tab" data-panel="announcements" type="button">📢 Announcements</button>
+      <button class="admin-tab" data-panel="results" type="button">📈 Results</button>
+      <button class="admin-tab" data-panel="fees" type="button">💰 Fees</button>
+      <button class="admin-tab" data-panel="timetable" type="button">📅 Timetable</button>
+      <button class="admin-tab" data-panel="assignments" type="button">📝 Assignments</button>
+    </nav>
+
+    <!-- Overview -->
+    <section class="admin-panel active" id="panel-overview">
+      <h2>Overview</h2>
+      <div class="stats-grid">
+        <div class="stat-card"><div class="stat-num" id="statStudents">0</div><div class="stat-lbl">Students</div></div>
+        <div class="stat-card"><div class="stat-num" id="statCourses">0</div><div class="stat-lbl">Courses</div></div>
+        <div class="stat-card"><div class="stat-num" id="statEnrollments">0</div><div class="stat-lbl">Enrollments</div></div>
+        <div class="stat-card"><div class="stat-num" id="statAnnouncements">0</div><div class="stat-lbl">Announcements</div></div>
+      </div>
+    </section>
+
+    <!-- Students -->
+    <section class="admin-panel" id="panel-students">
+      <div class="panel-head">
+        <h2>Students</h2>
+        <button class="btn-primary" id="addStudentBtn" type="button">+ Add Student</button>
+      </div>
+      <div class="table-wrap">
+        <table id="studentsTable">
+          <thead>
+            <tr><th>Reg No</th><th>Name</th><th>Email</th><th>Course</th><th>Status</th><th>Actions</th></tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- Courses -->
+    <section class="admin-panel" id="panel-courses">
+      <div class="panel-head">
+        <h2>Courses</h2>
+        <button class="btn-primary" id="addCourseBtn" type="button">+ Add Course</button>
+      </div>
+      <div class="table-wrap">
+        <table id="coursesTable">
+          <thead>
+            <tr><th>Code</th><th>Title</th><th>Trainer</th><th>Enrolled</th><th>Actions</th></tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- Announcements -->
+    <section class="admin-panel" id="panel-announcements">
+      <div class="panel-head">
+        <h2>Announcements</h2>
+        <button class="btn-primary" id="addAnnBtn" type="button">+ New Announcement</button>
+      </div>
+      <div id="annList" class="ann-admin-list"></div>
+    </section>
+
+    <!-- Results -->
+    <section class="admin-panel" id="panel-results">
+      <div class="panel-head">
+        <h2>Results</h2>
+        <button class="btn-primary" id="addResultBtn" type="button">+ Add Result</button>
+      </div>
+      <div class="table-wrap">
+        <table id="resultsTable">
+          <thead>
+            <tr><th>Student</th><th>Course</th><th>Marks</th><th>Grade</th><th>Term</th><th>Actions</th></tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- Fees -->
+    <section class="admin-panel" id="panel-fees">
+      <div class="panel-head">
+        <h2>Fees</h2>
+        <button class="btn-primary" id="addFeeBtn" type="button">+ Add Fee Record</button>
+      </div>
+      <div class="table-wrap">
+        <table id="feesTable">
+          <thead>
+            <tr><th>Student</th><th>Term</th><th>Due</th><th>Paid</th><th>Balance</th><th>Status</th><th>Actions</th></tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- Timetable -->
+    <section class="admin-panel" id="panel-timetable">
+      <div class="panel-head">
+        <h2>Timetable</h2>
+        <button class="btn-primary" id="addTTBtn" type="button">+ Add Slot</button>
+      </div>
+      <div class="table-wrap">
+        <table id="ttTable">
+          <thead>
+            <tr><th>Day</th><th>Time</th><th>Course</th><th>Room</th><th>Trainer</th><th>Actions</th></tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- Assignments -->
+    <section class="admin-panel" id="panel-assignments">
+      <div class="panel-head">
+        <h2>Assignments</h2>
+        <button class="btn-primary" id="addAsgBtn" type="button">+ New Assignment</button>
+      </div>
+      <div class="table-wrap">
+        <table id="asgTable">
+          <thead>
+            <tr><th>Course</th><th>Title</th><th>Due</th><th>Submissions</th><th>Actions</th></tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </section>
+  </main>
+
+  <!-- Modal -->
+  <div class="modal-overlay hidden" id="modal" role="dialog" aria-modal="true">
+    <div class="modal">
+      <h3 id="modalTitle"></h3>
+      <form id="modalForm" class="modal-form"></form>
+      <div class="modal-actions">
+        <button class="btn-ghost dark" id="modalCancel" type="button">Cancel</button>
+        <button class="btn-primary" id="modalSave" type="submit" form="modalForm">Save</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="toastWrap" class="toast-wrap"></div>
+  <script src="admin-app.js"></script>
+</body>
+</html>
