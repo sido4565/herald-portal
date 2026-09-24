@@ -1,6 +1,14 @@
+/* ===================================================================
+   Herald Trainer Consultant — Students Portal
+   Full stylesheet: Student portal + Admin panel + Dark mode + Toasts
+   =================================================================== */
+
+/* ---------- Theme Tokens ---------- */
 :root {
   --primary: #1e3a8a;
   --primary-light: #3b82f6;
+  --admin: #7c2d12;
+  --admin-light: #dc2626;
   --bg: #f1f5f9;
   --card: #ffffff;
   --text: #0f172a;
@@ -8,8 +16,51 @@
   --border: #e2e8f0;
   --success: #16a34a;
   --danger: #dc2626;
+  --shadow-sm: 0 2px 10px rgba(0, 0, 0, 0.05);
+  --shadow-md: 0 6px 20px rgba(0, 0, 0, 0.08);
+  --shadow-lg: 0 20px 60px rgba(0, 0, 0, 0.25);
+  --radius: 12px;
+  --radius-sm: 8px;
 }
 
+/* ---------- Dark Mode ---------- */
+body.dark {
+  --bg: #0f172a;
+  --card: #1e293b;
+  --text: #f1f5f9;
+  --muted: #94a3b8;
+  --border: #334155;
+  --shadow-sm: 0 2px 10px rgba(0, 0, 0, 0.3);
+  --shadow-md: 0 6px 20px rgba(0, 0, 0, 0.4);
+  --shadow-lg: 0 20px 60px rgba(0, 0, 0, 0.6);
+}
+body.dark .topbar { background: #1e293b; }
+body.dark .admin-topbar { background: #431407; }
+body.dark th { color: var(--muted); }
+body.dark tr:hover td { background: rgba(255, 255, 255, 0.03); }
+body.dark .modal { background: #1e293b; color: var(--text); }
+body.dark .modal-form input,
+body.dark .modal-form select,
+body.dark .modal-form textarea {
+  background: #0f172a;
+  color: var(--text);
+  border-color: #334155;
+}
+body.dark .btn-xs { background: #334155; color: var(--text); }
+body.dark .btn-xs:hover { background: #475569; }
+body.dark .btn-xs.danger { background: #7f1d1d; color: #fecaca; }
+body.dark .btn-xs.danger:hover { background: #991b1b; }
+body.dark .auth-form input { background: #0f172a; color: var(--text); }
+body.dark .hint code { background: #334155; }
+body.dark .grade-input { background: #0f172a; color: var(--text); }
+body.dark .sub-card { background: #0f172a; }
+body.dark .pill-green { background: #052e16; color: #86efac; }
+body.dark .pill-red { background: #450a0a; color: #fca5a5; }
+body.dark .pill-amber { background: #451a03; color: #fcd34d; }
+body.dark .btn-ghost.dark { border-color: var(--border); color: var(--text); }
+body.dark .btn-ghost.dark:hover { background: #0f172a; }
+
+/* ---------- Reset ---------- */
 * { box-sizing: border-box; margin: 0; padding: 0; }
 
 body {
@@ -17,9 +68,15 @@ body {
   background: var(--bg);
   color: var(--text);
   min-height: 100vh;
+  transition: background .2s, color .2s;
 }
 
-/* ---------- Auth Page ---------- */
+a { color: var(--primary-light); text-decoration: none; }
+a:hover { text-decoration: underline; }
+
+/* ===================================================================
+   AUTH PAGES (Student + Admin login)
+   =================================================================== */
 .auth-body {
   display: flex;
   align-items: center;
@@ -28,13 +85,15 @@ body {
   padding: 20px;
 }
 
+.admin-auth { background: linear-gradient(135deg, #7c2d12 0%, #dc2626 100%); }
+
 .auth-card {
   background: var(--card);
   padding: 40px;
   border-radius: 16px;
   width: 100%;
   max-width: 420px;
-  box-shadow: 0 20px 60px rgba(0,0,0,0.25);
+  box-shadow: var(--shadow-lg);
 }
 
 .auth-card h1 { font-size: 26px; text-align: center; }
@@ -56,18 +115,27 @@ body {
   cursor: pointer;
   font-weight: 600;
   color: var(--muted);
+  font-family: inherit;
+  font-size: 14px;
 }
-.tab.active { background: var(--card); color: var(--primary); box-shadow: 0 2px 6px rgba(0,0,0,0.08); }
+.tab.active {
+  background: var(--card);
+  color: var(--primary);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
+}
 
 .auth-form { display: flex; flex-direction: column; gap: 10px; }
 .auth-form label { font-size: 13px; font-weight: 600; color: var(--muted); }
 .auth-form input {
   padding: 11px 14px;
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
   font-size: 15px;
   outline: none;
   transition: border .15s;
+  background: var(--card);
+  color: var(--text);
+  font-family: inherit;
 }
 .auth-form input:focus { border-color: var(--primary-light); }
 
@@ -75,24 +143,35 @@ body {
   margin-top: 8px;
   padding: 12px;
   border: none;
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
   background: var(--primary);
   color: white;
   font-size: 15px;
   font-weight: 600;
   cursor: pointer;
-  transition: background .15s;
+  transition: background .15s, transform .1s;
+  font-family: inherit;
 }
 .btn-primary:hover { background: var(--primary-light); }
+.btn-primary:active { transform: scale(0.98); }
+.admin-auth .btn-primary { background: var(--admin); }
+.admin-auth .btn-primary:hover { background: var(--admin-light); }
 
 .hint { text-align: center; font-size: 12px; color: var(--muted); margin-top: 8px; }
-.hint code { background: var(--bg); padding: 2px 6px; border-radius: 4px; }
+.hint code {
+  background: var(--bg);
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-family: 'Courier New', monospace;
+}
 .msg { text-align: center; margin-top: 14px; font-size: 14px; }
 .msg.error { color: var(--danger); }
 .msg.success { color: var(--success); }
 .hidden { display: none !important; }
 
-/* ---------- Dashboard ---------- */
+/* ===================================================================
+   TOPBAR (Student + Admin)
+   =================================================================== */
 .topbar {
   background: var(--primary);
   color: white;
@@ -100,22 +179,58 @@ body {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+  position: sticky;
+  top: 0;
+  z-index: 50;
 }
+.admin-topbar { background: var(--admin); }
+
 .brand { font-size: 18px; font-weight: 700; }
 .user-box { display: flex; align-items: center; gap: 14px; font-size: 14px; }
+
 .btn-ghost {
   background: transparent;
-  border: 1px solid rgba(255,255,255,0.4);
+  border: 1px solid rgba(255, 255, 255, 0.4);
   color: white;
   padding: 6px 14px;
   border-radius: 6px;
   cursor: pointer;
   font-size: 13px;
+  font-family: inherit;
+  transition: background .15s;
 }
-.btn-ghost:hover { background: rgba(255,255,255,0.15); }
+.btn-ghost:hover { background: rgba(255, 255, 255, 0.15); }
 
+.role-badge {
+  background: rgba(255, 255, 255, 0.2);
+  padding: 2px 10px;
+  border-radius: 999px;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  font-weight: 600;
+}
+
+/* Dark mode toggle button in topbar */
+.theme-toggle {
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  color: white;
+  padding: 6px 10px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 14px;
+  line-height: 1;
+  transition: background .15s;
+}
+.theme-toggle:hover { background: rgba(255, 255, 255, 0.15); }
+
+/* ===================================================================
+   CONTAINER & LAYOUT
+   =================================================================== */
 .container { max-width: 1100px; margin: 0 auto; padding: 24px; }
+
 .hero { margin-bottom: 24px; }
 .hero h2 { font-size: 24px; margin-bottom: 4px; }
 .hero p { color: var(--muted); }
@@ -125,11 +240,12 @@ body {
   grid-template-columns: 1fr 1fr;
   gap: 20px;
 }
+
 .card {
   background: var(--card);
   padding: 20px;
-  border-radius: 12px;
-  box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-sm);
 }
 .card.wide { grid-column: 1 / -1; }
 .card h3 { margin-bottom: 14px; font-size: 16px; color: var(--primary); }
@@ -144,10 +260,30 @@ body {
 .list li strong { color: var(--text); }
 .list li p { color: var(--muted); font-size: 13px; margin-top: 3px; }
 
+/* ===================================================================
+   TABLES
+   =================================================================== */
 table { width: 100%; border-collapse: collapse; font-size: 14px; }
 th, td { padding: 10px; text-align: left; border-bottom: 1px solid var(--border); }
-th { color: var(--muted); font-weight: 600; font-size: 12px; text-transform: uppercase; }
+th {
+  color: var(--muted);
+  font-weight: 600;
+  font-size: 12px;
+  text-transform: uppercase;
+}
+.table-wrap {
+  overflow-x: auto;
+  background: var(--card);
+  border-radius: var(--radius);
+  padding: 8px;
+}
+table { min-width: 600px; }
+tr:hover td { background: rgba(0, 0, 0, 0.02); }
+.empty { text-align: center; color: var(--muted); padding: 24px !important; }
 
+/* ===================================================================
+   BUTTONS (small)
+   =================================================================== */
 .btn-enroll {
   background: var(--primary-light);
   color: white;
@@ -156,10 +292,282 @@ th { color: var(--muted); font-weight: 600; font-size: 12px; text-transform: upp
   border-radius: 5px;
   font-size: 12px;
   cursor: pointer;
+  font-family: inherit;
+  transition: opacity .15s;
 }
+.btn-enroll:hover { opacity: 0.9; }
 .btn-enroll:disabled { background: #cbd5e1; cursor: default; }
 
+.btn-xs {
+  background: #e2e8f0;
+  color: var(--text);
+  border: none;
+  padding: 5px 10px;
+  border-radius: 6px;
+  font-size: 12px;
+  cursor: pointer;
+  margin-right: 4px;
+  font-family: inherit;
+  transition: background .15s;
+}
+.btn-xs:hover { background: #cbd5e1; }
+.btn-xs.danger { background: #fee2e2; color: #991b1b; }
+.btn-xs.danger:hover { background: #fecaca; }
+
+/* ===================================================================
+   ADMIN PANEL
+   =================================================================== */
+.admin-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 20px;
+  padding-bottom: 16px;
+  border-bottom: 2px solid var(--border);
+}
+.admin-tab {
+  background: transparent;
+  border: 1px solid var(--border);
+  padding: 8px 14px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--muted);
+  transition: all .15s;
+  font-family: inherit;
+}
+.admin-tab:hover { background: var(--bg); }
+.admin-tab.active {
+  background: var(--admin);
+  color: white;
+  border-color: var(--admin);
+}
+
+.admin-panel { display: none; }
+.admin-panel.active { display: block; }
+.admin-panel h2 { font-size: 22px; margin-bottom: 16px; color: var(--admin); }
+body.dark .admin-panel h2 { color: #fca5a5; }
+
+.panel-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+.panel-head .btn-primary {
+  margin-top: 0;
+  padding: 10px 18px;
+  font-size: 14px;
+}
+
+/* ===================================================================
+   STATS
+   =================================================================== */
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 16px;
+}
+.stat-card {
+  background: var(--card);
+  padding: 24px;
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-sm);
+  text-align: center;
+  border-left: 4px solid var(--admin-light);
+  transition: transform .15s;
+}
+.stat-card:hover { transform: translateY(-2px); }
+.stat-num { font-size: 32px; font-weight: 800; color: var(--admin); }
+body.dark .stat-num { color: #fca5a5; }
+.stat-lbl {
+  color: var(--muted);
+  font-size: 13px;
+  text-transform: uppercase;
+  margin-top: 4px;
+  letter-spacing: 0.5px;
+}
+
+/* ===================================================================
+   PILLS / BADGES
+   =================================================================== */
+.pill {
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  display: inline-block;
+}
+.pill-green { background: #dcfce7; color: #166534; }
+.pill-red { background: #fee2e2; color: #991b1b; }
+.pill-amber { background: #fef3c7; color: #92400e; }
+
+/* ===================================================================
+   ANNOUNCEMENTS (admin)
+   =================================================================== */
+.ann-admin-list { display: flex; flex-direction: column; gap: 12px; }
+.ann-card {
+  background: var(--card);
+  padding: 16px;
+  border-radius: 10px;
+  border-left: 4px solid var(--admin-light);
+  box-shadow: var(--shadow-sm);
+}
+.ann-head {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 6px;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.ann-date { font-size: 12px; color: var(--muted); }
+.ann-actions { margin-top: 10px; }
+
+/* ===================================================================
+   MODAL
+   =================================================================== */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+  padding: 20px;
+  animation: fadeIn .15s ease;
+}
+@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+
+.modal {
+  background: var(--card);
+  color: var(--text);
+  padding: 24px;
+  border-radius: 14px;
+  width: 100%;
+  max-width: 480px;
+  max-height: 90vh;
+  overflow: auto;
+  animation: slideUp .2s ease;
+}
+@keyframes slideUp {
+  from { transform: translateY(20px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+.modal h3 { margin-bottom: 16px; color: var(--admin); }
+body.dark .modal h3 { color: #fca5a5; }
+
+.modal-form { display: flex; flex-direction: column; gap: 10px; }
+.modal-form label {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--muted);
+}
+.modal-form input,
+.modal-form select,
+.modal-form textarea {
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  font-size: 14px;
+  font-family: inherit;
+  width: 100%;
+  background: var(--card);
+  color: var(--text);
+  outline: none;
+  transition: border .15s;
+}
+.modal-form input:focus,
+.modal-form select:focus,
+.modal-form textarea:focus { border-color: var(--primary-light); }
+.modal-form textarea { resize: vertical; min-height: 80px; }
+
+.modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 20px;
+}
+.btn-ghost.dark {
+  border-color: var(--border);
+  color: var(--text);
+}
+.btn-ghost.dark:hover { background: var(--bg); }
+
+/* ===================================================================
+   SUBMISSIONS (admin assignments)
+   =================================================================== */
+.sub-card {
+  background: var(--bg);
+  padding: 12px;
+  border-radius: var(--radius-sm);
+  margin-bottom: 10px;
+}
+.sub-card p { color: var(--muted); margin: 6px 0; font-size: 13px; }
+.sub-meta { font-size: 13px; margin-top: 8px; }
+.grade-input {
+  width: 60px;
+  padding: 4px 8px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  margin: 0 6px;
+  font-family: inherit;
+  background: var(--card);
+  color: var(--text);
+}
+
+/* ===================================================================
+   TOASTS
+   =================================================================== */
+.toast-wrap {
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  z-index: 200;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-width: 340px;
+}
+.toast {
+  background: #0f172a;
+  color: white;
+  padding: 12px 18px;
+  border-radius: 10px;
+  font-size: 14px;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.2);
+  opacity: 0;
+  transform: translateX(20px);
+  transition: all .3s ease;
+}
+.toast.show { opacity: 1; transform: translateX(0); }
+.toast-error { background: var(--danger); }
+.toast-success { background: var(--success); }
+
+/* ===================================================================
+   RESPONSIVE
+   =================================================================== */
 @media (max-width: 720px) {
   .grid { grid-template-columns: 1fr; }
   .auth-card { padding: 28px; }
+  .container { padding: 16px; }
+  .topbar { padding: 12px 16px; flex-wrap: wrap; gap: 8px; }
+  .brand { font-size: 16px; }
+  .user-box { gap: 8px; font-size: 13px; }
+  .admin-tabs { gap: 6px; }
+  .admin-tab { padding: 6px 10px; font-size: 12px; }
+  .modal { padding: 20px; }
+  .toast-wrap { top: 10px; right: 10px; left: 10px; max-width: none; }
+}
+
+@media (max-width: 480px) {
+  .auth-card { padding: 22px; border-radius: 12px; }
+  .auth-card h1 { font-size: 22px; }
+  .stat-num { font-size: 26px; }
+  .admin-panel h2 { font-size: 18px; }
+  .panel-head .btn-primary { width: 100%; }
 }
