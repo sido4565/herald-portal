@@ -1,3 +1,8 @@
+cd /workspaces/herald-portal
+
+# ─────────────────────────────────────────────
+# 1. Update .gitignore
+# ─────────────────────────────────────────────
 cat > .gitignore << 'EOF'
 # Dependencies
 node_modules/
@@ -15,6 +20,7 @@ herald.db*
 # Logs
 *.log
 npm-debug.log*
+server.log
 
 # OS / Editor
 .DS_Store
@@ -22,3 +28,46 @@ Thumbs.db
 .vscode/
 .idea/
 EOF
+echo "✅ .gitignore written"
+
+# ─────────────────────────────────────────────
+# 2. Create .env.example
+# ─────────────────────────────────────────────
+cat > .env.example << 'EOF'
+# Copy this file to .env for local dev (never commit .env)
+# For Render: set these in the Environment tab of your service
+
+JWT_SECRET=change-me-to-a-long-random-string
+
+# Uncomment if using a Render persistent disk mounted at /var/data
+# DATA_DIR=/var/data
+EOF
+echo "✅ .env.example written"
+
+# ─────────────────────────────────────────────
+# 3. Create favicon.svg
+# ─────────────────────────────────────────────
+cat > public/favicon.svg << 'EOF'
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <defs>
+    <linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#1e3a8a"/>
+      <stop offset="100%" stop-color="#3b82f6"/>
+    </linearGradient>
+  </defs>
+  <rect width="100" height="100" rx="20" fill="url(#g)"/>
+  <text x="50" y="68" font-size="56" text-anchor="middle" fill="white" font-family="Arial" font-weight="bold">H</text>
+</svg>
+EOF
+echo "✅ favicon.svg written"
+
+# ─────────────────────────────────────────────
+# 4. Verify files
+# ─────────────────────────────────────────────
+echo ""
+echo "═══ Files check ═══"
+ls -la .gitignore .env.example public/favicon.svg
+
+echo ""
+echo "═══ Ready to commit ═══"
+git status -s

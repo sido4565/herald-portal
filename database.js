@@ -1,10 +1,19 @@
 const Database = require('better-sqlite3');
 const bcrypt = require('bcryptjs');
 const path = require('path');
+const fs = require('fs');
 
-const db = new Database(path.join(__dirname, 'herald.db'));
+// Use DATA_DIR env var if set (for Render persistent disk), else local dir
+const DATA_DIR = process.env.DATA_DIR || __dirname;
+if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
+
+const DB_PATH = path.join(DATA_DIR, 'herald.db');
+const db = new Database(DB_PATH);
 db.pragma('journal_mode = WAL');
 
+console.log(`📁 Database: ${DB_PATH}`);
+
+// ---------- Schema ----------
 db.exec(`
 CREATE TABLE IF NOT EXISTS students (
   id INTEGER PRIMARY KEY AUTOINCREMENT,

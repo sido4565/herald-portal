@@ -308,4 +308,21 @@ async function submitAssignment(assignmentId) {
   } catch (e) {
     toast('❌ ' + e.message, 'error');
   }
+  // ---------- Auto-logout after 30 min inactivity ----------
+(function autoLogout() {
+  const TIMEOUT = 30 * 60 * 1000;
+  let timer;
+  function reset() {
+    clearTimeout(timer);
+    timer = setTimeout(() => {
+      fetch('/api/logout', { method: 'POST' })
+        .catch(() => {})
+        .finally(() => location.href = 'login.html');
+    }, TIMEOUT);
+  }
+  ['click', 'keypress', 'scroll', 'mousemove'].forEach(ev =>
+    document.addEventListener(ev, reset, { passive: true })
+  );
+  reset();
+})();
 }

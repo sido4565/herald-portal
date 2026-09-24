@@ -884,4 +884,21 @@ if ($('#adminName')) {
       });
     });
   }
+    // ---------- Auto-logout after 30 min inactivity ----------
+  (function autoLogout() {
+    const TIMEOUT = 30 * 60 * 1000;
+    let timer;
+    function reset() {
+      clearTimeout(timer);
+      timer = setTimeout(() => {
+        fetch('/api/admin/logout', { method: 'POST' })
+          .catch(() => {})
+          .finally(() => location.href = 'admin-login.html');
+      }, TIMEOUT);
+    }
+    ['click', 'keypress', 'scroll', 'mousemove'].forEach(ev =>
+      document.addEventListener(ev, reset, { passive: true })
+    );
+    reset();
+  })();
 }

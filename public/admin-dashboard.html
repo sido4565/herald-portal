@@ -4,6 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Herald Admin — Dashboard</title>
+  <link rel="icon" type="image/svg+xml" href="favicon.svg" />
   <link rel="stylesheet" href="style.css" />
   <script>
     (function () {
@@ -39,7 +40,6 @@
       <button class="admin-tab" data-panel="assignments" type="button">📝 Assignments</button>
     </nav>
 
-    <!-- Overview -->
     <section class="admin-panel active" id="panel-overview">
       <h2>Overview</h2>
       <div class="stats-grid">
@@ -50,7 +50,6 @@
       </div>
     </section>
 
-    <!-- Students -->
     <section class="admin-panel" id="panel-students">
       <div class="panel-head">
         <h2>Students</h2>
@@ -58,15 +57,12 @@
       </div>
       <div class="table-wrap">
         <table id="studentsTable">
-          <thead>
-            <tr><th>Reg No</th><th>Name</th><th>Email</th><th>Course</th><th>Status</th><th>Actions</th></tr>
-          </thead>
+          <thead><tr><th>Reg No</th><th>Name</th><th>Email</th><th>Course</th><th>Status</th><th>Actions</th></tr></thead>
           <tbody></tbody>
         </table>
       </div>
     </section>
 
-    <!-- Courses -->
     <section class="admin-panel" id="panel-courses">
       <div class="panel-head">
         <h2>Courses</h2>
@@ -74,15 +70,12 @@
       </div>
       <div class="table-wrap">
         <table id="coursesTable">
-          <thead>
-            <tr><th>Code</th><th>Title</th><th>Trainer</th><th>Enrolled</th><th>Actions</th></tr>
-          </thead>
+          <thead><tr><th>Code</th><th>Title</th><th>Trainer</th><th>Enrolled</th><th>Actions</th></tr></thead>
           <tbody></tbody>
         </table>
       </div>
     </section>
 
-    <!-- Announcements -->
     <section class="admin-panel" id="panel-announcements">
       <div class="panel-head">
         <h2>Announcements</h2>
@@ -91,7 +84,6 @@
       <div id="annList" class="ann-admin-list"></div>
     </section>
 
-    <!-- Results -->
     <section class="admin-panel" id="panel-results">
       <div class="panel-head">
         <h2>Results</h2>
@@ -99,15 +91,12 @@
       </div>
       <div class="table-wrap">
         <table id="resultsTable">
-          <thead>
-            <tr><th>Student</th><th>Course</th><th>Marks</th><th>Grade</th><th>Term</th><th>Actions</th></tr>
-          </thead>
+          <thead><tr><th>Student</th><th>Course</th><th>Marks</th><th>Grade</th><th>Term</th><th>Actions</th></tr></thead>
           <tbody></tbody>
         </table>
       </div>
     </section>
 
-    <!-- Fees -->
     <section class="admin-panel" id="panel-fees">
       <div class="panel-head">
         <h2>Fees</h2>
@@ -115,15 +104,12 @@
       </div>
       <div class="table-wrap">
         <table id="feesTable">
-          <thead>
-            <tr><th>Student</th><th>Term</th><th>Due</th><th>Paid</th><th>Balance</th><th>Status</th><th>Actions</th></tr>
-          </thead>
+          <thead><tr><th>Student</th><th>Term</th><th>Due</th><th>Paid</th><th>Balance</th><th>Status</th><th>Actions</th></tr></thead>
           <tbody></tbody>
         </table>
       </div>
     </section>
 
-    <!-- Timetable -->
     <section class="admin-panel" id="panel-timetable">
       <div class="panel-head">
         <h2>Timetable</h2>
@@ -132,11 +118,9 @@
           <button class="btn-ghost dark" id="exportTTCsvBtn" type="button">⬇ Export CSV</button>
         </div>
       </div>
-
       <div class="tt-grid-wrap">
         <div class="tt-grid" id="ttGrid"></div>
       </div>
-
       <h3 style="margin-top:24px; margin-bottom:12px; color:var(--admin);">All Slots</h3>
       <div class="table-wrap">
         <table id="ttTable">
@@ -154,7 +138,6 @@
       </div>
     </section>
 
-    <!-- Assignments -->
     <section class="admin-panel" id="panel-assignments">
       <div class="panel-head">
         <h2>Assignments</h2>
@@ -162,9 +145,7 @@
       </div>
       <div class="table-wrap">
         <table id="asgTable">
-          <thead>
-            <tr><th>Course</th><th>Title</th><th>Due</th><th>Submissions</th><th>Graded</th><th>Actions</th></tr>
-          </thead>
+          <thead><tr><th>Course</th><th>Title</th><th>Due</th><th>Submissions</th><th>Graded</th><th>Actions</th></tr></thead>
           <tbody></tbody>
         </table>
       </div>

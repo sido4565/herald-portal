@@ -4,6 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Herald Portal — Login</title>
+  <link rel="icon" type="image/svg+xml" href="favicon.svg" />
   <link rel="stylesheet" href="style.css" />
 </head>
 <body class="auth-body">
@@ -12,11 +13,10 @@
     <p class="subtitle">Trainer Consultant Students Portal</p>
 
     <div class="tabs">
-      <button class="tab active" data-tab="login">Login</button>
-      <button class="tab" data-tab="register">Register</button>
+      <button class="tab active" data-tab="login" type="button">Login</button>
+      <button class="tab" data-tab="register" type="button">Register</button>
     </div>
 
-    <!-- Login Form -->
     <form id="loginForm" class="auth-form">
       <label>Registration Number</label>
       <input name="reg_no" placeholder="e.g. STU001" required />
@@ -26,7 +26,6 @@
       <p class="hint">Demo: <code>STU001</code> / <code>password123</code></p>
     </form>
 
-    <!-- Register Form -->
     <form id="registerForm" class="auth-form hidden">
       <label>Registration Number</label>
       <input name="reg_no" required />
@@ -42,6 +41,10 @@
     </form>
 
     <p id="authMsg" class="msg"></p>
+
+    <p class="hint" style="margin-top:16px; border-top:1px solid var(--border); padding-top:16px;">
+      Are you a trainer? <a href="admin-login.html">🛡️ Admin login →</a>
+    </p>
   </div>
   <script src="app.js"></script>
 </body>

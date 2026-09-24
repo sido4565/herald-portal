@@ -158,7 +158,6 @@ app.get('/api/admin/stats', authAdmin, (req, res) => {
   });
 });
 
-// --- Students
 app.get('/api/admin/students', authAdmin, (req, res) => {
   res.json(db.prepare('SELECT id, reg_no, name, email, course, active, created_at FROM students ORDER BY id DESC').all());
 });
@@ -195,7 +194,6 @@ app.post('/api/admin/students/:id/reset-password', authAdmin, (req, res) => {
   res.json({ ok: true });
 });
 
-// --- Courses
 app.get('/api/admin/courses', authAdmin, (req, res) => {
   res.json(db.prepare(`
     SELECT c.*, (SELECT COUNT(*) FROM enrollments WHERE course_id = c.id) AS enrolled_count
@@ -234,7 +232,6 @@ app.get('/api/admin/courses/:id/students', authAdmin, (req, res) => {
   `).all(req.params.id));
 });
 
-// --- Announcements
 app.get('/api/admin/announcements', authAdmin, (req, res) => {
   res.json(db.prepare('SELECT * FROM announcements ORDER BY created_at DESC').all());
 });
@@ -257,7 +254,6 @@ app.delete('/api/admin/announcements/:id', authAdmin, (req, res) => {
   res.json({ ok: true });
 });
 
-// --- Results
 function calcGrade(m) {
   if (m >= 80) return 'A'; if (m >= 75) return 'A-'; if (m >= 70) return 'B+';
   if (m >= 65) return 'B'; if (m >= 60) return 'B-'; if (m >= 55) return 'C+';
@@ -286,7 +282,6 @@ app.delete('/api/admin/results/:id', authAdmin, (req, res) => {
   res.json({ ok: true });
 });
 
-// --- Fees
 app.get('/api/admin/fees', authAdmin, (req, res) => {
   res.json(db.prepare(`
     SELECT f.*, s.reg_no, s.name AS student_name
@@ -344,7 +339,6 @@ app.delete('/api/admin/fees/:id', authAdmin, (req, res) => {
   res.json({ ok: true });
 });
 
-// --- Timetable
 app.get('/api/admin/timetable', authAdmin, (req, res) => {
   res.json(db.prepare(`
     SELECT t.*, c.code, c.title FROM timetable t JOIN courses c ON c.id = t.course_id
@@ -368,7 +362,6 @@ app.delete('/api/admin/timetable/:id', authAdmin, (req, res) => {
   res.json({ ok: true });
 });
 
-// --- Assignments
 app.get('/api/admin/assignments', authAdmin, (req, res) => {
   res.json(db.prepare(`
     SELECT a.*, c.code, c.title,
