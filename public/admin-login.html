@@ -3,24 +3,32 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Herald Admin — Login</title>
+  <title>Admin Access — Herald Portal</title>
   <link rel="icon" type="image/svg+xml" href="favicon.svg" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="style.css" />
 </head>
 <body class="auth-body admin-auth">
   <div class="auth-card">
-    <h1>🛡️ Herald Admin</h1>
-    <p class="subtitle">Trainer / Consultant Panel</p>
+    <h1>Administrator</h1>
+    <p class="subtitle">Staff Access Only</p>
+
     <form id="adminLoginForm" class="auth-form">
-      <label>Username</label>
-      <input name="username" placeholder="admin" required autofocus />
-      <label>Password</label>
-      <input name="password" type="password" required />
+      <label for="admin-user">Username</label>
+      <input id="admin-user" name="username" placeholder="admin" required autofocus />
+      <label for="admin-pwd">Password</label>
+      <input id="admin-pwd" name="password" type="password" required />
       <button type="submit" class="btn-primary">Sign In</button>
-      <p class="hint">Demo: <code>admin</code> / <code>admin123</code></p>
+      <p class="hint">Demo credentials: <code>admin</code> / <code>admin123</code></p>
     </form>
+
     <p id="adminMsg" class="msg"></p>
-    <p class="hint" style="margin-top:16px;"><a href="login.html">← Student login</a></p>
+
+    <p class="hint" style="margin-top:20px; border-top:1px solid var(--border-soft); padding-top:20px;">
+      <a href="login.html">Return to student portal</a>
+    </p>
   </div>
   <script src="admin-app.js"></script>
 </body>

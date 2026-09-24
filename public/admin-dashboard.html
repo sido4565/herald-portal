@@ -3,8 +3,11 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Herald Admin — Dashboard</title>
+  <title>Admin Dashboard — Herald Portal</title>
   <link rel="icon" type="image/svg+xml" href="favicon.svg" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="style.css" />
   <script>
     (function () {
@@ -15,29 +18,29 @@
       } catch (e) {}
     })();
   </script>
-  <style>.dark-preload body { background: #0f172a; }</style>
+  <style>.dark-preload body { background: #0b1220; }</style>
 </head>
 <body class="admin-body">
   <header class="topbar admin-topbar">
-    <div class="brand">🛡️ Herald Admin</div>
+    <div class="brand">Herald Admin</div>
     <div class="user-box">
       <span id="adminName">…</span>
       <span class="role-badge" id="adminRole"></span>
-      <button class="theme-toggle" id="themeToggle" title="Toggle dark mode" type="button">🌓</button>
-      <button id="adminLogoutBtn" class="btn-ghost" type="button">Logout</button>
+      <button class="theme-toggle" id="themeToggle" title="Toggle theme" type="button">Theme</button>
+      <button id="adminLogoutBtn" class="btn-ghost" type="button">Sign Out</button>
     </div>
   </header>
 
   <main class="container">
     <nav class="admin-tabs">
-      <button class="admin-tab active" data-panel="overview" type="button">📊 Overview</button>
-      <button class="admin-tab" data-panel="students" type="button">👥 Students</button>
-      <button class="admin-tab" data-panel="courses" type="button">📚 Courses</button>
-      <button class="admin-tab" data-panel="announcements" type="button">📢 Announcements</button>
-      <button class="admin-tab" data-panel="results" type="button">📈 Results</button>
-      <button class="admin-tab" data-panel="fees" type="button">💰 Fees</button>
-      <button class="admin-tab" data-panel="timetable" type="button">📅 Timetable</button>
-      <button class="admin-tab" data-panel="assignments" type="button">📝 Assignments</button>
+      <button class="admin-tab active" data-panel="overview" type="button">Overview</button>
+      <button class="admin-tab" data-panel="students" type="button">Students</button>
+      <button class="admin-tab" data-panel="courses" type="button">Courses</button>
+      <button class="admin-tab" data-panel="announcements" type="button">Announcements</button>
+      <button class="admin-tab" data-panel="results" type="button">Results</button>
+      <button class="admin-tab" data-panel="fees" type="button">Fees</button>
+      <button class="admin-tab" data-panel="timetable" type="button">Timetable</button>
+      <button class="admin-tab" data-panel="assignments" type="button">Assignments</button>
     </nav>
 
     <section class="admin-panel active" id="panel-overview">
@@ -53,7 +56,7 @@
     <section class="admin-panel" id="panel-students">
       <div class="panel-head">
         <h2>Students</h2>
-        <button class="btn-primary" id="addStudentBtn" type="button">+ Add Student</button>
+        <button class="btn-primary" id="addStudentBtn" type="button">Add Student</button>
       </div>
       <div class="table-wrap">
         <table id="studentsTable">
@@ -66,7 +69,7 @@
     <section class="admin-panel" id="panel-courses">
       <div class="panel-head">
         <h2>Courses</h2>
-        <button class="btn-primary" id="addCourseBtn" type="button">+ Add Course</button>
+        <button class="btn-primary" id="addCourseBtn" type="button">Add Course</button>
       </div>
       <div class="table-wrap">
         <table id="coursesTable">
@@ -79,7 +82,7 @@
     <section class="admin-panel" id="panel-announcements">
       <div class="panel-head">
         <h2>Announcements</h2>
-        <button class="btn-primary" id="addAnnBtn" type="button">+ New Announcement</button>
+        <button class="btn-primary" id="addAnnBtn" type="button">New Announcement</button>
       </div>
       <div id="annList" class="ann-admin-list"></div>
     </section>
@@ -87,7 +90,7 @@
     <section class="admin-panel" id="panel-results">
       <div class="panel-head">
         <h2>Results</h2>
-        <button class="btn-primary" id="addResultBtn" type="button">+ Add Result</button>
+        <button class="btn-primary" id="addResultBtn" type="button">Add Result</button>
       </div>
       <div class="table-wrap">
         <table id="resultsTable">
@@ -99,8 +102,8 @@
 
     <section class="admin-panel" id="panel-fees">
       <div class="panel-head">
-        <h2>Fees</h2>
-        <button class="btn-primary" id="addFeeBtn" type="button">+ Add Fee Record</button>
+        <h2>Fee Records</h2>
+        <button class="btn-primary" id="addFeeBtn" type="button">Add Fee Record</button>
       </div>
       <div class="table-wrap">
         <table id="feesTable">
@@ -114,14 +117,14 @@
       <div class="panel-head">
         <h2>Timetable</h2>
         <div style="display:flex; gap:8px; flex-wrap:wrap;">
-          <button class="btn-primary" id="addTTBtn" type="button">+ Add Slot</button>
-          <button class="btn-ghost dark" id="exportTTCsvBtn" type="button">⬇ Export CSV</button>
+          <button class="btn-primary" id="addTTBtn" type="button">Add Slot</button>
+          <button class="btn-ghost dark" id="exportTTCsvBtn" type="button">Export CSV</button>
         </div>
       </div>
       <div class="tt-grid-wrap">
         <div class="tt-grid" id="ttGrid"></div>
       </div>
-      <h3 style="margin-top:24px; margin-bottom:12px; color:var(--admin);">All Slots</h3>
+      <h3 style="margin-top:28px; margin-bottom:14px; color:var(--text-soft); font-size:12px; text-transform:uppercase; letter-spacing:0.08em; font-weight:600;">All Slots</h3>
       <div class="table-wrap">
         <table id="ttTable">
           <thead>
@@ -133,7 +136,7 @@
           <tbody></tbody>
         </table>
       </div>
-      <div style="margin-top:12px;">
+      <div style="margin-top:14px;">
         <button class="btn-xs danger" id="ttBulkDeleteBtn" type="button">Delete Selected</button>
       </div>
     </section>
@@ -141,7 +144,7 @@
     <section class="admin-panel" id="panel-assignments">
       <div class="panel-head">
         <h2>Assignments</h2>
-        <button class="btn-primary" id="addAsgBtn" type="button">+ New Assignment</button>
+        <button class="btn-primary" id="addAsgBtn" type="button">New Assignment</button>
       </div>
       <div class="table-wrap">
         <table id="asgTable">

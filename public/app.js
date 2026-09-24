@@ -11,12 +11,20 @@ function applyTheme() {
   const isDark = localStorage.getItem('theme') === 'dark';
   document.body.classList.toggle('dark', isDark);
   document.documentElement.classList.remove('dark-preload');
+  updateThemeLabel();
 }
 applyTheme();
 
 function toggleTheme() {
   const isDark = document.body.classList.toggle('dark');
   localStorage.setItem('theme', isDark ? 'dark' : 'light');
+  updateThemeLabel();
+}
+
+function updateThemeLabel() {
+  const btn = document.getElementById('themeToggle');
+  if (!btn) return;
+  btn.textContent = document.body.classList.contains('dark') ? 'Light' : 'Dark';
 }
 
 // ---------- Toast ----------
@@ -62,11 +70,11 @@ if (document.getElementById('loginForm')) {
     const json = await res.json();
     if (res.ok) {
       msg.className = 'msg success';
-      msg.textContent = 'Login successful. Redirecting…';
+      msg.textContent = 'Signing in…';
       location.href = 'dashboard.html';
     } else {
       msg.className = 'msg error';
-      msg.textContent = json.error || 'Login failed';
+      msg.textContent = json.error || 'Sign in failed';
     }
   });
 
@@ -116,7 +124,7 @@ async function loadDashboard() {
     const anns = await annRes.json();
     document.getElementById('announcements').innerHTML = anns.length
       ? anns.map(a => `<li><strong>${esc(a.title)}</strong><p>${esc(a.body)}</p></li>`).join('')
-      : '<li style="color:var(--muted);">No announcements yet.</li>';
+      : '<li style="color:var(--muted);">No announcements at this time.</li>';
   } catch (e) { console.error(e); }
 
   // Courses
@@ -125,10 +133,10 @@ async function loadDashboard() {
     const courses = await courseRes.json();
     document.getElementById('courses').innerHTML = courses.map(c => `
       <li>
-        <strong>${esc(c.code)} — ${esc(c.title)}</strong>
+        <strong>${esc(c.code)} &mdash; ${esc(c.title)}</strong>
         <p>Trainer: ${esc(c.trainer)}</p>
         ${c.enrolled
-          ? '<button class="btn-enroll" disabled>Enrolled ✓</button>'
+          ? '<button class="btn-enroll" disabled>Enrolled</button>'
           : `<button class="btn-enroll" data-id="${c.id}">Enroll</button>`}
       </li>
     `).join('');
@@ -155,10 +163,10 @@ async function loadDashboard() {
             <td><strong>${esc(r.grade)}</strong></td>
           </tr>
         `).join('')
-      : '<tr><td colspan="5" style="text-align:center;color:var(--muted);">No results yet.</td></tr>';
+      : '<tr><td colspan="5" class="empty">No results published yet.</td></tr>';
   } catch (e) { console.error(e); }
 
-  // ---------- Fees ----------
+  // Fees
   try {
     const feeRes = await fetch('/api/my-fees');
     const fees = await feeRes.json();
@@ -194,32 +202,32 @@ async function loadDashboard() {
               <div style="display:flex; justify-content:space-between; align-items:center; gap:12px;">
                 <div>
                   <strong>${esc(f.term)}</strong>
-                  <p>Due: KES ${Number(f.amount_due).toLocaleString()} • Paid: KES ${Number(f.amount_paid).toLocaleString()}</p>
+                  <p>Due: KES ${Number(f.amount_due).toLocaleString()} &middot; Paid: KES ${Number(f.amount_paid).toLocaleString()}</p>
                 </div>
                 <span class="pill ${pillCls}">${esc(f.status)}</span>
               </div>
               ${bal > 0 ? `<p style="color:var(--danger); font-size:12px; margin-top:6px;">Outstanding: KES ${bal.toLocaleString()}</p>` : ''}
-              ${Number(f.amount_paid) > 0 ? `<button class="btn-xs" onclick="printReceipt(${f.id}, '${esc(f.term)}', ${f.amount_due}, ${f.amount_paid})">🧾 Receipt</button>` : ''}
+              ${Number(f.amount_paid) > 0 ? `<button class="btn-xs" onclick="printReceipt(${f.id}, '${esc(f.term)}', ${f.amount_due}, ${f.amount_paid})">Receipt</button>` : ''}
             </li>`;
         }).join('')
-      : '<li style="color:var(--muted);">No fee records yet.</li>';
+      : '<li style="color:var(--muted);">No fee records on file.</li>';
   } catch (e) { console.error('fees load', e); }
 
-  // ---------- Timetable ----------
+  // Timetable
   try {
     const ttRes = await fetch('/api/my-timetable');
     const tt = await ttRes.json();
     document.getElementById('timetable').innerHTML = tt.length
       ? tt.map(t => `
           <li>
-            <strong>${esc(t.day)} • ${esc(t.start_time)}–${esc(t.end_time)}</strong>
-            <p>${esc(t.code)} — ${esc(t.title)}</p>
-            <p style="font-size:12px;">📍 ${esc(t.room || 'TBA')} • 👤 ${esc(t.trainer || 'TBA')}</p>
+            <strong>${esc(t.day)} &middot; ${esc(t.start_time)}&ndash;${esc(t.end_time)}</strong>
+            <p>${esc(t.code)} &mdash; ${esc(t.title)}</p>
+            <p style="font-size:12px;">Room: ${esc(t.room || 'TBA')} &middot; Trainer: ${esc(t.trainer || 'TBA')}</p>
           </li>`).join('')
       : '<li style="color:var(--muted);">No classes scheduled.</li>';
   } catch (e) { console.error('timetable load', e); }
 
-  // ---------- Assignments ----------
+  // Assignments
   try {
     const asgRes = await fetch('/api/my-assignments');
     const asg = await asgRes.json();
@@ -229,7 +237,7 @@ async function loadDashboard() {
             <div style="display:flex; justify-content:space-between; gap:12px; flex-wrap:wrap;">
               <div>
                 <strong>${esc(a.title)}</strong>
-                <p>${esc(a.code)} — ${esc(a.title)}</p>
+                <p>${esc(a.code)} &mdash; ${esc(a.title)}</p>
               </div>
               <div style="text-align:right;">
                 ${a.grade
@@ -238,7 +246,7 @@ async function loadDashboard() {
                     ? '<span class="pill pill-amber">Submitted</span>'
                     : '<span class="pill pill-red">Not submitted</span>'}
                 <p style="font-size:12px; color:var(--muted); margin-top:4px;">
-                  Due: ${esc(a.due_date || 'N/A')}
+                  Due: ${esc(a.due_date || 'Not set')}
                 </p>
               </div>
             </div>
@@ -248,38 +256,39 @@ async function loadDashboard() {
               </button>
             </div>
           </li>`).join('')
-      : '<li style="color:var(--muted);">No assignments yet.</li>';
+      : '<li style="color:var(--muted);">No assignments posted.</li>';
   } catch (e) { console.error('assignments load', e); }
 }
 
 // ---------- Fee receipt (printable) ----------
 function printReceipt(feeId, term, due, paid) {
   const balance = Number(due) - Number(paid);
-  const win = window.open('', '_blank', 'width=420,height=600');
+  const win = window.open('', '_blank', 'width=440,height=640');
   win.document.write(`
     <!DOCTYPE html>
     <html>
     <head>
-      <title>Receipt — ${esc(term)}</title>
+      <title>Fee Receipt &mdash; ${esc(term)}</title>
       <style>
-        body { font-family: 'Courier New', monospace; padding: 24px; max-width: 340px; margin: auto; }
-        h1 { text-align: center; font-size: 18px; margin-bottom: 4px; }
-        .sub { text-align: center; color: #666; font-size: 12px; margin-bottom: 20px; }
-        .row { display: flex; justify-content: space-between; padding: 6px 0; border-bottom: 1px dashed #ccc; }
-        .row.total { border-top: 2px solid #000; border-bottom: 2px solid #000; margin-top: 8px; font-weight: bold; }
-        .footer { text-align: center; font-size: 11px; color: #666; margin-top: 24px; }
+        body { font-family: 'Inter', -apple-system, sans-serif; padding: 32px; max-width: 360px; margin: auto; color: #1a1f2e; }
+        h1 { text-align: center; font-size: 15px; font-weight: 700; margin-bottom: 4px; letter-spacing: 0.02em; }
+        .sub { text-align: center; color: #6b7280; font-size: 11px; margin-bottom: 24px; text-transform: uppercase; letter-spacing: 0.08em; }
+        .row { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #e5e8ed; font-size: 13px; }
+        .row.total { border-top: 2px solid #1a1f2e; border-bottom: 2px solid #1a1f2e; margin-top: 10px; font-weight: 700; padding: 10px 0; }
+        .lbl { color: #6b7280; font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; }
+        .footer { text-align: center; font-size: 11px; color: #6b7280; margin-top: 32px; padding-top: 20px; border-top: 1px solid #e5e8ed; }
         @media print { body { padding: 0; } }
       </style>
     </head>
     <body>
-      <h1>🎓 HERALD TRAINER CONSULTANT</h1>
+      <h1>Herald Trainer Consultant</h1>
       <div class="sub">Official Fee Receipt</div>
-      <div class="row"><span>Receipt #</span><span>HR-${String(feeId).padStart(5, '0')}</span></div>
-      <div class="row"><span>Date</span><span>${new Date().toLocaleDateString()}</span></div>
-      <div class="row"><span>Term</span><span>${esc(term)}</span></div>
-      <hr style="margin: 12px 0;">
-      <div class="row"><span>Amount Due</span><span>KES ${Number(due).toLocaleString()}</span></div>
-      <div class="row"><span>Amount Paid</span><span>KES ${Number(paid).toLocaleString()}</span></div>
+      <div class="row"><span class="lbl">Receipt No.</span><span>HR-${String(feeId).padStart(5, '0')}</span></div>
+      <div class="row"><span class="lbl">Date Issued</span><span>${new Date().toLocaleDateString()}</span></div>
+      <div class="row"><span class="lbl">Term</span><span>${esc(term)}</span></div>
+      <div style="margin-top:16px;"></div>
+      <div class="row"><span class="lbl">Amount Due</span><span>KES ${Number(due).toLocaleString()}</span></div>
+      <div class="row"><span class="lbl">Amount Paid</span><span>KES ${Number(paid).toLocaleString()}</span></div>
       <div class="row total"><span>Balance</span><span>KES ${balance.toLocaleString()}</span></div>
       <div class="footer">
         Thank you for your payment.<br>
@@ -293,23 +302,26 @@ function printReceipt(feeId, term, due, paid) {
 
 // ---------- Assignment submission ----------
 async function submitAssignment(assignmentId) {
-  const content = prompt('Enter your submission (text/answer):');
+  const content = prompt('Enter your submission (text or answer):');
   if (content === null) return;
-  if (!content.trim()) return alert('Submission cannot be empty');
+  if (!content.trim()) return alert('Submission cannot be empty.');
   try {
     const res = await fetch(`/api/submit/${assignmentId}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ content })
     });
-    if (!res.ok) throw new Error('Failed');
-    toast('✅ Submitted successfully!');
+    if (!res.ok) throw new Error('Submission failed');
+    toast('Submitted successfully.');
     setTimeout(() => location.reload(), 800);
   } catch (e) {
-    toast('❌ ' + e.message, 'error');
+    toast(e.message, 'error');
   }
-  // ---------- Auto-logout after 30 min inactivity ----------
+}
+
+// ---------- Auto-logout after 30 min inactivity ----------
 (function autoLogout() {
+  if (!document.getElementById('userName')) return;
   const TIMEOUT = 30 * 60 * 1000;
   let timer;
   function reset() {
@@ -325,4 +337,3 @@ async function submitAssignment(assignmentId) {
   );
   reset();
 })();
-}

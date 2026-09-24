@@ -3,8 +3,11 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Herald Portal — Dashboard</title>
+  <title>Dashboard — Herald Portal</title>
   <link rel="icon" type="image/svg+xml" href="favicon.svg" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="style.css" />
   <script>
     (function () {
@@ -15,48 +18,48 @@
       } catch (e) {}
     })();
   </script>
-  <style>.dark-preload body { background: #0f172a; }</style>
+  <style>.dark-preload body { background: #0b1220; }</style>
 </head>
 <body>
   <header class="topbar">
-    <div class="brand">🎓 Herald Portal</div>
+    <div class="brand">Herald Portal</div>
     <div class="user-box">
       <span id="userName">…</span>
-      <button class="theme-toggle" id="themeToggle" title="Toggle dark mode" type="button">🌓</button>
-      <button id="logoutBtn" class="btn-ghost" type="button">Logout</button>
+      <button class="theme-toggle" id="themeToggle" title="Toggle theme" type="button">Theme</button>
+      <button id="logoutBtn" class="btn-ghost" type="button">Sign Out</button>
     </div>
   </header>
 
   <main class="container">
     <section class="hero">
-      <h2>Welcome back, <span id="welcomeName"></span> 👋</h2>
-      <p>Reg No: <strong id="regNo"></strong> • <span id="studentCourse"></span></p>
+      <h2>Welcome, <span id="welcomeName"></span></h2>
+      <p>Reg No <strong id="regNo"></strong> &middot; <span id="studentCourse"></span></p>
     </section>
 
     <div class="grid">
       <section class="card">
-        <h3>📢 Announcements</h3>
+        <h3>Announcements</h3>
         <ul id="announcements" class="list"></ul>
       </section>
 
       <section class="card">
-        <h3>💰 My Fees</h3>
+        <h3>Fee Statement</h3>
         <div id="feesSummary" class="fees-summary"></div>
         <ul id="feesList" class="list"></ul>
       </section>
 
       <section class="card">
-        <h3>📚 Available Courses</h3>
+        <h3>Available Courses</h3>
         <ul id="courses" class="list"></ul>
       </section>
 
       <section class="card">
-        <h3>📅 My Timetable</h3>
+        <h3>Weekly Timetable</h3>
         <ul id="timetable" class="list"></ul>
       </section>
 
       <section class="card wide">
-        <h3>📊 My Results</h3>
+        <h3>Academic Results</h3>
         <div class="table-wrap">
           <table id="resultsTable">
             <thead>
@@ -68,7 +71,7 @@
       </section>
 
       <section class="card wide">
-        <h3>📝 My Assignments</h3>
+        <h3>Assignments</h3>
         <ul id="assignments" class="list"></ul>
       </section>
     </div>

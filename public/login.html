@@ -3,47 +3,50 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Herald Portal — Login</title>
+  <title>Sign In — Herald Portal</title>
   <link rel="icon" type="image/svg+xml" href="favicon.svg" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="style.css" />
 </head>
 <body class="auth-body">
   <div class="auth-card">
-    <h1>🎓 Herald Portal</h1>
-    <p class="subtitle">Trainer Consultant Students Portal</p>
+    <h1>Herald Portal</h1>
+    <p class="subtitle">Student Access</p>
 
     <div class="tabs">
-      <button class="tab active" data-tab="login" type="button">Login</button>
+      <button class="tab active" data-tab="login" type="button">Sign In</button>
       <button class="tab" data-tab="register" type="button">Register</button>
     </div>
 
     <form id="loginForm" class="auth-form">
-      <label>Registration Number</label>
-      <input name="reg_no" placeholder="e.g. STU001" required />
-      <label>Password</label>
-      <input name="password" type="password" required />
+      <label for="login-reg">Registration Number</label>
+      <input id="login-reg" name="reg_no" placeholder="STU001" required />
+      <label for="login-pwd">Password</label>
+      <input id="login-pwd" name="password" type="password" required />
       <button type="submit" class="btn-primary">Sign In</button>
-      <p class="hint">Demo: <code>STU001</code> / <code>password123</code></p>
+      <p class="hint">Demo credentials: <code>STU001</code> / <code>password123</code></p>
     </form>
 
     <form id="registerForm" class="auth-form hidden">
-      <label>Registration Number</label>
-      <input name="reg_no" required />
-      <label>Full Name</label>
-      <input name="name" required />
-      <label>Email</label>
-      <input name="email" type="email" required />
-      <label>Course</label>
-      <input name="course" required />
-      <label>Password</label>
-      <input name="password" type="password" minlength="6" required />
+      <label for="reg-reg">Registration Number</label>
+      <input id="reg-reg" name="reg_no" required />
+      <label for="reg-name">Full Name</label>
+      <input id="reg-name" name="name" required />
+      <label for="reg-email">Email Address</label>
+      <input id="reg-email" name="email" type="email" required />
+      <label for="reg-course">Program of Study</label>
+      <input id="reg-course" name="course" required />
+      <label for="reg-pwd">Password</label>
+      <input id="reg-pwd" name="password" type="password" minlength="6" required />
       <button type="submit" class="btn-primary">Create Account</button>
     </form>
 
     <p id="authMsg" class="msg"></p>
 
-    <p class="hint" style="margin-top:16px; border-top:1px solid var(--border); padding-top:16px;">
-      Are you a trainer? <a href="admin-login.html">🛡️ Admin login →</a>
+    <p class="hint" style="margin-top:20px; border-top:1px solid var(--border-soft); padding-top:20px;">
+      Trainer or administrator? <a href="admin-login.html">Access admin panel</a>
     </p>
   </div>
   <script src="app.js"></script>
