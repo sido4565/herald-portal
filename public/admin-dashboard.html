@@ -6,7 +6,6 @@
   <title>Herald Admin — Dashboard</title>
   <link rel="stylesheet" href="style.css" />
   <script>
-    // Apply saved theme BEFORE paint to avoid flash
     (function () {
       try {
         if (localStorage.getItem('theme') === 'dark') {
@@ -15,10 +14,7 @@
       } catch (e) {}
     })();
   </script>
-  <style>
-    /* Preload prevents white flash before body loads */
-    .dark-preload body { background: #0f172a; }
-  </style>
+  <style>.dark-preload body { background: #0f172a; }</style>
 </head>
 <body class="admin-body">
   <header class="topbar admin-topbar">
@@ -131,15 +127,30 @@
     <section class="admin-panel" id="panel-timetable">
       <div class="panel-head">
         <h2>Timetable</h2>
-        <button class="btn-primary" id="addTTBtn" type="button">+ Add Slot</button>
+        <div style="display:flex; gap:8px; flex-wrap:wrap;">
+          <button class="btn-primary" id="addTTBtn" type="button">+ Add Slot</button>
+          <button class="btn-ghost dark" id="exportTTCsvBtn" type="button">⬇ Export CSV</button>
+        </div>
       </div>
+
+      <div class="tt-grid-wrap">
+        <div class="tt-grid" id="ttGrid"></div>
+      </div>
+
+      <h3 style="margin-top:24px; margin-bottom:12px; color:var(--admin);">All Slots</h3>
       <div class="table-wrap">
         <table id="ttTable">
           <thead>
-            <tr><th>Day</th><th>Time</th><th>Course</th><th>Room</th><th>Trainer</th><th>Actions</th></tr>
+            <tr>
+              <th><input type="checkbox" id="ttSelectAll" /></th>
+              <th>Day</th><th>Time</th><th>Course</th><th>Room</th><th>Trainer</th><th>Actions</th>
+            </tr>
           </thead>
           <tbody></tbody>
         </table>
+      </div>
+      <div style="margin-top:12px;">
+        <button class="btn-xs danger" id="ttBulkDeleteBtn" type="button">Delete Selected</button>
       </div>
     </section>
 
@@ -152,7 +163,7 @@
       <div class="table-wrap">
         <table id="asgTable">
           <thead>
-            <tr><th>Course</th><th>Title</th><th>Due</th><th>Submissions</th><th>Actions</th></tr>
+            <tr><th>Course</th><th>Title</th><th>Due</th><th>Submissions</th><th>Graded</th><th>Actions</th></tr>
           </thead>
           <tbody></tbody>
         </table>
@@ -160,7 +171,6 @@
     </section>
   </main>
 
-  <!-- Modal -->
   <div class="modal-overlay hidden" id="modal" role="dialog" aria-modal="true">
     <div class="modal">
       <h3 id="modalTitle"></h3>

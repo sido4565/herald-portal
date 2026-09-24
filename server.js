@@ -111,12 +111,13 @@ app.get('/api/my-assignments', authStudent, (req, res) => {
   res.json(db.prepare(`
     SELECT a.*, c.code, c.title,
       (SELECT id FROM submissions WHERE assignment_id = a.id AND student_id = ?) AS submission_id,
-      (SELECT grade FROM submissions WHERE assignment_id = a.id AND student_id = ?) AS grade
+      (SELECT grade FROM submissions WHERE assignment_id = a.id AND student_id = ?) AS grade,
+      (SELECT feedback FROM submissions WHERE assignment_id = a.id AND student_id = ?) AS feedback
     FROM assignments a JOIN courses c ON c.id = a.course_id
     JOIN enrollments e ON e.course_id = a.course_id
     WHERE e.student_id = ?
     ORDER BY a.due_date ASC
-  `).all(req.user.id, req.user.id, req.user.id));
+  `).all(req.user.id, req.user.id, req.user.id, req.user.id));
 });
 
 app.post('/api/submit/:assignmentId', authStudent, (req, res) => {
@@ -371,7 +372,8 @@ app.delete('/api/admin/timetable/:id', authAdmin, (req, res) => {
 app.get('/api/admin/assignments', authAdmin, (req, res) => {
   res.json(db.prepare(`
     SELECT a.*, c.code, c.title,
-      (SELECT COUNT(*) FROM submissions WHERE assignment_id = a.id) AS submission_count
+      (SELECT COUNT(*) FROM submissions WHERE assignment_id = a.id) AS submission_count,
+      (SELECT COUNT(*) FROM submissions WHERE assignment_id = a.id AND grade IS NOT NULL AND grade != '') AS graded_count
     FROM assignments a JOIN courses c ON c.id = a.course_id ORDER BY a.id DESC
   `).all());
 });

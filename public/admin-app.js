@@ -8,6 +8,28 @@ const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({
   '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
 }[c]));
 
+// ---------- CSV helpers ----------
+function toCSV(rows) {
+  return rows.map(row =>
+    row.map(cell => {
+      const s = String(cell ?? '');
+      return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+    }).join(',')
+  ).join('\n');
+}
+
+function downloadCSV(filename, csv) {
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+}
+
 // ------------------------------------------------------------
 // Theme
 // ------------------------------------------------------------
@@ -50,16 +72,12 @@ async function api(url, opts = {}) {
     ...opts,
     body: opts.body ? JSON.stringify(opts.body) : undefined
   });
-
-  // Redirect to login on auth failure (except during login itself)
   if (res.status === 401 && !url.includes('/login')) {
     location.href = 'admin-login.html';
     return;
   }
-
   let data = {};
   try { data = await res.json(); } catch (_) {}
-
   if (!res.ok) throw new Error(data.error || `Request failed (${res.status})`);
   return data;
 }
@@ -82,7 +100,6 @@ if ($('#adminLoginForm')) {
     }
   });
 
-  // Theme toggle on login page too (if button exists)
   const tgl = $('#themeToggle');
   if (tgl) tgl.addEventListener('click', toggleTheme);
 }
@@ -93,12 +110,11 @@ if ($('#adminLoginForm')) {
 if ($('#adminName')) {
   let coursesCache = [];
   let studentsCache = [];
+  let ttCache = [];
 
-  // ---- Theme toggle button ----
   const themeBtn = $('#themeToggle');
   if (themeBtn) themeBtn.addEventListener('click', toggleTheme);
 
-  // ---- Boot ----
   (async () => {
     try {
       const me = await api('/api/admin/me');
@@ -106,13 +122,11 @@ if ($('#adminName')) {
       $('#adminRole').textContent = me.role;
     } catch { return; }
 
-    // Logout
     $('#adminLogoutBtn').addEventListener('click', async () => {
       try { await api('/api/admin/logout', { method: 'POST' }); } catch (_) {}
       location.href = 'admin-login.html';
     });
 
-    // Tabs
     $$('.admin-tab').forEach(tab => {
       tab.addEventListener('click', () => {
         $$('.admin-tab').forEach(t => t.classList.remove('active'));
@@ -124,27 +138,18 @@ if ($('#adminName')) {
       });
     });
 
-    // Modal wiring
     $('#modalCancel').addEventListener('click', closeModal);
     $('#modal').addEventListener('click', e => {
       if (e.target.id === 'modal') closeModal();
     });
     document.addEventListener('keydown', e => {
-      if (e.key === 'Escape' && !$('#modal').classList.contains('hidden')) {
-        closeModal();
-      }
+      if (e.key === 'Escape' && !$('#modal').classList.contains('hidden')) closeModal();
     });
 
-    // Panel buttons
     wireButtons();
-
-    // Initial load
     await loadPanel('overview');
   })();
 
-  // ------------------------------------------------------------
-  // Panel dispatch
-  // ------------------------------------------------------------
   async function loadPanel(name) {
     switch (name) {
       case 'overview':      return loadOverview();
@@ -158,21 +163,15 @@ if ($('#adminName')) {
     }
   }
 
-  // Refresh caches (call after any mutation that could affect them)
   async function refreshCaches() {
     coursesCache = await api('/api/admin/courses');
     studentsCache = await api('/api/admin/students');
   }
 
   async function ensureCache() {
-    if (!coursesCache.length || !studentsCache.length) {
-      await refreshCaches();
-    }
+    if (!coursesCache.length || !studentsCache.length) await refreshCaches();
   }
 
-  // ------------------------------------------------------------
-  // Overview
-  // ------------------------------------------------------------
   async function loadOverview() {
     const s = await api('/api/admin/stats');
     $('#statStudents').textContent      = s.students;
@@ -181,18 +180,13 @@ if ($('#adminName')) {
     $('#statAnnouncements').textContent = s.announcements;
   }
 
-  // ------------------------------------------------------------
-  // Modal
-  // ------------------------------------------------------------
   let currentSubmit = null;
-
   function openModal(title, fields, onSubmit) {
     $('#modalTitle').textContent = title;
     const form = $('#modalForm');
     form.innerHTML = fields.map(f => {
       const req = f.required ? 'required' : '';
       const val = f.value ?? '';
-
       if (f.type === 'select') {
         const opts = [
           `<option value="">— Select —</option>`,
@@ -202,16 +196,12 @@ if ($('#adminName')) {
         ].join('');
         return `<label>${esc(f.label)}</label><select name="${esc(f.name)}" ${req}>${opts}</select>`;
       }
-
       if (f.type === 'textarea') {
         return `<label>${esc(f.label)}</label><textarea name="${esc(f.name)}" rows="4" ${req}>${esc(val)}</textarea>`;
       }
-
-      return `<label>${esc(f.label)}</label>
-        <input name="${esc(f.name)}" type="${esc(f.type || 'text')}" value="${esc(val)}" ${req} />`;
+      return `<label>${esc(f.label)}</label><input name="${esc(f.name)}" type="${esc(f.type || 'text')}" value="${esc(val)}" ${req} />`;
     }).join('');
 
-    // Reset any previous handler to avoid leaks
     form.onsubmit = async e => {
       e.preventDefault();
       if (!currentSubmit) return;
@@ -225,9 +215,7 @@ if ($('#adminName')) {
       }
     };
     currentSubmit = onSubmit;
-
     $('#modal').classList.remove('hidden');
-    // Focus first input
     setTimeout(() => form.querySelector('input,select,textarea')?.focus(), 50);
   }
 
@@ -236,9 +224,24 @@ if ($('#adminName')) {
     currentSubmit = null;
   }
 
-  // ------------------------------------------------------------
-  // Wire button listeners (only once)
-  // ------------------------------------------------------------
+  function showCustomModal(title, bodyHtml, onReady) {
+    const overlay = document.createElement('div');
+    overlay.className = 'modal-overlay';
+    overlay.innerHTML = `
+      <div class="modal" style="max-width:720px;">
+        <h3>${title}</h3>
+        ${bodyHtml}
+        <div class="modal-actions">
+          <button class="btn-ghost dark" data-close type="button">Close</button>
+        </div>
+      </div>`;
+    document.body.appendChild(overlay);
+    overlay.addEventListener('click', e => {
+      if (e.target === overlay || e.target.closest('[data-close]')) overlay.remove();
+    });
+    if (onReady) onReady(overlay);
+  }
+
   function wireButtons() {
     // Students
     $('#addStudentBtn').addEventListener('click', () => openModal('Add Student', [
@@ -249,7 +252,7 @@ if ($('#adminName')) {
       { name: 'course',   label: 'Course',          required: true }
     ], async d => {
       await api('/api/admin/students', { method: 'POST', body: d });
-      studentsCache = [];           // invalidate
+      studentsCache = [];
       await loadStudents();
     }));
 
@@ -261,7 +264,7 @@ if ($('#adminName')) {
       { name: 'description', label: 'Description', type: 'textarea' }
     ], async d => {
       await api('/api/admin/courses', { method: 'POST', body: d });
-      coursesCache = [];            // invalidate
+      coursesCache = [];
       await loadCourses();
     }));
 
@@ -276,9 +279,7 @@ if ($('#adminName')) {
 
     // Results
     $('#addResultBtn').addEventListener('click', async () => {
-      try {
-        await ensureCache();
-      } catch (e) { return toast(e.message, 'error'); }
+      try { await ensureCache(); } catch (e) { return toast(e.message, 'error'); }
       openModal('Add Result', [
         { name: 'student_id', label: 'Student', type: 'select', required: true,
           options: studentsCache.map(s => ({ value: s.id, label: `${s.reg_no} — ${s.name}` })) },
@@ -296,9 +297,7 @@ if ($('#adminName')) {
 
     // Fees
     $('#addFeeBtn').addEventListener('click', async () => {
-      try {
-        await ensureCache();
-      } catch (e) { return toast(e.message, 'error'); }
+      try { await ensureCache(); } catch (e) { return toast(e.message, 'error'); }
       openModal('Add Fee Record', [
         { name: 'student_id', label: 'Student', type: 'select', required: true,
           options: studentsCache.map(s => ({ value: s.id, label: `${s.reg_no} — ${s.name}` })) },
@@ -314,9 +313,7 @@ if ($('#adminName')) {
 
     // Timetable
     $('#addTTBtn').addEventListener('click', async () => {
-      try {
-        await ensureCache();
-      } catch (e) { return toast(e.message, 'error'); }
+      try { await ensureCache(); } catch (e) { return toast(e.message, 'error'); }
       openModal('Add Timetable Slot', [
         { name: 'course_id', label: 'Course', type: 'select', required: true,
           options: coursesCache.map(c => ({ value: c.id, label: `${c.code} — ${c.title}` })) },
@@ -329,16 +326,45 @@ if ($('#adminName')) {
         { name: 'trainer', label: 'Trainer' }
       ], async d => {
         d.course_id = Number(d.course_id);
+        const conflict = ttCache.find(t =>
+          t.day === d.day && !(d.end_time <= t.start_time || d.start_time >= t.end_time)
+        );
+        if (conflict) {
+          if (!confirm(`⚠️ Conflict with ${conflict.code} (${conflict.start_time}–${conflict.end_time}). Continue anyway?`)) return;
+        }
         await api('/api/admin/timetable', { method: 'POST', body: d });
         await loadTimetable();
       });
     });
 
+    const exportBtn = $('#exportTTCsvBtn');
+    if (exportBtn) {
+      exportBtn.addEventListener('click', () => {
+        if (!ttCache.length) return toast('No data to export', 'error');
+        const rows = [['Day', 'Start', 'End', 'Code', 'Title', 'Room', 'Trainer']];
+        ttCache.forEach(t => rows.push([t.day, t.start_time, t.end_time, t.code, t.title, t.room, t.trainer]));
+        downloadCSV(`timetable-${Date.now()}.csv`, toCSV(rows));
+        toast('CSV downloaded ✅');
+      });
+    }
+
+    const bulkDel = $('#ttBulkDeleteBtn');
+    if (bulkDel) {
+      bulkDel.addEventListener('click', async () => {
+        const ids = [...document.querySelectorAll('.tt-check:checked')].map(cb => Number(cb.dataset.id));
+        if (!ids.length) return toast('Select at least one slot', 'error');
+        if (!confirm(`Delete ${ids.length} slot(s)?`)) return;
+        try {
+          for (const id of ids) await api(`/api/admin/timetable/${id}`, { method: 'DELETE' });
+          toast(`${ids.length} slot(s) deleted ✅`);
+          await loadTimetable();
+        } catch (e) { toast(e.message, 'error'); }
+      });
+    }
+
     // Assignments
     $('#addAsgBtn').addEventListener('click', async () => {
-      try {
-        await ensureCache();
-      } catch (e) { return toast(e.message, 'error'); }
+      try { await ensureCache(); } catch (e) { return toast(e.message, 'error'); }
       openModal('New Assignment', [
         { name: 'course_id', label: 'Course', type: 'select', required: true,
           options: coursesCache.map(c => ({ value: c.id, label: `${c.code} — ${c.title}` })) },
@@ -353,9 +379,7 @@ if ($('#adminName')) {
     });
   }
 
-  // ------------------------------------------------------------
-  // Students
-  // ------------------------------------------------------------
+  // ---------------- Students ----------------
   async function loadStudents() {
     const rows = await api('/api/admin/students');
     studentsCache = rows;
@@ -373,7 +397,6 @@ if ($('#adminName')) {
           <button class="btn-xs danger" data-act="del-student" data-id="${s.id}" type="button">Delete</button>
         </td>
       </tr>`).join('') || '<tr><td colspan="6" class="empty">No students yet</td></tr>';
-
     wireTableActions(tb);
   }
 
@@ -399,9 +422,7 @@ if ($('#adminName')) {
         if (act === 'del-tt')        return delTT(id);
         if (act === 'view-subs')     return viewSubs(id);
         if (act === 'del-asg')       return delAsg(id);
-      } catch (err) {
-        toast(err.message, 'error');
-      }
+      } catch (err) { toast(err.message, 'error'); }
     });
   }
 
@@ -440,9 +461,7 @@ if ($('#adminName')) {
     } catch (e) { toast(e.message, 'error'); }
   }
 
-  // ------------------------------------------------------------
-  // Courses
-  // ------------------------------------------------------------
+  // ---------------- Courses ----------------
   async function loadCourses() {
     const rows = await api('/api/admin/courses');
     coursesCache = rows;
@@ -459,7 +478,6 @@ if ($('#adminName')) {
           <button class="btn-xs danger" data-act="del-course" data-id="${c.id}" type="button">Delete</button>
         </td>
       </tr>`).join('') || '<tr><td colspan="5" class="empty">No courses yet</td></tr>';
-
     wireTableActions(tb);
   }
 
@@ -499,13 +517,10 @@ if ($('#adminName')) {
           `).join('')}</tbody>
         </table></div>`
       : `<p class="empty">No students enrolled in ${esc(course?.code || 'this course')} yet.</p>`;
-
     showCustomModal(`Students — ${esc(course?.code || '')}`, body);
   }
 
-  // ------------------------------------------------------------
-  // Announcements
-  // ------------------------------------------------------------
+  // ---------------- Announcements ----------------
   async function loadAnnouncements() {
     const list = await api('/api/admin/announcements');
     const wrap = $('#annList');
@@ -521,7 +536,6 @@ if ($('#adminName')) {
           <button class="btn-xs danger" data-act="del-ann" data-id="${a.id}" type="button">Delete</button>
         </div>
       </div>`).join('') || '<p class="empty">No announcements</p>';
-
     wireTableActions(wrap);
   }
 
@@ -547,9 +561,7 @@ if ($('#adminName')) {
     } catch (e) { toast(e.message, 'error'); }
   }
 
-  // ------------------------------------------------------------
-  // Results
-  // ------------------------------------------------------------
+  // ---------------- Results ----------------
   async function loadResults() {
     const rows = await api('/api/admin/results');
     const tb = $('#resultsTable tbody');
@@ -562,7 +574,6 @@ if ($('#adminName')) {
         <td>${esc(r.term)}</td>
         <td><button class="btn-xs danger" data-act="del-result" data-id="${r.id}" type="button">Delete</button></td>
       </tr>`).join('') || '<tr><td colspan="6" class="empty">No results yet</td></tr>';
-
     wireTableActions(tb);
   }
 
@@ -575,10 +586,7 @@ if ($('#adminName')) {
     } catch (e) { toast(e.message, 'error'); }
   }
 
-  // ------------------------------------------------------------
-  // Fees
-  // ------------------------------------------------------------
-    // ---------- Fees ----------
+  // ---------------- Fees ----------------
   async function loadFees() {
     const summary = await api('/api/admin/fees/summary');
     const outstanding = summary.total_due - summary.total_paid;
@@ -632,8 +640,29 @@ if ($('#adminName')) {
           </td>
         </tr>`;
     }).join('') || '<tr><td colspan="7" class="empty">No fee records</td></tr>';
-
     wireTableActions(tb);
+  }
+
+  async function editFee(id) {
+    const rows = await api('/api/admin/fees');
+    const f = rows.find(x => x.id === id);
+    if (!f) return;
+    openModal('Edit Fee', [
+      { name: 'amount_due',  label: 'Amount Due',  type: 'number', value: f.amount_due,  required: true },
+      { name: 'amount_paid', label: 'Amount Paid', type: 'number', value: f.amount_paid }
+    ], async d => {
+      await api(`/api/admin/fees/${id}`, { method: 'PUT', body: d });
+      await loadFees();
+    });
+  }
+
+  async function delFee(id) {
+    if (!confirm('Delete this fee record?')) return;
+    try {
+      await api(`/api/admin/fees/${id}`, { method: 'DELETE' });
+      await loadFees();
+      toast('Fee record deleted');
+    } catch (e) { toast(e.message, 'error'); }
   }
 
   async function payFee(id) {
@@ -641,7 +670,6 @@ if ($('#adminName')) {
     const f = rows.find(x => x.id === id);
     if (!f) return;
     const balance = Number(f.amount_due) - Number(f.amount_paid);
-
     const amountStr = prompt(
       `Record payment for ${f.reg_no} — ${f.student_name}\n` +
       `Term: ${f.term}\n` +
@@ -661,24 +689,110 @@ if ($('#adminName')) {
     } catch (e) { toast(e.message, 'error'); }
   }
 
-  // ------------------------------------------------------------
-  // Assignments
-  // ------------------------------------------------------------
+  // ---------------- Timetable ----------------
+  const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+
+  async function loadTimetable() {
+    ttCache = await api('/api/admin/timetable');
+
+    const grid = $('#ttGrid');
+    if (!grid) return;
+
+    const times = [...new Set(ttCache.map(t => `${t.start_time}-${t.end_time}`))].sort();
+
+    if (!times.length) {
+      grid.innerHTML = '<p class="empty" style="grid-column:1/-1;">No slots scheduled. Click <strong>+ Add Slot</strong> to begin.</p>';
+    } else {
+      let html = '<div class="tt-cell tt-head"></div>';
+      DAYS.forEach(d => { html += `<div class="tt-cell tt-head">${d}</div>`; });
+      times.forEach(timeStr => {
+        const [start, end] = timeStr.split('-');
+        html += `<div class="tt-cell tt-time">${start}<br>${end}</div>`;
+        DAYS.forEach(day => {
+          const slot = ttCache.find(t => t.day === day && `${t.start_time}-${t.end_time}` === timeStr);
+          if (slot) {
+            html += `<div class="tt-cell tt-slot">
+              <div class="tt-slot-code">${esc(slot.code)}</div>
+              <div class="tt-slot-title">${esc(slot.title)}</div>
+              <div class="tt-slot-meta">📍${esc(slot.room || '—')}</div>
+              <div class="tt-slot-meta">👤${esc(slot.trainer || '—')}</div>
+            </div>`;
+          } else {
+            html += '<div class="tt-cell tt-empty">—</div>';
+          }
+        });
+      });
+      grid.innerHTML = html;
+    }
+
+    const tb = $('#ttTable tbody');
+    tb.innerHTML = ttCache.map(t => `
+      <tr>
+        <td><input type="checkbox" class="tt-check" data-id="${t.id}" /></td>
+        <td>${esc(t.day)}</td>
+        <td>${esc(t.start_time)} – ${esc(t.end_time)}</td>
+        <td>${esc(t.code)} — ${esc(t.title)}</td>
+        <td>${esc(t.room || '')}</td>
+        <td>${esc(t.trainer || '')}</td>
+        <td>
+          <button class="btn-xs danger" data-act="del-tt" data-id="${t.id}" type="button">Delete</button>
+        </td>
+      </tr>`).join('') || '<tr><td colspan="7" class="empty">No slots</td></tr>';
+    wireTableActions(tb);
+
+    const selAll = $('#ttSelectAll');
+    if (selAll) {
+      selAll.checked = false;
+      selAll.onclick = () => {
+        document.querySelectorAll('.tt-check').forEach(cb => cb.checked = selAll.checked);
+      };
+    }
+  }
+
+  async function delTT(id) {
+    if (!confirm('Delete this slot?')) return;
+    try {
+      await api(`/api/admin/timetable/${id}`, { method: 'DELETE' });
+      await loadTimetable();
+      toast('Slot deleted');
+    } catch (e) { toast(e.message, 'error'); }
+  }
+
+  // ---------------- Assignments ----------------
   async function loadAssignments() {
     const rows = await api('/api/admin/assignments');
     const tb = $('#asgTable tbody');
-    tb.innerHTML = rows.map(a => `
-      <tr>
-        <td>${esc(a.code)}</td>
-        <td>${esc(a.title)}</td>
-        <td>${esc(a.due_date || '—')}</td>
-        <td>${a.submission_count}</td>
-        <td>
-          <button class="btn-xs" data-act="view-subs" data-id="${a.id}" type="button">Submissions</button>
-          <button class="btn-xs danger" data-act="del-asg" data-id="${a.id}" type="button">Delete</button>
-        </td>
-      </tr>`).join('') || '<tr><td colspan="5" class="empty">No assignments</td></tr>';
 
+    tb.innerHTML = rows.map(a => {
+      const dueBadge = (() => {
+        if (!a.due_date) return '—';
+        const due = new Date(a.due_date);
+        const now = new Date();
+        const days = Math.ceil((due - now) / (1000 * 60 * 60 * 24));
+        if (days < 0)  return `<span class="pill pill-red">Overdue (${-days}d)</span>`;
+        if (days <= 3) return `<span class="pill pill-amber">Due in ${days}d</span>`;
+        return esc(a.due_date);
+      })();
+
+      const subCount = a.submission_count || 0;
+      const gradedCount = a.graded_count || 0;
+      const gradedBadge = subCount
+        ? `<span class="pill ${gradedCount === subCount ? 'pill-green' : 'pill-amber'}">${gradedCount}/${subCount}</span>`
+        : '<span class="pill pill-red">0</span>';
+
+      return `
+        <tr>
+          <td>${esc(a.code)}</td>
+          <td>${esc(a.title)}</td>
+          <td>${dueBadge}</td>
+          <td><strong>${subCount}</strong></td>
+          <td>${gradedBadge}</td>
+          <td>
+            <button class="btn-xs" data-act="view-subs" data-id="${a.id}" type="button">📥 Submissions</button>
+            <button class="btn-xs danger" data-act="del-asg" data-id="${a.id}" type="button">Delete</button>
+          </td>
+        </tr>`;
+    }).join('') || '<tr><td colspan="6" class="empty">No assignments</td></tr>';
     wireTableActions(tb);
   }
 
@@ -693,60 +807,81 @@ if ($('#adminName')) {
 
   async function viewSubs(id) {
     const subs = await api(`/api/admin/assignments/${id}/submissions`);
-    if (!subs.length) {
-      showCustomModal('Submissions', '<p class="empty">No submissions yet.</p>');
-      return;
-    }
-    const body = `<div style="max-height:60vh; overflow:auto; margin-top:12px;">
-      ${subs.map(s => `
-        <div class="sub-card">
-          <strong>${esc(s.reg_no)} — ${esc(s.student_name)}</strong>
-          <p>${esc(s.content || '(no content)')}</p>
-          <div class="sub-meta">
-            Grade:
-            <input class="grade-input" data-sub-id="${s.id}" value="${esc(s.grade || '')}" placeholder="—" />
-            <button class="btn-xs" data-save-grade="${s.id}" type="button">Save</button>
+    const assignments = await api('/api/admin/assignments');
+    const asg = assignments.find(a => a.id === id);
+    const title = asg ? `${esc(asg.code)} — ${esc(asg.title)}` : 'Submissions';
+
+    const body = subs.length
+      ? `
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; flex-wrap:wrap; gap:8px;">
+          <span class="pill pill-amber">${subs.length} submission(s)</span>
+          <div style="display:flex; gap:6px;">
+            <button class="btn-xs" data-export-subs type="button">⬇ CSV</button>
+            <button class="btn-xs" data-save-all type="button">💾 Save All</button>
           </div>
-        </div>`).join('')}
-    </div>`;
-    showCustomModal(`Submissions (${subs.length})`, body);
-  }
-
-  // ------------------------------------------------------------
-  // Custom modal helper (for read-only panels like submissions list)
-  // ------------------------------------------------------------
-  function showCustomModal(title, bodyHtml) {
-    const overlay = document.createElement('div');
-    overlay.className = 'modal-overlay';
-    overlay.innerHTML = `
-      <div class="modal" style="max-width:640px;">
-        <h3>${title}</h3>
-        ${bodyHtml}
-        <div class="modal-actions">
-          <button class="btn-ghost dark" data-close type="button">Close</button>
         </div>
-      </div>`;
-    document.body.appendChild(overlay);
+        <div style="max-height:60vh; overflow:auto;">
+          ${subs.map(s => `
+            <div class="sub-card" data-sub="${s.id}">
+              <div class="sub-head">
+                <strong>${esc(s.reg_no)} — ${esc(s.student_name)}</strong>
+                <span class="sub-date">${new Date(s.submitted_at).toLocaleString()}</span>
+              </div>
+              <div class="sub-content">${esc(s.content || '(no content)')}</div>
+              <div class="sub-grade-row">
+                <div>
+                  <label>Grade</label>
+                  <input class="grade-input" data-field="grade" data-id="${s.id}" value="${esc(s.grade || '')}" placeholder="A" />
+                </div>
+                <div style="flex:1;">
+                  <label>Feedback</label>
+                  <input class="feedback-input" data-field="feedback" data-id="${s.id}" value="${esc(s.feedback || '')}" placeholder="Optional feedback…" />
+                </div>
+                <button class="btn-xs" data-save-one="${s.id}" type="button">Save</button>
+              </div>
+            </div>
+          `).join('')}
+        </div>`
+      : '<p class="empty">No submissions yet.</p>';
 
-    overlay.addEventListener('click', async e => {
-      if (e.target === overlay || e.target.closest('[data-close]')) {
-        overlay.remove();
-        return;
-      }
-      const saveBtn = e.target.closest('[data-save-grade]');
-      if (saveBtn) {
-        const subId = Number(saveBtn.dataset.saveGrade);
-        const input = overlay.querySelector(`.grade-input[data-sub-id="${subId}"]`);
-        try {
-          await api(`/api/admin/submissions/${subId}`, {
-            method: 'PUT',
-            body: { grade: input.value }
-          });
-          toast('Grade saved ✅');
-        } catch (err) {
-          toast(err.message, 'error');
+    showCustomModal(title, body, overlay => {
+      overlay.addEventListener('click', async e => {
+        const saveOne = e.target.closest('[data-save-one]');
+        const saveAll = e.target.closest('[data-save-all]');
+        const exportBtn = e.target.closest('[data-export-subs]');
+
+        if (saveOne) {
+          const subId = Number(saveOne.dataset.saveOne);
+          const grade = overlay.querySelector(`[data-field="grade"][data-id="${subId}"]`).value;
+          const feedback = overlay.querySelector(`[data-field="feedback"][data-id="${subId}"]`).value;
+          try {
+            await api(`/api/admin/submissions/${subId}`, { method: 'PUT', body: { grade, feedback } });
+            toast('Saved ✅');
+          } catch (err) { toast(err.message, 'error'); }
         }
-      }
+
+        if (saveAll) {
+          try {
+            for (const s of subs) {
+              const grade = overlay.querySelector(`[data-field="grade"][data-id="${s.id}"]`).value;
+              const feedback = overlay.querySelector(`[data-field="feedback"][data-id="${s.id}"]`).value;
+              await api(`/api/admin/submissions/${s.id}`, { method: 'PUT', body: { grade, feedback } });
+            }
+            toast('All saved ✅');
+          } catch (err) { toast(err.message, 'error'); }
+        }
+
+        if (exportBtn) {
+          const rows = [['Reg No', 'Name', 'Submitted', 'Content', 'Grade', 'Feedback']];
+          subs.forEach(s => rows.push([
+            s.reg_no, s.student_name, s.submitted_at, s.content || '',
+            overlay.querySelector(`[data-field="grade"][data-id="${s.id}"]`).value,
+            overlay.querySelector(`[data-field="feedback"][data-id="${s.id}"]`).value
+          ]));
+          downloadCSV(`submissions-${id}-${Date.now()}.csv`, toCSV(rows));
+          toast('CSV downloaded ✅');
+        }
+      });
     });
   }
 }

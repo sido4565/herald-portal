@@ -1,6 +1,5 @@
 /* ===================================================================
-   Herald Trainer Consultant — Students Portal
-   Full stylesheet: Student portal + Admin panel + Dark mode + Toasts
+   Herald Trainer Consultant — Full stylesheet
    =================================================================== */
 
 /* ---------- Theme Tokens ---------- */
@@ -36,8 +35,6 @@ body.dark {
 }
 body.dark .topbar { background: #1e293b; }
 body.dark .admin-topbar { background: #431407; }
-body.dark th { color: var(--muted); }
-body.dark tr:hover td { background: rgba(255, 255, 255, 0.03); }
 body.dark .modal { background: #1e293b; color: var(--text); }
 body.dark .modal-form input,
 body.dark .modal-form select,
@@ -52,7 +49,7 @@ body.dark .btn-xs.danger { background: #7f1d1d; color: #fecaca; }
 body.dark .btn-xs.danger:hover { background: #991b1b; }
 body.dark .auth-form input { background: #0f172a; color: var(--text); }
 body.dark .hint code { background: #334155; }
-body.dark .grade-input { background: #0f172a; color: var(--text); }
+body.dark .grade-input, body.dark .feedback-input { background: #0f172a; color: var(--text); }
 body.dark .sub-card { background: #0f172a; }
 body.dark .pill-green { background: #052e16; color: #86efac; }
 body.dark .pill-red { background: #450a0a; color: #fca5a5; }
@@ -62,7 +59,6 @@ body.dark .btn-ghost.dark:hover { background: #0f172a; }
 
 /* ---------- Reset ---------- */
 * { box-sizing: border-box; margin: 0; padding: 0; }
-
 body {
   font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
   background: var(--bg);
@@ -70,12 +66,11 @@ body {
   min-height: 100vh;
   transition: background .2s, color .2s;
 }
-
 a { color: var(--primary-light); text-decoration: none; }
 a:hover { text-decoration: underline; }
 
 /* ===================================================================
-   AUTH PAGES (Student + Admin login)
+   AUTH PAGES
    =================================================================== */
 .auth-body {
   display: flex;
@@ -84,7 +79,6 @@ a:hover { text-decoration: underline; }
   background: linear-gradient(135deg, #1e3a8a 0%, #3b82f6 100%);
   padding: 20px;
 }
-
 .admin-auth { background: linear-gradient(135deg, #7c2d12 0%, #dc2626 100%); }
 
 .auth-card {
@@ -95,7 +89,6 @@ a:hover { text-decoration: underline; }
   max-width: 420px;
   box-shadow: var(--shadow-lg);
 }
-
 .auth-card h1 { font-size: 26px; text-align: center; }
 .subtitle { text-align: center; color: var(--muted); margin: 6px 0 24px; font-size: 14px; }
 
@@ -170,7 +163,7 @@ a:hover { text-decoration: underline; }
 .hidden { display: none !important; }
 
 /* ===================================================================
-   TOPBAR (Student + Admin)
+   TOPBAR
    =================================================================== */
 .topbar {
   background: var(--primary);
@@ -212,7 +205,6 @@ a:hover { text-decoration: underline; }
   font-weight: 600;
 }
 
-/* Dark mode toggle button in topbar */
 .theme-toggle {
   background: transparent;
   border: 1px solid rgba(255, 255, 255, 0.4);
@@ -230,7 +222,6 @@ a:hover { text-decoration: underline; }
    CONTAINER & LAYOUT
    =================================================================== */
 .container { max-width: 1100px; margin: 0 auto; padding: 24px; }
-
 .hero { margin-bottom: 24px; }
 .hero h2 { font-size: 24px; margin-bottom: 4px; }
 .hero p { color: var(--muted); }
@@ -240,7 +231,6 @@ a:hover { text-decoration: underline; }
   grid-template-columns: 1fr 1fr;
   gap: 20px;
 }
-
 .card {
   background: var(--card);
   padding: 20px;
@@ -279,10 +269,11 @@ th {
 }
 table { min-width: 600px; }
 tr:hover td { background: rgba(0, 0, 0, 0.02); }
+body.dark tr:hover td { background: rgba(255, 255, 255, 0.03); }
 .empty { text-align: center; color: var(--muted); padding: 24px !important; }
 
 /* ===================================================================
-   BUTTONS (small)
+   BUTTONS
    =================================================================== */
 .btn-enroll {
   background: var(--primary-light);
@@ -313,6 +304,23 @@ tr:hover td { background: rgba(0, 0, 0, 0.02); }
 .btn-xs:hover { background: #cbd5e1; }
 .btn-xs.danger { background: #fee2e2; color: #991b1b; }
 .btn-xs.danger:hover { background: #fecaca; }
+
+.btn-pay {
+  background: #dcfce7;
+  color: #166534;
+  border: none;
+  padding: 5px 10px;
+  border-radius: 6px;
+  font-size: 12px;
+  cursor: pointer;
+  font-family: inherit;
+  font-weight: 600;
+  margin-right: 4px;
+  transition: background .15s;
+}
+.btn-pay:hover { background: #bbf7d0; }
+body.dark .btn-pay { background: #052e16; color: #86efac; }
+body.dark .btn-pay:hover { background: #064e3b; }
 
 /* ===================================================================
    ADMIN PANEL
@@ -363,9 +371,6 @@ body.dark .admin-panel h2 { color: #fca5a5; }
   font-size: 14px;
 }
 
-/* ===================================================================
-   STATS
-   =================================================================== */
 .stats-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
@@ -392,7 +397,7 @@ body.dark .stat-num { color: #fca5a5; }
 }
 
 /* ===================================================================
-   PILLS / BADGES
+   PILLS
    =================================================================== */
 .pill {
   padding: 3px 10px;
@@ -407,7 +412,7 @@ body.dark .stat-num { color: #fca5a5; }
 .pill-amber { background: #fef3c7; color: #92400e; }
 
 /* ===================================================================
-   ANNOUNCEMENTS (admin)
+   ANNOUNCEMENTS
    =================================================================== */
 .ann-admin-list { display: flex; flex-direction: column; gap: 12px; }
 .ann-card {
@@ -499,25 +504,177 @@ body.dark .modal h3 { color: #fca5a5; }
 .btn-ghost.dark:hover { background: var(--bg); }
 
 /* ===================================================================
-   SUBMISSIONS (admin assignments)
+   FEES — Student view
    =================================================================== */
-.sub-card {
+.fees-summary { margin-bottom: 16px; }
+.fee-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+}
+.fee-summary-item {
   background: var(--bg);
   padding: 12px;
   border-radius: var(--radius-sm);
-  margin-bottom: 10px;
+  text-align: center;
 }
-.sub-card p { color: var(--muted); margin: 6px 0; font-size: 13px; }
-.sub-meta { font-size: 13px; margin-top: 8px; }
+.fee-summary-lbl {
+  font-size: 11px;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 4px;
+}
+.fee-summary-num {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--text);
+}
+.fee-summary-num.success { color: var(--success); }
+.fee-summary-num.danger  { color: var(--danger); }
+
+.fees-summary-bar {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 12px;
+  margin-bottom: 20px;
+}
+.fees-summary-bar .stat-card {
+  padding: 16px;
+  border-left-color: var(--primary-light);
+}
+.fees-summary-bar .stat-num { font-size: 22px; color: var(--primary); }
+body.dark .fees-summary-bar .stat-num { color: #93c5fd; }
+
+/* ===================================================================
+   TIMETABLE GRID (admin)
+   =================================================================== */
+.tt-grid-wrap {
+  overflow-x: auto;
+  background: var(--card);
+  padding: 12px;
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-sm);
+}
+.tt-grid {
+  display: grid;
+  grid-template-columns: 90px repeat(6, minmax(130px, 1fr));
+  gap: 6px;
+  min-width: 900px;
+}
+.tt-cell {
+  padding: 8px;
+  border-radius: 6px;
+  font-size: 12px;
+  min-height: 60px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  text-align: center;
+}
+.tt-head {
+  background: var(--admin);
+  color: white;
+  font-weight: 700;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  min-height: auto;
+  padding: 10px 6px;
+}
+.tt-time {
+  background: var(--bg);
+  color: var(--muted);
+  font-weight: 600;
+  font-size: 11px;
+  line-height: 1.3;
+}
+.tt-slot {
+  background: #dbeafe;
+  border-left: 3px solid var(--primary-light);
+  align-items: flex-start;
+  justify-content: flex-start;
+  text-align: left;
+  gap: 2px;
+  padding: 8px;
+}
+body.dark .tt-slot { background: #1e3a8a; color: #dbeafe; }
+.tt-slot-code { font-weight: 700; font-size: 12px; color: var(--primary); }
+body.dark .tt-slot-code { color: #93c5fd; }
+.tt-slot-title { font-size: 11px; color: var(--text); }
+.tt-slot-meta { font-size: 10px; color: var(--muted); }
+.tt-empty {
+  background: transparent;
+  color: var(--border);
+  font-size: 16px;
+}
+
+/* ===================================================================
+   SUBMISSIONS PANEL
+   =================================================================== */
+.sub-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 6px;
+}
+.sub-date {
+  font-size: 11px;
+  color: var(--muted);
+}
+.sub-content {
+  background: var(--bg);
+  padding: 10px;
+  border-radius: 6px;
+  font-size: 13px;
+  color: var(--text);
+  margin: 8px 0;
+  white-space: pre-wrap;
+  word-break: break-word;
+  max-height: 150px;
+  overflow: auto;
+}
+body.dark .sub-content { background: #0f172a; }
+.sub-grade-row {
+  display: flex;
+  gap: 8px;
+  align-items: flex-end;
+  flex-wrap: wrap;
+  margin-top: 8px;
+}
+.sub-grade-row label {
+  display: block;
+  font-size: 11px;
+  color: var(--muted);
+  font-weight: 600;
+  margin-bottom: 3px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
 .grade-input {
-  width: 60px;
-  padding: 4px 8px;
+  width: 70px;
+  padding: 6px 10px;
   border: 1px solid var(--border);
   border-radius: 6px;
-  margin: 0 6px;
   font-family: inherit;
   background: var(--card);
   color: var(--text);
+  font-size: 13px;
+  text-align: center;
+  font-weight: 700;
+}
+.feedback-input {
+  width: 100%;
+  padding: 6px 10px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  font-family: inherit;
+  background: var(--card);
+  color: var(--text);
+  font-size: 13px;
 }
 
 /* ===================================================================
@@ -562,6 +719,9 @@ body.dark .modal h3 { color: #fca5a5; }
   .admin-tab { padding: 6px 10px; font-size: 12px; }
   .modal { padding: 20px; }
   .toast-wrap { top: 10px; right: 10px; left: 10px; max-width: none; }
+  .tt-grid { grid-template-columns: 80px repeat(6, minmax(110px, 1fr)); }
+  .sub-grade-row { flex-direction: column; align-items: stretch; }
+  .grade-input { width: 100%; }
 }
 
 @media (max-width: 480px) {
@@ -570,68 +730,5 @@ body.dark .modal h3 { color: #fca5a5; }
   .stat-num { font-size: 26px; }
   .admin-panel h2 { font-size: 18px; }
   .panel-head .btn-primary { width: 100%; }
-}
-
-/* ===================================================================
-   FEES — Student view
-   =================================================================== */
-.fees-summary { margin-bottom: 16px; }
-.fee-summary-grid {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 8px;
-}
-.fee-summary-item {
-  background: var(--bg);
-  padding: 12px;
-  border-radius: var(--radius-sm);
-  text-align: center;
-}
-.fee-summary-lbl {
-  font-size: 11px;
-  color: var(--muted);
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-  margin-bottom: 4px;
-}
-.fee-summary-num {
-  font-size: 16px;
-  font-weight: 700;
-  color: var(--text);
-}
-.fee-summary-num.success { color: var(--success); }
-.fee-summary-num.danger  { color: var(--danger); }
-
-.fees-summary-bar {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-  gap: 12px;
-  margin-bottom: 20px;
-}
-.fees-summary-bar .stat-card {
-  padding: 16px;
-  border-left-color: var(--primary-light);
-}
-.fees-summary-bar .stat-num { font-size: 22px; color: var(--primary); }
-body.dark .fees-summary-bar .stat-num { color: #93c5fd; }
-
-.btn-pay {
-  background: #dcfce7;
-  color: #166534;
-  border: none;
-  padding: 5px 10px;
-  border-radius: 6px;
-  font-size: 12px;
-  cursor: pointer;
-  font-family: inherit;
-  font-weight: 600;
-  margin-right: 4px;
-  transition: background .15s;
-}
-.btn-pay:hover { background: #bbf7d0; }
-body.dark .btn-pay { background: #052e16; color: #86efac; }
-body.dark .btn-pay:hover { background: #064e3b; }
-
-@media (max-width: 480px) {
   .fee-summary-grid { grid-template-columns: 1fr; }
 }
