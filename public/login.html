@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Herald Portal — Login</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body class="auth-body">
+  <div class="auth-card">
+    <h1>🎓 Herald Portal</h1>
+    <p class="subtitle">Trainer Consultant Students Portal</p>
+
+    <div class="tabs">
+      <button class="tab active" data-tab="login">Login</button>
+      <button class="tab" data-tab="register">Register</button>
+    </div>
+
+    <!-- Login Form -->
+    <form id="loginForm" class="auth-form">
+      <label>Registration Number</label>
+      <input name="reg_no" placeholder="e.g. STU001" required />
+      <label>Password</label>
+      <input name="password" type="password" required />
+      <button type="submit" class="btn-primary">Sign In</button>
+      <p class="hint">Demo: <code>STU001</code> / <code>password123</code></p>
+    </form>
+
+    <!-- Register Form -->
+    <form id="registerForm" class="auth-form hidden">
+      <label>Registration Number</label>
+      <input name="reg_no" required />
+      <label>Full Name</label>
+      <input name="name" required />
+      <label>Email</label>
+      <input name="email" type="email" required />
+      <label>Course</label>
+      <input name="course" required />
+      <label>Password</label>
+      <input name="password" type="password" minlength="6" required />
+      <button type="submit" class="btn-primary">Create Account</button>
+    </form>
+
+    <p id="authMsg" class="msg"></p>
+  </div>
+  <script src="app.js"></script>
+</body>
+</html>

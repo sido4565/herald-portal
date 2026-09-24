@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Herald Portal — Dashboard</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">🎓 Herald Portal</div>
+    <div class="user-box">
+      <span id="userName">…</span>
+      <button id="logoutBtn" class="btn-ghost">Logout</button>
+    </div>
+  </header>
+
+  <main class="container">
+    <section class="hero">
+      <h2>Welcome back, <span id="welcomeName"></span> 👋</h2>
+      <p>Reg No: <strong id="regNo"></strong> • <span id="studentCourse"></span></p>
+    </section>
+
+    <div class="grid">
+      <section class="card">
+        <h3>📢 Announcements</h3>
+        <ul id="announcements" class="list"></ul>
+      </section>
+
+      <section class="card">
+        <h3>📚 Available Courses</h3>
+        <ul id="courses" class="list"></ul>
+      </section>
+
+      <section class="card wide">
+        <h3>📊 My Results</h3>
+        <table id="resultsTable">
+          <thead>
+            <tr><th>Code</th><th>Course</th><th>Term</th><th>Marks</th><th>Grade</th></tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </section>
+    </div>
+  </main>
+
+  <script src="app.js"></script>
+</body>
+</html>
