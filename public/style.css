@@ -571,3 +571,67 @@ body.dark .modal h3 { color: #fca5a5; }
   .admin-panel h2 { font-size: 18px; }
   .panel-head .btn-primary { width: 100%; }
 }
+
+/* ===================================================================
+   FEES — Student view
+   =================================================================== */
+.fees-summary { margin-bottom: 16px; }
+.fee-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+}
+.fee-summary-item {
+  background: var(--bg);
+  padding: 12px;
+  border-radius: var(--radius-sm);
+  text-align: center;
+}
+.fee-summary-lbl {
+  font-size: 11px;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 4px;
+}
+.fee-summary-num {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--text);
+}
+.fee-summary-num.success { color: var(--success); }
+.fee-summary-num.danger  { color: var(--danger); }
+
+.fees-summary-bar {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 12px;
+  margin-bottom: 20px;
+}
+.fees-summary-bar .stat-card {
+  padding: 16px;
+  border-left-color: var(--primary-light);
+}
+.fees-summary-bar .stat-num { font-size: 22px; color: var(--primary); }
+body.dark .fees-summary-bar .stat-num { color: #93c5fd; }
+
+.btn-pay {
+  background: #dcfce7;
+  color: #166534;
+  border: none;
+  padding: 5px 10px;
+  border-radius: 6px;
+  font-size: 12px;
+  cursor: pointer;
+  font-family: inherit;
+  font-weight: 600;
+  margin-right: 4px;
+  transition: background .15s;
+}
+.btn-pay:hover { background: #bbf7d0; }
+body.dark .btn-pay { background: #052e16; color: #86efac; }
+body.dark .btn-pay:hover { background: #064e3b; }
+
+@media (max-width: 480px) {
+  .fee-summary-grid { grid-template-columns: 1fr; }
+}

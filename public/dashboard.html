@@ -5,13 +5,24 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Herald Portal — Dashboard</title>
   <link rel="stylesheet" href="style.css" />
+  <script>
+    (function () {
+      try {
+        if (localStorage.getItem('theme') === 'dark') {
+          document.documentElement.classList.add('dark-preload');
+        }
+      } catch (e) {}
+    })();
+  </script>
+  <style>.dark-preload body { background: #0f172a; }</style>
 </head>
 <body>
   <header class="topbar">
     <div class="brand">🎓 Herald Portal</div>
     <div class="user-box">
       <span id="userName">…</span>
-      <button id="logoutBtn" class="btn-ghost">Logout</button>
+      <button class="theme-toggle" id="themeToggle" title="Toggle dark mode" type="button">🌓</button>
+      <button id="logoutBtn" class="btn-ghost" type="button">Logout</button>
     </div>
   </header>
 
@@ -28,22 +39,41 @@
       </section>
 
       <section class="card">
+        <h3>💰 My Fees</h3>
+        <div id="feesSummary" class="fees-summary"></div>
+        <ul id="feesList" class="list"></ul>
+      </section>
+
+      <section class="card">
         <h3>📚 Available Courses</h3>
         <ul id="courses" class="list"></ul>
       </section>
 
+      <section class="card">
+        <h3>📅 My Timetable</h3>
+        <ul id="timetable" class="list"></ul>
+      </section>
+
       <section class="card wide">
         <h3>📊 My Results</h3>
-        <table id="resultsTable">
-          <thead>
-            <tr><th>Code</th><th>Course</th><th>Term</th><th>Marks</th><th>Grade</th></tr>
-          </thead>
-          <tbody></tbody>
-        </table>
+        <div class="table-wrap">
+          <table id="resultsTable">
+            <thead>
+              <tr><th>Code</th><th>Course</th><th>Term</th><th>Marks</th><th>Grade</th></tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="card wide">
+        <h3>📝 My Assignments</h3>
+        <ul id="assignments" class="list"></ul>
       </section>
     </div>
   </main>
 
+  <div id="toastWrap" class="toast-wrap"></div>
   <script src="app.js"></script>
 </body>
 </html>

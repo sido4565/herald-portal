@@ -293,6 +293,20 @@ app.get('/api/admin/fees', authAdmin, (req, res) => {
   `).all());
 });
 
+app.get('/api/admin/fees/summary', authAdmin, (req, res) => {
+  const row = db.prepare(`
+    SELECT
+      COALESCE(SUM(amount_due), 0) AS total_due,
+      COALESCE(SUM(amount_paid), 0) AS total_paid,
+      COUNT(*) AS records,
+      SUM(CASE WHEN status = 'paid' THEN 1 ELSE 0 END) AS paid_count,
+      SUM(CASE WHEN status = 'partial' THEN 1 ELSE 0 END) AS partial_count,
+      SUM(CASE WHEN status = 'unpaid' THEN 1 ELSE 0 END) AS unpaid_count
+    FROM fees
+  `).get();
+  res.json(row);
+});
+
 app.post('/api/admin/fees', authAdmin, (req, res) => {
   const { student_id, term, amount_due, amount_paid } = req.body;
   if (!student_id || !term || amount_due == null) return res.status(400).json({ error: 'Required fields missing' });
@@ -310,6 +324,18 @@ app.put('/api/admin/fees/:id', authAdmin, (req, res) => {
   db.prepare('UPDATE fees SET amount_due = ?, amount_paid = ?, status = ?, paid_at = ? WHERE id = ?')
     .run(due, paid, status, paid > 0 ? new Date().toISOString() : null, req.params.id);
   res.json({ ok: true });
+});
+
+app.post('/api/admin/fees/:id/pay', authAdmin, (req, res) => {
+  const { amount } = req.body;
+  if (!amount || Number(amount) <= 0) return res.status(400).json({ error: 'Amount must be > 0' });
+  const fee = db.prepare('SELECT * FROM fees WHERE id = ?').get(req.params.id);
+  if (!fee) return res.status(404).json({ error: 'Fee record not found' });
+  const newPaid = Number(fee.amount_paid) + Number(amount);
+  const status = newPaid >= fee.amount_due ? 'paid' : (newPaid > 0 ? 'partial' : 'unpaid');
+  db.prepare('UPDATE fees SET amount_paid = ?, status = ?, paid_at = ? WHERE id = ?')
+    .run(newPaid, status, new Date().toISOString(), req.params.id);
+  res.json({ ok: true, new_paid: newPaid, status });
 });
 
 app.delete('/api/admin/fees/:id', authAdmin, (req, res) => {

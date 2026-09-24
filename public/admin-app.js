@@ -395,6 +395,7 @@ if ($('#adminName')) {
         if (act === 'del-result')    return delResult(id);
         if (act === 'edit-fee')      return editFee(id);
         if (act === 'del-fee')       return delFee(id);
+        if (act === 'pay-fee')       return payFee(id);
         if (act === 'del-tt')        return delTT(id);
         if (act === 'view-subs')     return viewSubs(id);
         if (act === 'del-asg')       return delAsg(id);
@@ -577,7 +578,38 @@ if ($('#adminName')) {
   // ------------------------------------------------------------
   // Fees
   // ------------------------------------------------------------
+    // ---------- Fees ----------
   async function loadFees() {
+    const summary = await api('/api/admin/fees/summary');
+    const outstanding = summary.total_due - summary.total_paid;
+
+    let bar = document.querySelector('.fees-summary-bar');
+    if (!bar) {
+      bar = document.createElement('div');
+      bar.className = 'fees-summary-bar';
+      const panel = document.querySelector('#panel-fees');
+      const tableWrap = panel.querySelector('.table-wrap');
+      panel.insertBefore(bar, tableWrap);
+    }
+    bar.innerHTML = `
+      <div class="stat-card">
+        <div class="stat-num">KES ${Number(summary.total_due).toLocaleString()}</div>
+        <div class="stat-lbl">Total Due</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-num" style="color:#16a34a;">KES ${Number(summary.total_paid).toLocaleString()}</div>
+        <div class="stat-lbl">Collected</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-num" style="color:#dc2626;">KES ${Number(outstanding).toLocaleString()}</div>
+        <div class="stat-lbl">Outstanding</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-num">${summary.records}</div>
+        <div class="stat-lbl">Records</div>
+      </div>
+    `;
+
     const rows = await api('/api/admin/fees');
     const tb = $('#feesTable tbody');
     tb.innerHTML = rows.map(f => {
@@ -594,6 +626,7 @@ if ($('#adminName')) {
           <td>${balance.toLocaleString()}</td>
           <td><span class="pill ${pillCls}">${esc(f.status)}</span></td>
           <td>
+            ${f.status !== 'paid' ? `<button class="btn-pay" data-act="pay-fee" data-id="${f.id}" type="button">💵 Pay</button>` : ''}
             <button class="btn-xs" data-act="edit-fee" data-id="${f.id}" type="button">Edit</button>
             <button class="btn-xs danger" data-act="del-fee" data-id="${f.id}" type="button">Delete</button>
           </td>
@@ -603,53 +636,28 @@ if ($('#adminName')) {
     wireTableActions(tb);
   }
 
-  async function editFee(id) {
+  async function payFee(id) {
     const rows = await api('/api/admin/fees');
     const f = rows.find(x => x.id === id);
     if (!f) return;
-    openModal('Edit Fee', [
-      { name: 'amount_due',  label: 'Amount Due',  type: 'number', value: f.amount_due,  required: true },
-      { name: 'amount_paid', label: 'Amount Paid', type: 'number', value: f.amount_paid }
-    ], async d => {
-      await api(`/api/admin/fees/${id}`, { method: 'PUT', body: d });
-      await loadFees();
-    });
-  }
+    const balance = Number(f.amount_due) - Number(f.amount_paid);
 
-  async function delFee(id) {
-    if (!confirm('Delete this fee record?')) return;
+    const amountStr = prompt(
+      `Record payment for ${f.reg_no} — ${f.student_name}\n` +
+      `Term: ${f.term}\n` +
+      `Balance: KES ${balance.toLocaleString()}\n\n` +
+      `Enter payment amount:`
+    );
+    if (amountStr === null) return;
+    const amount = Number(amountStr);
+    if (!amount || amount <= 0) return toast('Invalid amount', 'error');
+    if (amount > balance) {
+      if (!confirm(`Amount exceeds balance (KES ${balance.toLocaleString()}). Continue anyway?`)) return;
+    }
     try {
-      await api(`/api/admin/fees/${id}`, { method: 'DELETE' });
+      await api(`/api/admin/fees/${id}/pay`, { method: 'POST', body: { amount } });
+      toast('Payment recorded ✅');
       await loadFees();
-      toast('Fee record deleted');
-    } catch (e) { toast(e.message, 'error'); }
-  }
-
-  // ------------------------------------------------------------
-  // Timetable
-  // ------------------------------------------------------------
-  async function loadTimetable() {
-    const rows = await api('/api/admin/timetable');
-    const tb = $('#ttTable tbody');
-    tb.innerHTML = rows.map(t => `
-      <tr>
-        <td>${esc(t.day)}</td>
-        <td>${esc(t.start_time)} – ${esc(t.end_time)}</td>
-        <td>${esc(t.code)} — ${esc(t.title)}</td>
-        <td>${esc(t.room || '')}</td>
-        <td>${esc(t.trainer || '')}</td>
-        <td><button class="btn-xs danger" data-act="del-tt" data-id="${t.id}" type="button">Delete</button></td>
-      </tr>`).join('') || '<tr><td colspan="6" class="empty">No slots</td></tr>';
-
-    wireTableActions(tb);
-  }
-
-  async function delTT(id) {
-    if (!confirm('Delete this slot?')) return;
-    try {
-      await api(`/api/admin/timetable/${id}`, { method: 'DELETE' });
-      await loadTimetable();
-      toast('Slot deleted');
     } catch (e) { toast(e.message, 'error'); }
   }
 
