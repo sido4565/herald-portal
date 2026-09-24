@@ -166,7 +166,7 @@ async function loadDashboard() {
       : '<tr><td colspan="5" class="empty">No results published yet.</td></tr>';
   } catch (e) { console.error(e); }
 
-  // Fees
+    // Fees
   try {
     const feeRes = await fetch('/api/my-fees');
     const fees = await feeRes.json();
@@ -189,7 +189,9 @@ async function loadDashboard() {
           <div class="fee-summary-lbl">Balance</div>
           <div class="fee-summary-num ${balance > 0 ? 'danger' : 'success'}">KES ${balance.toLocaleString()}</div>
         </div>
-      </div>`;
+      </div>
+      ${balance > 0 ? renderPaymentBox() : ''}
+    `;
 
     document.getElementById('feesList').innerHTML = fees.length
       ? fees.map(f => {
@@ -263,41 +265,205 @@ async function loadDashboard() {
 // ---------- Fee receipt (printable) ----------
 function printReceipt(feeId, term, due, paid) {
   const balance = Number(due) - Number(paid);
-  const win = window.open('', '_blank', 'width=440,height=640');
+  const win = window.open('', '_blank', 'width=460,height=720');
   win.document.write(`
     <!DOCTYPE html>
     <html>
     <head>
       <title>Fee Receipt &mdash; ${esc(term)}</title>
       <style>
-        body { font-family: 'Inter', -apple-system, sans-serif; padding: 32px; max-width: 360px; margin: auto; color: #1a1f2e; }
-        h1 { text-align: center; font-size: 15px; font-weight: 700; margin-bottom: 4px; letter-spacing: 0.02em; }
-        .sub { text-align: center; color: #6b7280; font-size: 11px; margin-bottom: 24px; text-transform: uppercase; letter-spacing: 0.08em; }
-        .row { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #e5e8ed; font-size: 13px; }
-        .row.total { border-top: 2px solid #1a1f2e; border-bottom: 2px solid #1a1f2e; margin-top: 10px; font-weight: 700; padding: 10px 0; }
-        .lbl { color: #6b7280; font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; }
-        .footer { text-align: center; font-size: 11px; color: #6b7280; margin-top: 32px; padding-top: 20px; border-top: 1px solid #e5e8ed; }
-        @media print { body { padding: 0; } }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+          font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+          padding: 32px 28px;
+          max-width: 400px;
+          margin: auto;
+          color: #1a1f2e;
+          font-size: 12.5px;
+          line-height: 1.5;
+        }
+        .letterhead {
+          text-align: center;
+          padding-bottom: 16px;
+          border-bottom: 3px double #1a1f2e;
+          margin-bottom: 20px;
+        }
+        .letterhead h1 {
+          font-size: 14px;
+          font-weight: 700;
+          letter-spacing: 0.04em;
+          text-transform: uppercase;
+          margin-bottom: 4px;
+        }
+        .letterhead .tagline {
+          font-size: 10px;
+          color: #6b7280;
+          text-transform: uppercase;
+          letter-spacing: 0.12em;
+        }
+        .doc-title {
+          text-align: center;
+          font-size: 11px;
+          font-weight: 700;
+          text-transform: uppercase;
+          letter-spacing: 0.15em;
+          color: #6b7280;
+          margin-bottom: 20px;
+        }
+        .row {
+          display: flex;
+          justify-content: space-between;
+          padding: 7px 0;
+          border-bottom: 1px solid #e5e8ed;
+        }
+        .row .lbl {
+          color: #6b7280;
+          font-size: 10px;
+          text-transform: uppercase;
+          letter-spacing: 0.06em;
+          font-weight: 600;
+        }
+        .row .val { font-weight: 500; font-family: 'SF Mono', Menlo, monospace; font-size: 12px; }
+        .section-lbl {
+          font-size: 10px;
+          font-weight: 700;
+          text-transform: uppercase;
+          letter-spacing: 0.1em;
+          color: #6b7280;
+          margin: 20px 0 8px;
+          padding-bottom: 6px;
+          border-bottom: 1px solid #e5e8ed;
+        }
+        .row.total {
+          border-top: 2px solid #1a1f2e;
+          border-bottom: 2px solid #1a1f2e;
+          margin-top: 8px;
+          font-weight: 700;
+          padding: 10px 0;
+          font-size: 13px;
+        }
+        .row.total .lbl { color: #1a1f2e; }
+        .payment-block {
+          background: #f5f6f8;
+          border-left: 3px solid #b8860b;
+          padding: 12px 14px;
+          margin-top: 20px;
+          border-radius: 3px;
+        }
+        .payment-block .pb-title {
+          font-size: 10px;
+          font-weight: 700;
+          text-transform: uppercase;
+          letter-spacing: 0.1em;
+          color: #b8860b;
+          margin-bottom: 8px;
+        }
+        .payment-block .pb-row {
+          display: flex;
+          justify-content: space-between;
+          font-size: 11.5px;
+          padding: 3px 0;
+        }
+        .payment-block .pb-row .lbl {
+          color: #6b7280;
+          font-size: 10px;
+          text-transform: uppercase;
+          letter-spacing: 0.05em;
+          font-weight: 600;
+        }
+        .payment-block .pb-row .val {
+          font-family: 'SF Mono', Menlo, monospace;
+          font-weight: 700;
+          color: #1a1f2e;
+        }
+        .footer {
+          text-align: center;
+          font-size: 10.5px;
+          color: #6b7280;
+          margin-top: 24px;
+          padding-top: 16px;
+          border-top: 1px solid #e5e8ed;
+          line-height: 1.6;
+        }
+        .footer strong { color: #1a1f2e; }
+        @media print {
+          body { padding: 16px; }
+          .no-print { display: none; }
+        }
       </style>
     </head>
     <body>
-      <h1>Herald Trainer Consultant</h1>
-      <div class="sub">Official Fee Receipt</div>
-      <div class="row"><span class="lbl">Receipt No.</span><span>HR-${String(feeId).padStart(5, '0')}</span></div>
-      <div class="row"><span class="lbl">Date Issued</span><span>${new Date().toLocaleDateString()}</span></div>
-      <div class="row"><span class="lbl">Term</span><span>${esc(term)}</span></div>
-      <div style="margin-top:16px;"></div>
-      <div class="row"><span class="lbl">Amount Due</span><span>KES ${Number(due).toLocaleString()}</span></div>
-      <div class="row"><span class="lbl">Amount Paid</span><span>KES ${Number(paid).toLocaleString()}</span></div>
-      <div class="row total"><span>Balance</span><span>KES ${balance.toLocaleString()}</span></div>
-      <div class="footer">
-        Thank you for your payment.<br>
-        This is a computer-generated receipt.
+      <div class="letterhead">
+        <h1>Herald Trainer and Consultant</h1>
+        <div class="tagline">Training &middot; Consulting &middot; Excellence</div>
       </div>
+
+      <div class="doc-title">Official Fee Receipt</div>
+
+      <div class="row"><span class="lbl">Receipt No.</span><span class="val">HR-${String(feeId).padStart(5, '0')}</span></div>
+      <div class="row"><span class="lbl">Date Issued</span><span class="val">${new Date().toLocaleDateString()}</span></div>
+      <div class="row"><span class="lbl">Term</span><span class="val">${esc(term)}</span></div>
+
+      <div class="section-lbl">Fee Breakdown</div>
+      <div class="row"><span class="lbl">Amount Due</span><span class="val">KES ${Number(due).toLocaleString()}</span></div>
+      <div class="row"><span class="lbl">Amount Paid</span><span class="val">KES ${Number(paid).toLocaleString()}</span></div>
+      <div class="row total"><span class="lbl">Balance</span><span class="val">KES ${balance.toLocaleString()}</span></div>
+
+      <div class="payment-block">
+        <div class="pb-title">Payment Details</div>
+        <div class="pb-row"><span class="lbl">Bank</span><span class="val">KCB Bank Kenya</span></div>
+        <div class="pb-row"><span class="lbl">Paybill No.</span><span class="val">522522</span></div>
+        <div class="pb-row"><span class="lbl">Account No.</span><span class="val">1279021640</span></div>
+        <div class="pb-row"><span class="lbl">Account Name</span><span class="val" style="font-size:10.5px;">HERALD TRAINER AND CONSULTANT</span></div>
+      </div>
+
+      <div class="footer">
+        <strong>Thank you for your payment.</strong><br>
+        This is a computer-generated receipt and does not require a signature.<br>
+        For inquiries, contact the accounts office.
+      </div>
+
       <script>window.onload = () => window.print();<\/script>
     </body>
     </html>`);
   win.document.close();
+}
+
+// ---------- Payment details (KCB) ----------
+const PAYMENT = {
+  bank: 'KCB Bank Kenya',
+  paybill: '522522',
+  account: '1279021640',
+  name: 'HERALD TRAINER AND CONSULTANT'
+};
+
+function renderPaymentBox() {
+  return `
+    <div class="payment-box">
+      <div class="payment-box-head">
+        <span class="payment-box-title">Payment Instructions</span>
+        <span class="payment-box-bank">${PAYMENT.bank}</span>
+      </div>
+      <div class="payment-grid">
+        <div class="payment-field">
+          <span class="payment-field-lbl">Paybill Number</span>
+          <span class="payment-field-val paybill">${PAYMENT.paybill}</span>
+        </div>
+        <div class="payment-field">
+          <span class="payment-field-lbl">Account Number</span>
+          <span class="payment-field-val">${PAYMENT.account}</span>
+        </div>
+        <div class="payment-field">
+          <span class="payment-field-lbl">Account Name</span>
+          <span class="payment-field-val" style="font-size:12px; letter-spacing:0.01em;">${PAYMENT.name}</span>
+        </div>
+      </div>
+      <div class="payment-note">
+        Use your <strong>registration number</strong> as the payment reference where required.
+        Retain your M-Pesa confirmation SMS as proof of payment. Contact the accounts office
+        if your payment is not reflected within 24 hours.
+      </div>
+    </div>`;
 }
 
 // ---------- Assignment submission ----------

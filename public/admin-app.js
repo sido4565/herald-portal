@@ -586,6 +586,22 @@ if ($('#adminName')) {
     const summary = await api('/api/admin/fees/summary');
     const outstanding = summary.total_due - summary.total_paid;
 
+        // Payment info banner (rendered once)
+    let banner = document.querySelector('.payment-banner');
+    if (!banner) {
+      banner = document.createElement('div');
+      banner.className = 'payment-banner';
+      const panel = document.querySelector('#panel-fees');
+      const head = panel.querySelector('.panel-head');
+      head.insertAdjacentElement('afterend', banner);
+    }
+    banner.innerHTML = `
+      <span><strong>Payment Collection:</strong> KCB Bank Kenya</span>
+      <span class="payment-inline"><span class="lbl">Paybill</span>522522</span>
+      <span class="payment-inline"><span class="lbl">Account</span>1279021640</span>
+      <span class="payment-inline"><span class="lbl">Name</span>HERALD TRAINER AND CONSULTANT</span>
+    `;
+
     let bar = document.querySelector('.fees-summary-bar');
     if (!bar) {
       bar = document.createElement('div');
