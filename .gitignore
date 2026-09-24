@@ -71,3 +71,4 @@ ls -la .gitignore .env.example public/favicon.svg
 echo ""
 echo "═══ Ready to commit ═══"
 git status -s
+echo "uploads/" >> /workspaces/herald-portal/.gitignore

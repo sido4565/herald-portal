@@ -252,10 +252,13 @@ async function loadDashboard() {
                 </p>
               </div>
             </div>
-            <div style="margin-top:8px;">
+                        <div style="margin-top:8px; display:flex; gap:8px; flex-wrap:wrap; align-items:center;">
               <button class="btn-xs" onclick="submitAssignment(${a.id})">
-                ${a.submission_id ? 'Edit Submission' : 'Submit'}
+                ${a.submission_id ? 'Update Submission' : 'Submit'}
               </button>
+              ${a.submission_id
+                ? `<a class="pdf-link" href="/api/submission/${a.submission_id}/file" target="_blank" rel="noopener">View PDF</a>`
+                : ''}
             </div>
           </li>`).join('')
       : '<li style="color:var(--muted);">No assignments posted.</li>';
@@ -466,23 +469,117 @@ function renderPaymentBox() {
     </div>`;
 }
 
-// ---------- Assignment submission ----------
-async function submitAssignment(assignmentId) {
-  const content = prompt('Enter your submission (text or answer):');
-  if (content === null) return;
-  if (!content.trim()) return alert('Submission cannot be empty.');
-  try {
-    const res = await fetch(`/api/submit/${assignmentId}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ content })
-    });
-    if (!res.ok) throw new Error('Submission failed');
-    toast('Submitted successfully.');
-    setTimeout(() => location.reload(), 800);
-  } catch (e) {
-    toast(e.message, 'error');
-  }
+// ---------- Assignment submission (with PDF upload) ----------
+function submitAssignment(assignmentId) {
+  // Build custom modal
+  const overlay = document.createElement('div');
+  overlay.className = 'modal-overlay';
+  overlay.innerHTML = `
+    <div class="modal" style="max-width:520px;">
+      <h3>Submit Assignment</h3>
+      <form id="uploadForm" class="modal-form" enctype="multipart/form-data">
+        <label for="sub-content">Submission Notes (optional)</label>
+        <textarea id="sub-content" name="content" rows="4" placeholder="Add any notes or comments..."></textarea>
+
+        <label>PDF File (max 10MB)</label>
+        <label class="file-upload" id="fileDrop" for="fileInput">
+          <div class="file-upload-icon">Click to upload or drag &amp; drop</div>
+          <div class="file-upload-hint">Only PDF files &middot; Max 10 MB</div>
+          <div class="file-upload-filename" id="fileName" style="display:none;"></div>
+          <input type="file" id="fileInput" name="file" accept="application/pdf,.pdf" />
+        </label>
+
+        <p class="hint" style="text-align:left; margin-top:4px;">
+          You can submit text, a PDF, or both. Files are stored securely on the server.
+        </p>
+      </form>
+      <div class="modal-actions">
+        <button class="btn-ghost dark" type="button" data-cancel>Cancel</button>
+        <button class="btn-primary" type="submit" form="uploadForm">Submit</button>
+      </div>
+    </div>`;
+  document.body.appendChild(overlay);
+
+  const form = overlay.querySelector('#uploadForm');
+  const fileInput = overlay.querySelector('#fileInput');
+  const fileDrop = overlay.querySelector('#fileDrop');
+  const fileNameEl = overlay.querySelector('#fileName');
+
+  // File selection UI
+  fileInput.addEventListener('change', () => {
+    const f = fileInput.files[0];
+    if (!f) return;
+    if (f.type !== 'application/pdf' && !f.name.toLowerCase().endsWith('.pdf')) {
+      alert('Only PDF files are allowed.');
+      fileInput.value = '';
+      return;
+    }
+    if (f.size > 10 * 1024 * 1024) {
+      alert('File is too large. Maximum size is 10 MB.');
+      fileInput.value = '';
+      return;
+    }
+    fileNameEl.textContent = f.name;
+    fileNameEl.style.display = 'block';
+    fileDrop.classList.add('has-file');
+    fileDrop.querySelector('.file-upload-icon').textContent = 'File attached';
+  });
+
+  // Drag & drop
+  ['dragover', 'dragenter'].forEach(ev =>
+    fileDrop.addEventListener(ev, e => {
+      e.preventDefault();
+      fileDrop.classList.add('has-file');
+    })
+  );
+  ['dragleave', 'drop'].forEach(ev =>
+    fileDrop.addEventListener(ev, e => {
+      e.preventDefault();
+      if (ev === 'dragleave') fileDrop.classList.remove('has-file');
+    })
+  );
+  fileDrop.addEventListener('drop', e => {
+    const f = e.dataTransfer.files[0];
+    if (!f) return;
+    if (f.type !== 'application/pdf' && !f.name.toLowerCase().endsWith('.pdf')) {
+      return alert('Only PDF files are allowed.');
+    }
+    const dt = new DataTransfer();
+    dt.items.add(f);
+    fileInput.files = dt.files;
+    fileInput.dispatchEvent(new Event('change'));
+  });
+
+  overlay.addEventListener('click', e => {
+    if (e.target === overlay || e.target.closest('[data-cancel]')) overlay.remove();
+  });
+
+  form.addEventListener('submit', async e => {
+    e.preventDefault();
+    const submitBtn = overlay.querySelector('button[type="submit"][form="uploadForm"]');
+    submitBtn.classList.add('btn-loading');
+    submitBtn.disabled = true;
+
+    try {
+      const fd = new FormData(form);
+      const res = await fetch(`/api/submit/${assignmentId}`, {
+        method: 'POST',
+        body: fd
+        // NOTE: do NOT set Content-Type — browser sets multipart boundary
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || 'Submission failed');
+      }
+      overlay.remove();
+      toast('Assignment submitted successfully.');
+      setTimeout(() => location.reload(), 800);
+    } catch (err) {
+      submitBtn.classList.remove('btn-loading');
+      submitBtn.disabled = false;
+      toast(err.message, 'error');
+    }
+  });
 }
 
 // ---------- Auto-logout after 30 min inactivity ----------

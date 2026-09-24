@@ -4,6 +4,8 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const path = require('path');
 const db = require('./database');
+const multer = require('multer');
+const fs = require('fs');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -12,6 +14,37 @@ const JWT_SECRET = process.env.JWT_SECRET || 'herald-dev-secret-change-me';
 app.use(express.json());
 app.use(cookieParser());
 app.use(express.static(path.join(__dirname, 'public')));
+
+// ---------- File uploads ----------
+const UPLOAD_DIR = process.env.UPLOAD_DIR || path.join(__dirname, 'uploads');
+if (!fs.existsSync(UPLOAD_DIR)) fs.mkdirSync(UPLOAD_DIR, { recursive: true });
+
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => cb(null, UPLOAD_DIR),
+  filename: (req, file, cb) => {
+    const safe = file.originalname.replace(/[^a-zA-Z0-9._-]/g, '_');
+    cb(null, `${Date.now()}-${req.user.id}-${safe}`);
+  }
+});
+
+const upload = multer({
+  storage,
+  limits: { fileSize: 10 * 1024 * 1024 }, // 10 MB
+  fileFilter: (req, file, cb) => {
+    if (file.mimetype !== 'application/pdf') {
+      return cb(new Error('Only PDF files are allowed'));
+    }
+    cb(null, true);
+  }
+});
+
+// Serve uploaded PDFs (protected — only authenticated users via /api route)
+app.use('/uploads', express.static(UPLOAD_DIR, {
+  setHeaders: (res) => {
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', 'inline');
+  }
+}));
 
 // ---------- Auth helpers ----------
 const signStudent = s => jwt.sign({ id: s.id, reg: s.reg_no, type: 'student' }, JWT_SECRET, { expiresIn: '7d' });
@@ -112,24 +145,76 @@ app.get('/api/my-assignments', authStudent, (req, res) => {
     SELECT a.*, c.code, c.title,
       (SELECT id FROM submissions WHERE assignment_id = a.id AND student_id = ?) AS submission_id,
       (SELECT grade FROM submissions WHERE assignment_id = a.id AND student_id = ?) AS grade,
-      (SELECT feedback FROM submissions WHERE assignment_id = a.id AND student_id = ?) AS feedback
+      (SELECT feedback FROM submissions WHERE assignment_id = a.id AND student_id = ?) AS feedback,
+      (SELECT file_name FROM submissions WHERE assignment_id = a.id AND student_id = ?) AS file_name
     FROM assignments a JOIN courses c ON c.id = a.course_id
     JOIN enrollments e ON e.course_id = a.course_id
     WHERE e.student_id = ?
     ORDER BY a.due_date ASC
-  `).all(req.user.id, req.user.id, req.user.id, req.user.id));
+  `).all(req.user.id, req.user.id, req.user.id, req.user.id, req.user.id));
 });
 
-app.post('/api/submit/:assignmentId', authStudent, (req, res) => {
-  const { content } = req.body;
+app.post('/api/submit/:assignmentId', authStudent, upload.single('file'), (req, res) => {
   const aid = Number(req.params.assignmentId);
-  const existing = db.prepare('SELECT id FROM submissions WHERE assignment_id = ? AND student_id = ?').get(aid, req.user.id);
-  if (existing) {
-    db.prepare('UPDATE submissions SET content = ?, submitted_at = CURRENT_TIMESTAMP WHERE id = ?').run(content, existing.id);
-  } else {
-    db.prepare('INSERT INTO submissions (assignment_id, student_id, content) VALUES (?, ?, ?)').run(aid, req.user.id, content);
+  const content = (req.body.content || '').trim();
+  const filePath = req.file ? `/uploads/${req.file.filename}` : null;
+  const fileName = req.file ? req.file.originalname : null;
+
+  if (!content && !filePath) {
+    return res.status(400).json({ error: 'Provide text and/or a PDF file' });
   }
-  res.json({ ok: true });
+
+  const existing = db.prepare('SELECT * FROM submissions WHERE assignment_id = ? AND student_id = ?').get(aid, req.user.id);
+
+  if (existing) {
+    // Delete old file if replacing
+    if (existing.file_path && filePath && existing.file_path !== filePath) {
+      const oldPath = path.join(__dirname, existing.file_path);
+      if (fs.existsSync(oldPath)) fs.unlinkSync(oldPath);
+    }
+    db.prepare(`
+      UPDATE submissions
+      SET content = ?,
+          file_path = COALESCE(?, file_path),
+          file_name = COALESCE(?, file_name),
+          submitted_at = CURRENT_TIMESTAMP
+      WHERE id = ?
+    `).run(content, filePath, fileName, existing.id);
+  } else {
+    db.prepare(`
+      INSERT INTO submissions (assignment_id, student_id, content, file_path, file_name)
+      VALUES (?, ?, ?, ?, ?)
+    `).run(aid, req.user.id, content, filePath, fileName);
+  }
+
+  res.json({ ok: true, has_file: !!filePath });
+});
+
+app.get('/api/submission/:id/file', authStudent, (req, res) => {
+  const sub = db.prepare(`
+    SELECT sub.*, a.student_id AS owner_id
+    FROM submissions sub
+    JOIN assignments a ON a.id = sub.assignment_id
+    WHERE sub.id = ?
+  `).get(req.params.id);
+  if (!sub || !sub.file_path) return res.status(404).json({ error: 'No file' });
+  if (sub.student_id !== req.user.id) return res.status(403).json({ error: 'Not yours' });
+
+  const fullPath = path.join(__dirname, sub.file_path);
+  if (!fs.existsSync(fullPath)) return res.status(404).json({ error: 'File missing' });
+  res.setHeader('Content-Type', 'application/pdf');
+  res.setHeader('Content-Disposition', `inline; filename="${sub.file_name || 'submission.pdf'}"`);
+  fs.createReadStream(fullPath).pipe(res);
+});
+
+app.get('/api/admin/submission/:id/file', authAdmin, (req, res) => {
+  const sub = db.prepare('SELECT * FROM submissions WHERE id = ?').get(req.params.id);
+  if (!sub || !sub.file_path) return res.status(404).json({ error: 'No file' });
+  const fullPath = path.join(__dirname, sub.file_path);
+  if (!fs.existsSync(fullPath)) return res.status(404).json({ error: 'File missing' });
+  res.setHeader('Content-Type', 'application/pdf');
+  res.setHeader('Content-Disposition', `inline; filename="${sub.file_name || 'submission.pdf'}"`);
+  fs.createReadStream(fullPath).pipe(res);
 });
 
 // ==================== ADMIN ROUTES ====================
@@ -366,7 +451,8 @@ app.get('/api/admin/assignments', authAdmin, (req, res) => {
   res.json(db.prepare(`
     SELECT a.*, c.code, c.title,
       (SELECT COUNT(*) FROM submissions WHERE assignment_id = a.id) AS submission_count,
-      (SELECT COUNT(*) FROM submissions WHERE assignment_id = a.id AND grade IS NOT NULL AND grade != '') AS graded_count
+      (SELECT COUNT(*) FROM submissions WHERE assignment_id = a.id AND grade IS NOT NULL AND grade != '') AS graded_count,
+      (SELECT COUNT(*) FROM submissions WHERE assignment_id = a.id AND file_path IS NOT NULL) AS file_count
     FROM assignments a JOIN courses c ON c.id = a.course_id ORDER BY a.id DESC
   `).all());
 });

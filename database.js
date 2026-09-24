@@ -107,6 +107,8 @@ CREATE TABLE IF NOT EXISTS submissions (
   assignment_id INTEGER NOT NULL,
   student_id INTEGER NOT NULL,
   content TEXT,
+  file_path TEXT,
+  file_name TEXT,
   submitted_at DATETIME DEFAULT CURRENT_TIMESTAMP,
   grade TEXT,
   feedback TEXT,
@@ -114,6 +116,15 @@ CREATE TABLE IF NOT EXISTS submissions (
   FOREIGN KEY(student_id) REFERENCES students(id)
 );
 `);
+
+// ---------- Safe migrations for existing DBs ----------
+try {
+  db.prepare('SELECT file_path FROM submissions LIMIT 1').get();
+} catch (e) {
+  console.log('🔄 Migrating: adding file_path, file_name to submissions');
+  db.exec('ALTER TABLE submissions ADD COLUMN file_path TEXT');
+  db.exec('ALTER TABLE submissions ADD COLUMN file_name TEXT');
+}
 
 function seed() {
   const courseCount = db.prepare('SELECT COUNT(*) AS c FROM courses').get().c;

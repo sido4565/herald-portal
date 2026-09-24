@@ -769,7 +769,7 @@ if ($('#adminName')) {
     } catch (e) { toast(e.message, 'error'); }
   }
 
-  // ---------------- Assignments ----------------
+    // ---------------- Assignments ----------------
   async function loadAssignments() {
     const rows = await api('/api/admin/assignments');
     const tb = $('#asgTable tbody');
@@ -787,6 +787,8 @@ if ($('#adminName')) {
 
       const subCount = a.submission_count || 0;
       const gradedCount = a.graded_count || 0;
+      const fileCount = a.file_count || 0;
+
       const gradedBadge = subCount
         ? `<span class="pill ${gradedCount === subCount ? 'pill-green' : 'pill-amber'}">${gradedCount}/${subCount}</span>`
         : '<span class="pill pill-red">0</span>';
@@ -796,7 +798,7 @@ if ($('#adminName')) {
           <td>${esc(a.code)}</td>
           <td>${esc(a.title)}</td>
           <td>${dueBadge}</td>
-          <td><strong>${subCount}</strong></td>
+          <td><strong>${subCount}</strong>${fileCount ? ` <span class="pill pill-green" style="font-size:9px;">${fileCount} PDF</span>` : ''}</td>
           <td>${gradedBadge}</td>
           <td>
             <button class="btn-xs" data-act="view-subs" data-id="${a.id}" type="button">View Submissions</button>
@@ -816,7 +818,7 @@ if ($('#adminName')) {
     } catch (e) { toast(e.message, 'error'); }
   }
 
-  async function viewSubs(id) {
+    async function viewSubs(id) {
     const subs = await api(`/api/admin/assignments/${id}/submissions`);
     const assignments = await api('/api/admin/assignments');
     const asg = assignments.find(a => a.id === id);
@@ -828,17 +830,29 @@ if ($('#adminName')) {
           <span class="pill pill-amber">${subs.length} submission(s)</span>
           <div style="display:flex; gap:6px;">
             <button class="btn-xs" data-export-subs type="button">Export CSV</button>
-            <button class="btn-xs" data-save-all type="button">Save All</button>
+            <button class="btn-xs" data-save-all type="button">Save All Grades</button>
           </div>
         </div>
-        <div style="max-height:60vh; overflow:auto;">
+        <div style="max-height:65vh; overflow:auto;">
           ${subs.map(s => `
             <div class="sub-card" data-sub="${s.id}">
               <div class="sub-head">
                 <strong>${esc(s.reg_no)} — ${esc(s.student_name)}</strong>
                 <span class="sub-date">${new Date(s.submitted_at).toLocaleString()}</span>
               </div>
-              <div class="sub-content">${esc(s.content || '(no content)')}</div>
+
+              ${s.file_path ? `
+                <div style="margin:10px 0;">
+                  <a class="pdf-link"
+                     href="/api/admin/submission/${s.id}/file"
+                     target="_blank"
+                     rel="noopener">${esc(s.file_name || 'submission.pdf')}</a>
+                </div>
+              ` : ''}
+
+              ${s.content ? `<div class="sub-content">${esc(s.content)}</div>` : ''}
+              ${!s.content && !s.file_path ? '<p style="color:var(--muted); font-size:12px; font-style:italic;">(No content or file submitted)</p>' : ''}
+
               <div class="sub-grade-row">
                 <div>
                   <label>Grade</label>
@@ -883,9 +897,10 @@ if ($('#adminName')) {
         }
 
         if (exportBtn) {
-          const rows = [['Reg No', 'Name', 'Submitted', 'Content', 'Grade', 'Feedback']];
+          const rows = [['Reg No', 'Name', 'Submitted', 'Content', 'PDF File', 'Grade', 'Feedback']];
           subs.forEach(s => rows.push([
             s.reg_no, s.student_name, s.submitted_at, s.content || '',
+            s.file_name || (s.file_path ? 'PDF' : ''),
             overlay.querySelector(`[data-field="grade"][data-id="${s.id}"]`).value,
             overlay.querySelector(`[data-field="feedback"][data-id="${s.id}"]`).value
           ]));
