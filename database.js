@@ -217,7 +217,7 @@ if (ENABLED) {
   } catch (err) {
     console.error('⚠️  Auto-backup failed:', err.message);
   }
-}, 10 * 60 * 1000);
+}, 2 * 60 * 1000);
 
   // Final backup on shutdown
   const shutdown = async (signal) => {
