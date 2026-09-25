@@ -47,7 +47,6 @@ function getClient() {
     expiry_date: tokens.expiry_date,
   });
 
-  // Auto-save refreshed tokens
   oauth2Client.on('tokens', (newTokens) => {
     const merged = { ...tokens, ...newTokens };
     const tokenPath = path.join(__dirname, '.gdrive-tokens', 'tokens.json');
@@ -72,6 +71,17 @@ async function findFileId(drive) {
   });
   const files = res.data.files || [];
   return files.length ? files[0] : null;
+}
+
+// ---------- Snapshot via better-sqlite3 ----------
+// Creates a consistent copy of the DB even in WAL mode
+async function createSnapshot(db, snapshotPath) {
+  if (typeof db.backup !== 'function') {
+    // Fallback for older better-sqlite3
+    throw new Error('better-sqlite3 backup() not available — upgrade to >=8.0.0');
+  }
+  await db.backup(snapshotPath);
+  return snapshotPath;
 }
 
 // ---------- Public API ----------
@@ -122,10 +132,7 @@ async function downloadBackup(localPath) {
 
   await new Promise((resolve, reject) => {
     const dest = fs.createWriteStream(localPath);
-    res.data
-      .on('end', resolve)
-      .on('error', reject)
-      .pipe(dest);
+    res.data.on('end', resolve).on('error', reject).pipe(dest);
   });
 
   const size = fs.statSync(localPath).size;
@@ -144,4 +151,4 @@ async function remoteExists() {
   }
 }
 
-module.exports = { uploadBackup, downloadBackup, remoteExists, ENABLED };
+module.exports = { uploadBackup, downloadBackup, remoteExists, createSnapshot, ENABLED };

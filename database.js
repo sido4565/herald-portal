@@ -29,7 +29,7 @@ const DB_PATH = path.join(DATA_DIR, 'herald.db');
 })();
 
 const db = new Database(DB_PATH);
-db.pragma('journal_mode = WAL');
+db.pragma('journal_mode = DELETE');
 
 console.log(`📁 Database: ${DB_PATH}`);
 
@@ -206,17 +206,13 @@ seed();
 if (ENABLED) {
   setInterval(async () => {
   try {
-    // Force WAL flush + fsync
-    db.pragma('wal_checkpoint(TRUNCATE)');
-    const fd = fs.openSync(DB_PATH, 'r+');
-    fs.fsyncSync(fd);
-    fs.closeSync(fd);
-    await new Promise(r => setTimeout(r, 200));
-
-    const stats = fs.statSync(DB_PATH);
-    console.log(`📊 [auto] DB size: ${stats.size} bytes`);
-
-    const result = await uploadBackup(DB_PATH);
+    const snapshotPath = path.join('/tmp', `herald-auto-${Date.now()}.db`);
+    const { createSnapshot, uploadBackup } = require('./backup');
+    await createSnapshot(db, snapshotPath);
+    const stats = fs.statSync(snapshotPath);
+    console.log(`📊 [auto] Snapshot size: ${stats.size} bytes`);
+    const result = await uploadBackup(snapshotPath);
+    fs.unlinkSync(snapshotPath);
     if (result.ok) console.log(`☁️  Auto-backup uploaded @ ${new Date().toISOString()}`);
   } catch (err) {
     console.error('⚠️  Auto-backup failed:', err.message);
@@ -227,18 +223,18 @@ if (ENABLED) {
   const shutdown = async (signal) => {
   console.log(`\n${signal} received — backing up before exit...`);
   try {
-    db.pragma('wal_checkpoint(TRUNCATE)');
-    const fd = fs.openSync(DB_PATH, 'r+');
-    fs.fsyncSync(fd);
-    fs.closeSync(fd);
-    await new Promise(r => setTimeout(r, 200));
-    await uploadBackup(DB_PATH);
+    const snapshotPath = path.join('/tmp', `herald-exit-${Date.now()}.db`);
+    const { createSnapshot, uploadBackup } = require('./backup');
+    await createSnapshot(db, snapshotPath);
+    await uploadBackup(snapshotPath);
+    fs.unlinkSync(snapshotPath);
     console.log('✅ Final backup saved');
   } catch (err) {
     console.error('⚠️  Final backup failed:', err.message);
   }
   process.exit(0);
 };
+
   process.on('SIGTERM', () => shutdown('SIGTERM'));
   process.on('SIGINT', () => shutdown('SIGINT'));
 }
