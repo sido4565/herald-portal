@@ -167,7 +167,6 @@ app.post('/api/submit/:assignmentId', authStudent, upload.single('file'), (req, 
   const existing = db.prepare('SELECT * FROM submissions WHERE assignment_id = ? AND student_id = ?').get(aid, req.user.id);
 
   if (existing) {
-    // Delete old file if replacing
     if (existing.file_path && filePath && existing.file_path !== filePath) {
       const oldPath = path.join(__dirname, existing.file_path);
       if (fs.existsSync(oldPath)) fs.unlinkSync(oldPath);
@@ -241,6 +240,20 @@ app.get('/api/admin/stats', authAdmin, (req, res) => {
     enrollments: db.prepare('SELECT COUNT(*) AS c FROM enrollments').get().c,
     announcements: db.prepare('SELECT COUNT(*) AS c FROM announcements').get().c
   });
+});
+
+// ---------- Manual backup trigger ----------
+app.post('/api/admin/backup', authAdmin, async (req, res) => {
+  try {
+    const { uploadBackup, ENABLED } = require('./backup');
+    if (!ENABLED) return res.status(400).json({ error: 'Backup not configured' });
+    const DB_PATH = path.join(process.env.DATA_DIR || __dirname, 'herald.db');
+    db.pragma('wal_checkpoint(TRUNCATE)');
+    const result = await uploadBackup(DB_PATH);
+    res.json({ ok: true, size: result.size, at: new Date().toISOString() });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 app.get('/api/admin/students', authAdmin, (req, res) => {
