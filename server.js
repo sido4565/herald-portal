@@ -247,11 +247,34 @@ app.post('/api/admin/backup', authAdmin, async (req, res) => {
   try {
     const { uploadBackup, ENABLED } = require('./backup');
     if (!ENABLED) return res.status(400).json({ error: 'Backup not configured' });
+
     const DB_PATH = path.join(process.env.DATA_DIR || __dirname, 'herald.db');
+
+    // 1. Force WAL checkpoint — merge -wal file into main DB
     db.pragma('wal_checkpoint(TRUNCATE)');
+
+    // 2. Explicit fsync — ensure bytes reach disk before reading
+    const fd = fs.openSync(DB_PATH, 'r+');
+    fs.fsyncSync(fd);
+    fs.closeSync(fd);
+
+    // 3. Small delay to let the filesystem settle
+    await new Promise(r => setTimeout(r, 200));
+
+    // 4. Log actual file size for diagnostics
+    const stats = fs.statSync(DB_PATH);
+    console.log(`📊 DB size before upload: ${stats.size} bytes, mtime: ${stats.mtime.toISOString()}`);
+
+    // 5. Upload
     const result = await uploadBackup(DB_PATH);
-    res.json({ ok: true, size: result.size, at: new Date().toISOString() });
+    res.json({
+      ok: true,
+      size: result.size,
+      file_size: stats.size,
+      at: new Date().toISOString()
+    });
   } catch (err) {
+    console.error('Backup error:', err);
     res.status(500).json({ error: err.message });
   }
 });

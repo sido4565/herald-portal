@@ -205,27 +205,40 @@ seed();
 // ---------- Auto-backup every 10 minutes ----------
 if (ENABLED) {
   setInterval(async () => {
-    try {
-      db.pragma('wal_checkpoint(TRUNCATE)');
-      const result = await uploadBackup(DB_PATH);
-      if (result.ok) console.log(`☁️  Backup uploaded @ ${new Date().toISOString()}`);
-    } catch (err) {
-      console.error('⚠️  Backup failed:', err.message);
-    }
-  }, 10 * 60 * 1000);
+  try {
+    // Force WAL flush + fsync
+    db.pragma('wal_checkpoint(TRUNCATE)');
+    const fd = fs.openSync(DB_PATH, 'r+');
+    fs.fsyncSync(fd);
+    fs.closeSync(fd);
+    await new Promise(r => setTimeout(r, 200));
+
+    const stats = fs.statSync(DB_PATH);
+    console.log(`📊 [auto] DB size: ${stats.size} bytes`);
+
+    const result = await uploadBackup(DB_PATH);
+    if (result.ok) console.log(`☁️  Auto-backup uploaded @ ${new Date().toISOString()}`);
+  } catch (err) {
+    console.error('⚠️  Auto-backup failed:', err.message);
+  }
+}, 10 * 60 * 1000);
 
   // Final backup on shutdown
   const shutdown = async (signal) => {
-    console.log(`\n${signal} received — backing up before exit...`);
-    try {
-      db.pragma('wal_checkpoint(TRUNCATE)');
-      await uploadBackup(DB_PATH);
-      console.log('✅ Final backup saved');
-    } catch (err) {
-      console.error('⚠️  Final backup failed:', err.message);
-    }
-    process.exit(0);
-  };
+  console.log(`\n${signal} received — backing up before exit...`);
+  try {
+    db.pragma('wal_checkpoint(TRUNCATE)');
+    const fd = fs.openSync(DB_PATH, 'r+');
+    fs.fsyncSync(fd);
+    fs.closeSync(fd);
+    await new Promise(r => setTimeout(r, 200));
+    await uploadBackup(DB_PATH);
+    console.log('✅ Final backup saved');
+  } catch (err) {
+    console.error('⚠️  Final backup failed:', err.message);
+  }
+  process.exit(0);
+};
   process.on('SIGTERM', () => shutdown('SIGTERM'));
   process.on('SIGINT', () => shutdown('SIGINT'));
 }
