@@ -2,12 +2,32 @@ const Database = require('better-sqlite3');
 const bcrypt = require('bcryptjs');
 const path = require('path');
 const fs = require('fs');
+const { uploadBackup, downloadBackup, ENABLED } = require('./backup');
 
 // Use DATA_DIR env var if set (for Render persistent disk), else local dir
 const DATA_DIR = process.env.DATA_DIR || __dirname;
 if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
 
 const DB_PATH = path.join(DATA_DIR, 'herald.db');
+
+// ---------- Restore from Google Drive if local DB is missing ----------
+(async () => {
+  if (!ENABLED) {
+    console.log('ℹ️  Cloud backup disabled (no Google Drive credentials)');
+    return;
+  }
+  if (!fs.existsSync(DB_PATH)) {
+    console.log('🔄 Local DB missing — downloading from Google Drive...');
+    try {
+      const result = await downloadBackup(DB_PATH);
+      if (result.ok) console.log(`✅ Database restored from Google Drive (${result.size} bytes)`);
+      else if (result.notFound) console.log('ℹ️  No cloud backup yet — starting fresh');
+    } catch (err) {
+      console.error('⚠️  Restore failed:', err.message);
+    }
+  }
+})();
+
 const db = new Database(DB_PATH);
 db.pragma('journal_mode = WAL');
 
@@ -181,5 +201,33 @@ function seed() {
   }
 }
 seed();
+
+// ---------- Auto-backup every 10 minutes ----------
+if (ENABLED) {
+  setInterval(async () => {
+    try {
+      db.pragma('wal_checkpoint(TRUNCATE)');
+      const result = await uploadBackup(DB_PATH);
+      if (result.ok) console.log(`☁️  Backup uploaded @ ${new Date().toISOString()}`);
+    } catch (err) {
+      console.error('⚠️  Backup failed:', err.message);
+    }
+  }, 10 * 60 * 1000);
+
+  // Final backup on shutdown
+  const shutdown = async (signal) => {
+    console.log(`\n${signal} received — backing up before exit...`);
+    try {
+      db.pragma('wal_checkpoint(TRUNCATE)');
+      await uploadBackup(DB_PATH);
+      console.log('✅ Final backup saved');
+    } catch (err) {
+      console.error('⚠️  Final backup failed:', err.message);
+    }
+    process.exit(0);
+  };
+  process.on('SIGTERM', () => shutdown('SIGTERM'));
+  process.on('SIGINT', () => shutdown('SIGINT'));
+}
 
 module.exports = db;
