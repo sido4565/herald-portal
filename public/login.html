@@ -30,18 +30,37 @@
     </form>
 
     <form id="registerForm" class="auth-form hidden">
-      <label for="reg-reg">Registration Number</label>
-      <input id="reg-reg" name="reg_no" required />
-      <label for="reg-name">Full Name</label>
-      <input id="reg-name" name="name" required />
-      <label for="reg-email">Email Address</label>
-      <input id="reg-email" name="email" type="email" required />
-      <label for="reg-course">Program of Study</label>
-      <input id="reg-course" name="course" required />
-      <label for="reg-pwd">Password</label>
-      <input id="reg-pwd" name="password" type="password" minlength="6" required />
-      <button type="submit" class="btn-primary">Create Account</button>
-    </form>
+  <label for="reg-name">Full Name</label>
+  <input id="reg-name" name="name" required />
+
+  <label for="reg-email">Email Address</label>
+  <input id="reg-email" name="email" type="email" required />
+
+  <label for="reg-password">Password (min 6 characters)</label>
+  <input id="reg-password" name="password" type="password" minlength="6" required />
+
+  <label for="reg-course">Program of Study</label>
+  <select id="reg-course" name="course" required>
+    <option value="">— Select a course —</option>
+  </select>
+
+  <p class="hint" style="text-align:left; margin:4px 0 0;">
+    Your registration number will be generated automatically and sent to your email.
+  </p>
+
+  <button type="submit" class="btn-primary">Create Account</button>
+</form>
+
+<div id="regSuccess" class="hidden" style="margin-top:20px; padding:20px; background:var(--bg-alt); border-radius:8px; border-left:4px solid var(--success);">
+  <h3 style="margin:0 0 8px; font-size:16px; color:var(--text);">Registration Successful</h3>
+  <p style="margin:0 0 12px; color:var(--text-soft); font-size:13px;">Your registration number is:</p>
+  <div id="regNoDisplay" style="font-family:var(--font-mono); font-size:22px; font-weight:700; color:var(--navy-700); letter-spacing:0.05em; padding:12px; background:var(--card); border-radius:6px; text-align:center; margin-bottom:12px;">HRL-2025-0001</div>
+  <p style="margin:0; color:var(--muted); font-size:12px; line-height:1.5;">
+    We've emailed this to you. Use it to log in from now on.<br>
+    <strong>Save this number — you'll need it every time.</strong>
+  </p>
+  <button type="button" id="goToLogin" class="btn-primary" style="margin-top:16px; width:100%;">Continue to Login</button>
+</div>
 
     <p id="authMsg" class="msg"></p>
 

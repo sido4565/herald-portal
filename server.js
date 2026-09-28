@@ -77,24 +77,91 @@ app.post('/api/login', (req, res) => {
   res.json({ ok: true, name: s.name });
 });
 
-app.post('/api/register', (req, res) => {
-  const { reg_no, name, email, password, course } = req.body;
-  if (!reg_no || !name || !email || !password || !course)
-    return res.status(400).json({ error: 'All fields required' });
+// Helper: generate next registration number for the current year
+function generateRegNo() {
+  const year = new Date().getFullYear();
+  const prefix = `HRL-${year}-`;
+  const last = db.prepare(
+    "SELECT reg_no FROM students WHERE reg_no LIKE ? ORDER BY reg_no DESC LIMIT 1"
+  ).get(`${prefix}%`);
+  let nextNum = 1;
+  if (last) {
+    const parts = last.reg_no.split('-');
+    const n = parseInt(parts[parts.length - 1], 10);
+    if (!isNaN(n)) nextNum = n + 1;
+  }
+  return `${prefix}${String(nextNum).padStart(4, '0')}`;
+}
+
+app.post('/api/register', async (req, res) => {
+  const { name, email, password, course } = req.body;
+
+  // Validate required fields
+  if (!name || !email || !password || !course) {
+    return res.status(400).json({ error: 'All fields are required.' });
+  }
+
+  // Password validation
+  if (password.length < 6) {
+    return res.status(400).json({ error: 'Password must be at least 6 characters.' });
+  }
+
+  // Basic email validation
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    return res.status(400).json({ error: 'Please enter a valid email address.' });
+  }
+
   try {
     const hash = bcrypt.hashSync(password, 10);
-    const info = db.prepare('INSERT INTO students (reg_no, name, email, password, course) VALUES (?, ?, ?, ?, ?)')
-      .run(reg_no, name, email, hash, course);
+    const reg_no = generateRegNo();
+
+    const info = db.prepare(
+      'INSERT INTO students (reg_no, name, email, password, course) VALUES (?, ?, ?, ?, ?)'
+    ).run(reg_no, name.trim(), email.trim().toLowerCase(), hash, course);
+
     const s = db.prepare('SELECT * FROM students WHERE id = ?').get(info.lastInsertRowid);
     res.cookie('token', signStudent(s), { httpOnly: true, sameSite: 'lax' });
-    res.json({ ok: true });
-  } catch { res.status(400).json({ error: 'Registration number or email already exists' }); }
+
+    // Send welcome email with generated reg_no
+    if (process.env.GMAIL_USER) {
+      try {
+        const { sendWelcomeEmail } = require('./mailer');
+        sendWelcomeEmail({
+          to: s.email,
+          studentName: s.name,
+          regNo: s.reg_no,
+          course: s.course,
+        }).catch(err => console.error('Welcome email failed:', err.message));
+      } catch (e) {
+        console.error('Welcome email error:', e.message);
+      }
+    }
+
+    res.json({
+      ok: true,
+      reg_no: s.reg_no,
+      name: s.name,
+      message: `Your registration number is ${s.reg_no}`,
+    });
+  } catch (err) {
+    if (String(err.message).includes('UNIQUE')) {
+      return res.status(400).json({ error: 'This email is already registered.' });
+    }
+    console.error('Registration error:', err);
+    res.status(500).json({ error: 'Registration failed. Please try again.' });
+  }
 });
 
 app.post('/api/logout', (req, res) => { res.clearCookie('token'); res.json({ ok: true }); });
 
 app.get('/api/me', authStudent, (req, res) => {
   res.json(db.prepare('SELECT id, reg_no, name, email, course FROM students WHERE id = ?').get(req.user.id));
+});
+
+// Public: list course names for the registration dropdown
+app.get('/api/public/courses', (req, res) => {
+  const rows = db.prepare('SELECT DISTINCT title FROM courses ORDER BY title').all();
+  res.json(rows.map(r => r.title));
 });
 
 app.get('/api/courses', authStudent, (req, res) => {
@@ -281,22 +348,33 @@ app.get('/api/admin/students', authAdmin, (req, res) => {
 });
 
 app.post('/api/admin/students', authAdmin, (req, res) => {
-  const { reg_no, name, email, password, course } = req.body;
-  if (!reg_no || !name || !email || !password || !course) return res.status(400).json({ error: 'All fields required' });
+  let { reg_no, name, email, password, course } = req.body;
+  if (!name || !email || !password || !course) {
+    return res.status(400).json({ error: 'Name, email, password, and course are required.' });
+  }
+  if (!reg_no) {
+    reg_no = generateRegNo();  // auto-generate if blank
+  }
   try {
     const hash = bcrypt.hashSync(password, 10);
     db.prepare('INSERT INTO students (reg_no, name, email, password, course) VALUES (?, ?, ?, ?, ?)')
-      .run(reg_no, name, email, hash, course);
+      .run(reg_no, name, email.trim().toLowerCase(), hash, course);
 
-    // Welcome email (fire-and-forget)
     if (process.env.GMAIL_USER) {
-      const { sendWelcomeEmail } = require('./mailer');
-      sendWelcomeEmail({ to: email, studentName: name, regNo: reg_no, course })
-        .catch(e => console.error('Welcome email error:', e.message));
+      try {
+        const { sendWelcomeEmail } = require('./mailer');
+        sendWelcomeEmail({ to: email, studentName: name, regNo: reg_no, course })
+          .catch(err => console.error('Welcome email error:', err.message));
+      } catch (e) { console.error(e.message); }
     }
 
-    res.json({ ok: true });
-  } catch { res.status(400).json({ error: 'Reg no or email already exists' }); }
+    res.json({ ok: true, reg_no });
+  } catch (err) {
+    if (String(err.message).includes('UNIQUE')) {
+      return res.status(400).json({ error: 'Reg no or email already exists.' });
+    }
+    res.status(500).json({ error: err.message });
+  }
 });
 
 app.post('/api/admin/send-fee-reminders', authAdmin, async (req, res) => {
@@ -341,11 +419,39 @@ app.delete('/api/admin/students/:id', authAdmin, (req, res) => {
   res.json({ ok: true });
 });
 
-app.post('/api/admin/students/:id/reset-password', authAdmin, (req, res) => {
+app.post('/api/admin/students/:id/reset-password', authAdmin, async (req, res) => {
   const { newPassword } = req.body;
-  if (!newPassword || newPassword.length < 6) return res.status(400).json({ error: 'Min 6 chars' });
-  db.prepare('UPDATE students SET password = ? WHERE id = ?').run(bcrypt.hashSync(newPassword, 10), req.params.id);
-  res.json({ ok: true });
+  if (!newPassword || newPassword.length < 6) {
+    return res.status(400).json({ error: 'Password must be at least 6 characters.' });
+  }
+  try {
+    db.prepare('UPDATE students SET password = ? WHERE id = ?')
+      .run(bcrypt.hashSync(newPassword, 10), req.params.id);
+
+    // Optionally email the new password to the student
+    const student = db.prepare('SELECT name, email, reg_no FROM students WHERE id = ?').get(req.params.id);
+    if (student && process.env.GMAIL_USER) {
+      try {
+        const { sendMail } = require('./mailer');
+        sendMail({
+          to: student.email,
+          subject: 'Your Herald Portal password has been reset',
+          html: `
+            <h2>Password Reset</h2>
+            <p>Hello ${student.name},</p>
+            <p>Your password has been reset by an administrator.</p>
+            <p><strong>New password:</strong> <code style="background:#f0f0f0; padding:4px 8px; border-radius:4px; font-family:monospace;">${newPassword}</code></p>
+            <p>Please log in and change it immediately if you wish.</p>
+            <p>Reg No: ${student.reg_no}</p>
+          `,
+        }).catch(err => console.error('Reset email failed:', err.message));
+      } catch (e) { console.error(e.message); }
+    }
+
+    res.json({ ok: true, emailed: !!(student && process.env.GMAIL_USER) });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 app.get('/api/admin/courses', authAdmin, (req, res) => {

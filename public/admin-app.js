@@ -248,17 +248,17 @@ if ($('#adminName')) {
 
   function wireButtons() {
     $('#addStudentBtn').addEventListener('click', () => openModal('Add Student', [
-      { name: 'reg_no',   label: 'Registration No', required: true },
-      { name: 'name',     label: 'Full Name',       required: true },
-      { name: 'email',    label: 'Email', type: 'email', required: true },
-      { name: 'password', label: 'Password', type: 'password', required: true },
-      { name: 'course',   label: 'Course',          required: true }
-    ], async d => {
-      await api('/api/admin/students', { method: 'POST', body: d });
-      studentsCache = [];
-      await loadStudents();
-      toast('Student added. Welcome email sent if configured.');
-    }));
+  { name: 'reg_no',   label: 'Registration No (leave blank to auto-generate)' },
+  { name: 'name',     label: 'Full Name',       required: true },
+  { name: 'email',    label: 'Email', type: 'email', required: true },
+  { name: 'password', label: 'Password', type: 'password', required: true },
+  { name: 'course',   label: 'Course',          required: true }
+], async d => {
+  const r = await api('/api/admin/students', { method: 'POST', body: d });
+  studentsCache = [];
+  await loadStudents();
+  toast(r.reg_no ? `Student added. Reg No: ${r.reg_no}` : 'Student added.');
+}));
 
     $('#addCourseBtn').addEventListener('click', () => openModal('Add Course', [
       { name: 'code',        label: 'Code', required: true },

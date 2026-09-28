@@ -78,19 +78,60 @@ if (document.getElementById('loginForm')) {
     }
   });
 
+    // Load courses into register dropdown
+  (async () => {
+    try {
+      const courseSelect = document.getElementById('reg-course');
+      if (!courseSelect) return;
+      const res = await fetch('/api/public/courses');
+      const courses = await res.json();
+      courses.forEach(c => {
+        const opt = document.createElement('option');
+        opt.value = c;
+        opt.textContent = c;
+        courseSelect.appendChild(opt);
+      });
+    } catch (e) {
+      console.error('Course load error:', e);
+    }
+  })();
+
   registerForm.addEventListener('submit', async (e) => {
     e.preventDefault();
     const data = Object.fromEntries(new FormData(registerForm));
-    const res = await fetch('/api/register', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(data)
-    });
-    const json = await res.json();
-    if (res.ok) location.href = 'dashboard.html';
-    else {
+    const submitBtn = registerForm.querySelector('button[type="submit"]');
+    submitBtn.classList.add('btn-loading');
+    submitBtn.disabled = true;
+
+    try {
+      const res = await fetch('/api/register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data)
+      });
+      const json = await res.json();
+
+      if (res.ok) {
+        // Hide form, show success panel with reg_no
+        loginForm.classList.add('hidden');
+        registerForm.classList.add('hidden');
+        document.querySelector('.tabs').classList.add('hidden');
+        document.getElementById('regNoDisplay').textContent = json.reg_no;
+        document.getElementById('regSuccess').classList.remove('hidden');
+
+        document.getElementById('goToLogin').addEventListener('click', () => {
+          location.href = 'login.html';
+        });
+      } else {
+        msg.className = 'msg error';
+        msg.textContent = json.error || 'Registration failed';
+      }
+    } catch (err) {
       msg.className = 'msg error';
-      msg.textContent = json.error || 'Registration failed';
+      msg.textContent = 'Network error. Please try again.';
+    } finally {
+      submitBtn.classList.remove('btn-loading');
+      submitBtn.disabled = false;
     }
   });
 }
