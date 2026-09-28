@@ -9,37 +9,27 @@ if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
 
 const DB_PATH = path.join(DATA_DIR, 'herald.db');
 
-// ---------- Startup: restore DB synchronously before opening ----------
-(async () => {
-  if (!ENABLED) {
-    console.log('ℹ️  Cloud backup disabled (no Google Drive credentials)');
-    bootDatabase();
-    return;
+// ---------- Sync-restore workaround ----------
+// If DB is missing AND cloud backup is enabled, download it synchronously
+// using a child process so the require returns a fully-formed db.
+if (ENABLED && !fs.existsSync(DB_PATH)) {
+  console.log('🔄 Local DB missing — downloading from Google Drive (sync)...');
+  try {
+    const { execSync } = require('child_process');
+    execSync('node sync-restore.js', { stdio: 'inherit' });
+  } catch (err) {
+    console.error('⚠️  Sync restore failed:', err.message);
   }
+}
 
-  if (!fs.existsSync(DB_PATH)) {
-    console.log('🔄 Local DB missing — downloading from Google Drive...');
-    try {
-      const result = await downloadBackup(DB_PATH);
-      if (result.ok) console.log(`✅ Database restored from Google Drive (${result.size} bytes)`);
-      else if (result.notFound) console.log('ℹ️  No cloud backup yet — starting fresh');
-    } catch (err) {
-      console.error('⚠️  Restore failed:', err.message);
-    }
-  }
+// ---------- Open DB (now schema exists) ----------
+const db = new Database(DB_PATH);
+db.pragma('journal_mode = WAL');
 
-  bootDatabase();
-})();
+console.log(`📁 Database: ${DB_PATH}`);
 
-// ---------- Everything else runs after restore ----------
-function bootDatabase() {
-  const db = new Database(DB_PATH);
-  db.pragma('journal_mode = WAL');
-
-  console.log(`📁 Database: ${DB_PATH}`);
-
-  // ---------- Schema (creates all tables) ----------
-  db.exec(`
+// ---------- Schema ----------
+db.exec(`
 CREATE TABLE IF NOT EXISTS students (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   reg_no TEXT UNIQUE NOT NULL,
@@ -168,42 +158,17 @@ CREATE TABLE IF NOT EXISTS live_classes (
 );
 `);
 
-  // ---------- Safe migrations for older DBs ----------
-  try {
-    db.prepare('SELECT file_path FROM submissions LIMIT 1').get();
-  } catch (e) {
-    console.log('🔄 Migrating: adding file_path, file_name to submissions');
-    db.exec('ALTER TABLE submissions ADD COLUMN file_path TEXT');
-    db.exec('ALTER TABLE submissions ADD COLUMN file_name TEXT');
-  }
-
-  // ---------- Seed if empty ----------
-  seed(db);
-
-  // ---------- Auto-backup every 2 minutes ----------
-  if (ENABLED) {
-    setInterval(async () => {
-      try {
-        const snapshotPath = path.join('/tmp', `herald-auto-${Date.now()}.db`);
-        const { createSnapshot } = require('./backup');
-        await createSnapshot(db, snapshotPath);
-        const stats = fs.statSync(snapshotPath);
-        console.log(`📊 [auto] Snapshot size: ${stats.size} bytes`);
-        await uploadBackup(snapshotPath);
-        fs.unlinkSync(snapshotPath);
-        console.log(`☁️  Auto-backup uploaded @ ${new Date().toISOString()}`);
-      } catch (err) {
-        console.error('⚠️  Auto-backup failed:', err.message);
-      }
-    }, 2 * 60 * 1000);
-  }
-
-  // ---------- Export for use elsewhere ----------
-  module.exports = db;
+// ---------- Safe migrations ----------
+try {
+  db.prepare('SELECT file_path FROM submissions LIMIT 1').get();
+} catch (e) {
+  console.log('🔄 Migrating: adding file_path, file_name to submissions');
+  db.exec('ALTER TABLE submissions ADD COLUMN file_path TEXT');
+  db.exec('ALTER TABLE submissions ADD COLUMN file_name TEXT');
 }
 
-// ---------- Seed function ----------
-function seed(db) {
+// ---------- Seed if empty ----------
+(function seed() {
   const courseCount = db.prepare('SELECT COUNT(*) AS c FROM courses').get().c;
   if (courseCount === 0) {
     const insertCourse = db.prepare(
@@ -237,4 +202,25 @@ function seed(db) {
     db.prepare('INSERT INTO admins (username, name, password, role) VALUES (?, ?, ?, ?)')
       .run('admin', 'Herald Admin', adminHash, 'superadmin');
   }
+})();
+
+// ---------- Auto-backup every 2 minutes ----------
+if (ENABLED) {
+  setInterval(async () => {
+    try {
+      const snapshotPath = path.join('/tmp', `herald-auto-${Date.now()}.db`);
+      const { createSnapshot } = require('./backup');
+      await createSnapshot(db, snapshotPath);
+      const stats = fs.statSync(snapshotPath);
+      console.log(`📊 [auto] Snapshot size: ${stats.size} bytes`);
+      await uploadBackup(snapshotPath);
+      fs.unlinkSync(snapshotPath);
+      console.log(`☁️  Auto-backup uploaded @ ${new Date().toISOString()}`);
+    } catch (err) {
+      console.error('⚠️  Auto-backup failed:', err.message);
+    }
+  }, 2 * 60 * 1000);
 }
+
+// ---------- Export ----------
+module.exports = db;
