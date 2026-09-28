@@ -4,18 +4,19 @@ const path = require('path');
 const fs = require('fs');
 const { uploadBackup, downloadBackup, ENABLED } = require('./backup');
 
-// Use DATA_DIR env var if set (for Render persistent disk), else local dir
 const DATA_DIR = process.env.DATA_DIR || __dirname;
 if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
 
 const DB_PATH = path.join(DATA_DIR, 'herald.db');
 
-// ---------- Restore from Google Drive if local DB is missing ----------
+// ---------- Startup: restore DB synchronously before opening ----------
 (async () => {
   if (!ENABLED) {
     console.log('ℹ️  Cloud backup disabled (no Google Drive credentials)');
+    bootDatabase();
     return;
   }
+
   if (!fs.existsSync(DB_PATH)) {
     console.log('🔄 Local DB missing — downloading from Google Drive...');
     try {
@@ -26,15 +27,19 @@ const DB_PATH = path.join(DATA_DIR, 'herald.db');
       console.error('⚠️  Restore failed:', err.message);
     }
   }
+
+  bootDatabase();
 })();
 
-const db = new Database(DB_PATH);
-db.pragma('journal_mode = DELETE');
+// ---------- Everything else runs after restore ----------
+function bootDatabase() {
+  const db = new Database(DB_PATH);
+  db.pragma('journal_mode = WAL');
 
-console.log(`📁 Database: ${DB_PATH}`);
+  console.log(`📁 Database: ${DB_PATH}`);
 
-// ---------- Schema ----------
-db.exec(`
+  // ---------- Schema (creates all tables) ----------
+  db.exec(`
 CREATE TABLE IF NOT EXISTS students (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   reg_no TEXT UNIQUE NOT NULL,
@@ -163,16 +168,42 @@ CREATE TABLE IF NOT EXISTS live_classes (
 );
 `);
 
-// ---------- Safe migrations for existing DBs ----------
-try {
-  db.prepare('SELECT file_path FROM submissions LIMIT 1').get();
-} catch (e) {
-  console.log('🔄 Migrating: adding file_path, file_name to submissions');
-  db.exec('ALTER TABLE submissions ADD COLUMN file_path TEXT');
-  db.exec('ALTER TABLE submissions ADD COLUMN file_name TEXT');
+  // ---------- Safe migrations for older DBs ----------
+  try {
+    db.prepare('SELECT file_path FROM submissions LIMIT 1').get();
+  } catch (e) {
+    console.log('🔄 Migrating: adding file_path, file_name to submissions');
+    db.exec('ALTER TABLE submissions ADD COLUMN file_path TEXT');
+    db.exec('ALTER TABLE submissions ADD COLUMN file_name TEXT');
+  }
+
+  // ---------- Seed if empty ----------
+  seed(db);
+
+  // ---------- Auto-backup every 2 minutes ----------
+  if (ENABLED) {
+    setInterval(async () => {
+      try {
+        const snapshotPath = path.join('/tmp', `herald-auto-${Date.now()}.db`);
+        const { createSnapshot } = require('./backup');
+        await createSnapshot(db, snapshotPath);
+        const stats = fs.statSync(snapshotPath);
+        console.log(`📊 [auto] Snapshot size: ${stats.size} bytes`);
+        await uploadBackup(snapshotPath);
+        fs.unlinkSync(snapshotPath);
+        console.log(`☁️  Auto-backup uploaded @ ${new Date().toISOString()}`);
+      } catch (err) {
+        console.error('⚠️  Auto-backup failed:', err.message);
+      }
+    }, 2 * 60 * 1000);
+  }
+
+  // ---------- Export for use elsewhere ----------
+  module.exports = db;
 }
 
-function seed() {
+// ---------- Seed function ----------
+function seed(db) {
   const courseCount = db.prepare('SELECT COUNT(*) AS c FROM courses').get().c;
   if (courseCount === 0) {
     const insertCourse = db.prepare(
@@ -196,8 +227,7 @@ function seed() {
     db.prepare('INSERT INTO enrollments (student_id, course_id) VALUES (?, ?)').run(sid, 3);
     db.prepare('INSERT INTO results (student_id, course_id, marks, grade, term) VALUES (?, ?, ?, ?, ?)').run(sid, 1, 82, 'A-', 'Term 1 2025');
     db.prepare('INSERT INTO results (student_id, course_id, marks, grade, term) VALUES (?, ?, ?, ?, ?)').run(sid, 3, 76, 'B+', 'Term 1 2025');
-    db.prepare('INSERT INTO announcements (title, body) VALUES (?, ?)').run('Welcome to Herald Portal', 'New term begins Monday. Check your timetable.');
-    db.prepare('INSERT INTO announcements (title, body) VALUES (?, ?)').run('Fee Reminder', 'Term 1 fee balance due by end of month.');
+    db.prepare('INSERT INTO announcements (title, body) VALUES (?, ?)').run('Welcome to Herald Portal', 'New term begins Monday.');
     db.prepare('INSERT INTO fees (student_id, term, amount_due, amount_paid, status) VALUES (?, ?, ?, ?, ?)').run(sid, 'Term 1 2025', 25000, 15000, 'partial');
   }
 
@@ -207,62 +237,4 @@ function seed() {
     db.prepare('INSERT INTO admins (username, name, password, role) VALUES (?, ?, ?, ?)')
       .run('admin', 'Herald Admin', adminHash, 'superadmin');
   }
-
-  const ttCount = db.prepare('SELECT COUNT(*) AS c FROM timetable').get().c;
-  if (ttCount === 0) {
-    const insert = db.prepare('INSERT INTO timetable (course_id, day, start_time, end_time, room, trainer) VALUES (?, ?, ?, ?, ?, ?)');
-    insert.run(1, 'Monday', '08:00', '10:00', 'Lab A', 'Mr. Herald K.');
-    insert.run(3, 'Monday', '10:15', '12:15', 'Lab B', 'Mr. Herald K.');
-    insert.run(2, 'Tuesday', '14:00', '16:00', 'Room 5', 'Ms. Amina T.');
-    insert.run(1, 'Wednesday', '08:00', '10:00', 'Lab A', 'Mr. Herald K.');
-    insert.run(4, 'Thursday', '09:00', '11:00', 'Lab C', 'Dr. Otieno M.');
-  }
-
-  const asgCount = db.prepare('SELECT COUNT(*) AS c FROM assignments').get().c;
-  if (asgCount === 0) {
-    db.prepare('INSERT INTO assignments (course_id, title, description, due_date) VALUES (?, ?, ?, ?)')
-      .run(1, 'Build a Portfolio Page', 'Create a responsive HTML/CSS portfolio.', '2025-10-15');
-    db.prepare('INSERT INTO assignments (course_id, title, description, due_date) VALUES (?, ?, ?, ?)')
-      .run(3, 'Async/Await Exercise', 'Convert 5 callbacks to async/await.', '2025-10-20');
-  }
 }
-seed();
-
-// ---------- Auto-backup every 10 minutes ----------
-if (ENABLED) {
-  setInterval(async () => {
-  try {
-    const snapshotPath = path.join('/tmp', `herald-auto-${Date.now()}.db`);
-    const { createSnapshot, uploadBackup } = require('./backup');
-    await createSnapshot(db, snapshotPath);
-    const stats = fs.statSync(snapshotPath);
-    console.log(`📊 [auto] Snapshot size: ${stats.size} bytes`);
-    const result = await uploadBackup(snapshotPath);
-    fs.unlinkSync(snapshotPath);
-    if (result.ok) console.log(`☁️  Auto-backup uploaded @ ${new Date().toISOString()}`);
-  } catch (err) {
-    console.error('⚠️  Auto-backup failed:', err.message);
-  }
-}, 2 * 60 * 1000);
-
-  // Final backup on shutdown
-  const shutdown = async (signal) => {
-  console.log(`\n${signal} received — backing up before exit...`);
-  try {
-    const snapshotPath = path.join('/tmp', `herald-exit-${Date.now()}.db`);
-    const { createSnapshot, uploadBackup } = require('./backup');
-    await createSnapshot(db, snapshotPath);
-    await uploadBackup(snapshotPath);
-    fs.unlinkSync(snapshotPath);
-    console.log('✅ Final backup saved');
-  } catch (err) {
-    console.error('⚠️  Final backup failed:', err.message);
-  }
-  process.exit(0);
-};
-
-  process.on('SIGTERM', () => shutdown('SIGTERM'));
-  process.on('SIGINT', () => shutdown('SIGINT'));
-}
-
-module.exports = db;
