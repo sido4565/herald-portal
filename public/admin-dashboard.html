@@ -41,10 +41,16 @@
       <button class="admin-tab" data-panel="fees" type="button">Fees</button>
       <button class="admin-tab" data-panel="timetable" type="button">Timetable</button>
       <button class="admin-tab" data-panel="assignments" type="button">Assignments</button>
+      <button class="admin-tab" data-panel="attendance" type="button">Attendance</button>
+      <button class="admin-tab" data-panel="liveclasses" type="button">Live Classes</button>
     </nav>
 
+    <!-- Overview -->
     <section class="admin-panel active" id="panel-overview">
-      <h2>Overview</h2>
+      <div class="panel-head">
+        <h2>Overview</h2>
+        <button class="btn-ghost dark" id="backupNowBtn" type="button">Backup Now</button>
+      </div>
       <div class="stats-grid">
         <div class="stat-card"><div class="stat-num" id="statStudents">0</div><div class="stat-lbl">Students</div></div>
         <div class="stat-card"><div class="stat-num" id="statCourses">0</div><div class="stat-lbl">Courses</div></div>
@@ -53,6 +59,7 @@
       </div>
     </section>
 
+    <!-- Students -->
     <section class="admin-panel" id="panel-students">
       <div class="panel-head">
         <h2>Students</h2>
@@ -66,6 +73,7 @@
       </div>
     </section>
 
+    <!-- Courses -->
     <section class="admin-panel" id="panel-courses">
       <div class="panel-head">
         <h2>Courses</h2>
@@ -79,6 +87,7 @@
       </div>
     </section>
 
+    <!-- Announcements -->
     <section class="admin-panel" id="panel-announcements">
       <div class="panel-head">
         <h2>Announcements</h2>
@@ -87,6 +96,7 @@
       <div id="annList" class="ann-admin-list"></div>
     </section>
 
+    <!-- Results -->
     <section class="admin-panel" id="panel-results">
       <div class="panel-head">
         <h2>Results</h2>
@@ -100,6 +110,7 @@
       </div>
     </section>
 
+    <!-- Fees -->
     <section class="admin-panel" id="panel-fees">
       <div class="panel-head">
         <h2>Fee Records</h2>
@@ -113,6 +124,7 @@
       </div>
     </section>
 
+    <!-- Timetable -->
     <section class="admin-panel" id="panel-timetable">
       <div class="panel-head">
         <h2>Timetable</h2>
@@ -141,6 +153,7 @@
       </div>
     </section>
 
+    <!-- Assignments -->
     <section class="admin-panel" id="panel-assignments">
       <div class="panel-head">
         <h2>Assignments</h2>
@@ -149,6 +162,45 @@
       <div class="table-wrap">
         <table id="asgTable">
           <thead><tr><th>Course</th><th>Title</th><th>Due</th><th>Submissions</th><th>Graded</th><th>Actions</th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- Attendance -->
+    <section class="admin-panel" id="panel-attendance">
+      <div class="panel-head">
+        <h2>Attendance</h2>
+        <button class="btn-primary" id="takeAttendanceBtn" type="button">Take Attendance</button>
+      </div>
+
+      <div style="margin-bottom:16px;">
+        <label style="font-size:12px; font-weight:600; color:var(--muted); text-transform:uppercase; letter-spacing:0.05em;">Filter by Course</label>
+        <select id="attCourseFilter" class="term-filter" style="width:100%; max-width:360px; margin-top:6px;">
+          <option value="">— Select a course —</option>
+        </select>
+      </div>
+
+      <div id="attSummary" class="table-wrap" style="margin-bottom:20px;"></div>
+
+      <h3 style="margin: 20px 0 12px; color: var(--text-soft); font-size:12px; text-transform:uppercase; letter-spacing:0.08em; font-weight:600;">Recent Records</h3>
+      <div class="table-wrap">
+        <table id="attTable">
+          <thead><tr><th>Date</th><th>Student</th><th>Status</th><th>Notes</th><th>Actions</th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- Live Classes -->
+    <section class="admin-panel" id="panel-liveclasses">
+      <div class="panel-head">
+        <h2>Live Classes</h2>
+        <button class="btn-primary" id="addLiveClassBtn" type="button">Schedule Live Class</button>
+      </div>
+      <div class="table-wrap">
+        <table id="liveClassesTable">
+          <thead><tr><th>Course</th><th>Title</th><th>Scheduled</th><th>Duration</th><th>Status</th><th>Actions</th></tr></thead>
           <tbody></tbody>
         </table>
       </div>

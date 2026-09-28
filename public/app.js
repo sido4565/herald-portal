@@ -42,7 +42,7 @@ function toast(msg, type = 'success') {
   }, 3000);
 }
 
-// ---------- LOGIN / REGISTER PAGE ----------
+// ---------- LOGIN / REGISTER ----------
 if (document.getElementById('loginForm')) {
   const loginForm = document.getElementById('loginForm');
   const registerForm = document.getElementById('registerForm');
@@ -166,7 +166,7 @@ async function loadDashboard() {
       : '<tr><td colspan="5" class="empty">No results published yet.</td></tr>';
   } catch (e) { console.error(e); }
 
-    // Fees
+  // Fees
   try {
     const feeRes = await fetch('/api/my-fees');
     const fees = await feeRes.json();
@@ -215,6 +215,71 @@ async function loadDashboard() {
       : '<li style="color:var(--muted);">No fee records on file.</li>';
   } catch (e) { console.error('fees load', e); }
 
+  // Attendance
+  try {
+    const attRes = await fetch('/api/my-attendance');
+    const att = await attRes.json();
+
+    const summaryHtml = att.summary && att.summary.length ? `
+      <div style="display:grid; gap:6px; margin-bottom:12px;">
+        ${att.summary.map(s => {
+          const rate = s.total ? Math.round((s.present / s.total) * 100) : 0;
+          const pillCls = rate >= 75 ? 'pill-green' : rate >= 50 ? 'pill-amber' : 'pill-red';
+          return `
+            <div style="display:flex; justify-content:space-between; align-items:center; padding:8px 10px; background:var(--bg-alt); border-radius:6px;">
+              <div>
+                <strong style="font-size:13px;">${esc(s.code)}</strong>
+                <div style="font-size:11px; color:var(--muted);">${esc(s.title)}</div>
+              </div>
+              <span class="pill ${pillCls}">${rate}%</span>
+            </div>`;
+        }).join('')}
+      </div>` : '<p style="color:var(--muted); font-size:13px; margin-bottom:8px;">No attendance records yet.</p>';
+
+    document.getElementById('attendanceSummary').innerHTML = summaryHtml;
+
+    document.getElementById('attendanceList').innerHTML = att.records && att.records.length
+      ? att.records.slice(0, 10).map(r => `
+          <li>
+            <div style="display:flex; justify-content:space-between; align-items:center; gap:12px;">
+              <div>
+                <strong>${esc(r.date)}</strong>
+                <p>${esc(r.code)} — ${esc(r.title)}</p>
+              </div>
+              <span class="pill ${r.status === 'present' ? 'pill-green' : r.status === 'absent' ? 'pill-red' : 'pill-amber'}">${esc(r.status)}</span>
+            </div>
+          </li>`).join('')
+      : '';
+  } catch (e) { console.error('attendance load', e); }
+
+  // Live Classes
+  try {
+    const lcRes = await fetch('/api/my-live-classes');
+    const lcs = await lcRes.json();
+
+    document.getElementById('liveClasses').innerHTML = lcs.length
+      ? lcs.map(c => {
+          const pillCls = c.status === 'live' ? 'pill-green' : c.status === 'upcoming' ? 'pill-amber' : 'pill-red';
+          const label = c.status === 'live' ? 'LIVE NOW' : c.status.toUpperCase();
+          const start = new Date(c.scheduled_at);
+          return `
+            <li>
+              <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:12px; flex-wrap:wrap;">
+                <div>
+                  <strong>${esc(c.title)}</strong>
+                  <p>${esc(c.code)} — ${esc(c.course_title)}</p>
+                  <p style="font-size:12px; color:var(--muted);">${start.toLocaleString()} &middot; ${c.duration_minutes} min</p>
+                </div>
+                <div style="text-align:right;">
+                  <span class="pill ${pillCls}">${label}</span>
+                  ${c.status !== 'ended' ? `<div style="margin-top:6px;"><a class="btn-enroll" href="${esc(c.meeting_url)}" target="_blank" rel="noopener" style="text-decoration:none; display:inline-block;">Join</a></div>` : ''}
+                </div>
+              </div>
+            </li>`;
+        }).join('')
+      : '<li style="color:var(--muted);">No live classes scheduled.</li>';
+  } catch (e) { console.error('live classes load', e); }
+
   // Timetable
   try {
     const ttRes = await fetch('/api/my-timetable');
@@ -252,184 +317,14 @@ async function loadDashboard() {
                 </p>
               </div>
             </div>
-                        <div style="margin-top:8px; display:flex; gap:8px; flex-wrap:wrap; align-items:center;">
+            <div style="margin-top:8px;">
               <button class="btn-xs" onclick="submitAssignment(${a.id})">
                 ${a.submission_id ? 'Update Submission' : 'Submit'}
               </button>
-              ${a.submission_id
-                ? `<a class="pdf-link" href="/api/submission/${a.submission_id}/file" target="_blank" rel="noopener">View PDF</a>`
-                : ''}
             </div>
           </li>`).join('')
       : '<li style="color:var(--muted);">No assignments posted.</li>';
   } catch (e) { console.error('assignments load', e); }
-}
-
-// ---------- Fee receipt (printable) ----------
-function printReceipt(feeId, term, due, paid) {
-  const balance = Number(due) - Number(paid);
-  const win = window.open('', '_blank', 'width=460,height=720');
-  win.document.write(`
-    <!DOCTYPE html>
-    <html>
-    <head>
-      <title>Fee Receipt &mdash; ${esc(term)}</title>
-      <style>
-        * { box-sizing: border-box; margin: 0; padding: 0; }
-        body {
-          font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-          padding: 32px 28px;
-          max-width: 400px;
-          margin: auto;
-          color: #1a1f2e;
-          font-size: 12.5px;
-          line-height: 1.5;
-        }
-        .letterhead {
-          text-align: center;
-          padding-bottom: 16px;
-          border-bottom: 3px double #1a1f2e;
-          margin-bottom: 20px;
-        }
-        .letterhead h1 {
-          font-size: 14px;
-          font-weight: 700;
-          letter-spacing: 0.04em;
-          text-transform: uppercase;
-          margin-bottom: 4px;
-        }
-        .letterhead .tagline {
-          font-size: 10px;
-          color: #6b7280;
-          text-transform: uppercase;
-          letter-spacing: 0.12em;
-        }
-        .doc-title {
-          text-align: center;
-          font-size: 11px;
-          font-weight: 700;
-          text-transform: uppercase;
-          letter-spacing: 0.15em;
-          color: #6b7280;
-          margin-bottom: 20px;
-        }
-        .row {
-          display: flex;
-          justify-content: space-between;
-          padding: 7px 0;
-          border-bottom: 1px solid #e5e8ed;
-        }
-        .row .lbl {
-          color: #6b7280;
-          font-size: 10px;
-          text-transform: uppercase;
-          letter-spacing: 0.06em;
-          font-weight: 600;
-        }
-        .row .val { font-weight: 500; font-family: 'SF Mono', Menlo, monospace; font-size: 12px; }
-        .section-lbl {
-          font-size: 10px;
-          font-weight: 700;
-          text-transform: uppercase;
-          letter-spacing: 0.1em;
-          color: #6b7280;
-          margin: 20px 0 8px;
-          padding-bottom: 6px;
-          border-bottom: 1px solid #e5e8ed;
-        }
-        .row.total {
-          border-top: 2px solid #1a1f2e;
-          border-bottom: 2px solid #1a1f2e;
-          margin-top: 8px;
-          font-weight: 700;
-          padding: 10px 0;
-          font-size: 13px;
-        }
-        .row.total .lbl { color: #1a1f2e; }
-        .payment-block {
-          background: #f5f6f8;
-          border-left: 3px solid #b8860b;
-          padding: 12px 14px;
-          margin-top: 20px;
-          border-radius: 3px;
-        }
-        .payment-block .pb-title {
-          font-size: 10px;
-          font-weight: 700;
-          text-transform: uppercase;
-          letter-spacing: 0.1em;
-          color: #b8860b;
-          margin-bottom: 8px;
-        }
-        .payment-block .pb-row {
-          display: flex;
-          justify-content: space-between;
-          font-size: 11.5px;
-          padding: 3px 0;
-        }
-        .payment-block .pb-row .lbl {
-          color: #6b7280;
-          font-size: 10px;
-          text-transform: uppercase;
-          letter-spacing: 0.05em;
-          font-weight: 600;
-        }
-        .payment-block .pb-row .val {
-          font-family: 'SF Mono', Menlo, monospace;
-          font-weight: 700;
-          color: #1a1f2e;
-        }
-        .footer {
-          text-align: center;
-          font-size: 10.5px;
-          color: #6b7280;
-          margin-top: 24px;
-          padding-top: 16px;
-          border-top: 1px solid #e5e8ed;
-          line-height: 1.6;
-        }
-        .footer strong { color: #1a1f2e; }
-        @media print {
-          body { padding: 16px; }
-          .no-print { display: none; }
-        }
-      </style>
-    </head>
-    <body>
-      <div class="letterhead">
-        <h1>Herald Trainer and Consultant</h1>
-        <div class="tagline">Training &middot; Consulting &middot; Excellence</div>
-      </div>
-
-      <div class="doc-title">Official Fee Receipt</div>
-
-      <div class="row"><span class="lbl">Receipt No.</span><span class="val">HR-${String(feeId).padStart(5, '0')}</span></div>
-      <div class="row"><span class="lbl">Date Issued</span><span class="val">${new Date().toLocaleDateString()}</span></div>
-      <div class="row"><span class="lbl">Term</span><span class="val">${esc(term)}</span></div>
-
-      <div class="section-lbl">Fee Breakdown</div>
-      <div class="row"><span class="lbl">Amount Due</span><span class="val">KES ${Number(due).toLocaleString()}</span></div>
-      <div class="row"><span class="lbl">Amount Paid</span><span class="val">KES ${Number(paid).toLocaleString()}</span></div>
-      <div class="row total"><span class="lbl">Balance</span><span class="val">KES ${balance.toLocaleString()}</span></div>
-
-      <div class="payment-block">
-        <div class="pb-title">Payment Details</div>
-        <div class="pb-row"><span class="lbl">Bank</span><span class="val">KCB Bank Kenya</span></div>
-        <div class="pb-row"><span class="lbl">Paybill No.</span><span class="val">522522</span></div>
-        <div class="pb-row"><span class="lbl">Account No.</span><span class="val">1279021640</span></div>
-        <div class="pb-row"><span class="lbl">Account Name</span><span class="val" style="font-size:10.5px;">HERALD TRAINER AND CONSULTANT</span></div>
-      </div>
-
-      <div class="footer">
-        <strong>Thank you for your payment.</strong><br>
-        This is a computer-generated receipt and does not require a signature.<br>
-        For inquiries, contact the accounts office.
-      </div>
-
-      <script>window.onload = () => window.print();<\/script>
-    </body>
-    </html>`);
-  win.document.close();
 }
 
 // ---------- Payment details (KCB) ----------
@@ -463,15 +358,73 @@ function renderPaymentBox() {
       </div>
       <div class="payment-note">
         Use your <strong>registration number</strong> as the payment reference where required.
-        Retain your M-Pesa confirmation SMS as proof of payment. Contact the accounts office
-        if your payment is not reflected within 24 hours.
+        Retain your M-Pesa confirmation SMS as proof of payment.
       </div>
     </div>`;
 }
 
-// ---------- Assignment submission (with PDF upload) ----------
+// ---------- Fee receipt ----------
+function printReceipt(feeId, term, due, paid) {
+  const balance = Number(due) - Number(paid);
+  const win = window.open('', '_blank', 'width=460,height=720');
+  win.document.write(`
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <title>Fee Receipt &mdash; ${esc(term)}</title>
+      <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: 'Inter', -apple-system, sans-serif; padding: 32px 28px; max-width: 400px; margin: auto; color: #1a1f2e; font-size: 12.5px; line-height: 1.5; }
+        .letterhead { text-align: center; padding-bottom: 16px; border-bottom: 3px double #1a1f2e; margin-bottom: 20px; }
+        .letterhead h1 { font-size: 14px; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; margin-bottom: 4px; }
+        .letterhead .tagline { font-size: 10px; color: #6b7280; text-transform: uppercase; letter-spacing: 0.12em; }
+        .doc-title { text-align: center; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.15em; color: #6b7280; margin-bottom: 20px; }
+        .row { display: flex; justify-content: space-between; padding: 7px 0; border-bottom: 1px solid #e5e8ed; }
+        .row .lbl { color: #6b7280; font-size: 10px; text-transform: uppercase; letter-spacing: 0.06em; font-weight: 600; }
+        .row .val { font-weight: 500; font-family: 'SF Mono', Menlo, monospace; font-size: 12px; }
+        .section-lbl { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em; color: #6b7280; margin: 20px 0 8px; padding-bottom: 6px; border-bottom: 1px solid #e5e8ed; }
+        .row.total { border-top: 2px solid #1a1f2e; border-bottom: 2px solid #1a1f2e; margin-top: 8px; font-weight: 700; padding: 10px 0; font-size: 13px; }
+        .payment-block { background: #f5f6f8; border-left: 3px solid #b8860b; padding: 12px 14px; margin-top: 20px; border-radius: 3px; }
+        .payment-block .pb-title { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em; color: #b8860b; margin-bottom: 8px; }
+        .payment-block .pb-row { display: flex; justify-content: space-between; font-size: 11.5px; padding: 3px 0; }
+        .payment-block .pb-row .lbl { color: #6b7280; font-size: 10px; text-transform: uppercase; letter-spacing: 0.05em; font-weight: 600; }
+        .payment-block .pb-row .val { font-family: 'SF Mono', Menlo, monospace; font-weight: 700; color: #1a1f2e; }
+        .footer { text-align: center; font-size: 10.5px; color: #6b7280; margin-top: 24px; padding-top: 16px; border-top: 1px solid #e5e8ed; line-height: 1.6; }
+        @media print { body { padding: 16px; } }
+      </style>
+    </head>
+    <body>
+      <div class="letterhead">
+        <h1>Herald Trainer and Consultant</h1>
+        <div class="tagline">Training &middot; Consulting &middot; Excellence</div>
+      </div>
+      <div class="doc-title">Official Fee Receipt</div>
+      <div class="row"><span class="lbl">Receipt No.</span><span class="val">HR-${String(feeId).padStart(5, '0')}</span></div>
+      <div class="row"><span class="lbl">Date Issued</span><span class="val">${new Date().toLocaleDateString()}</span></div>
+      <div class="row"><span class="lbl">Term</span><span class="val">${esc(term)}</span></div>
+      <div class="section-lbl">Fee Breakdown</div>
+      <div class="row"><span class="lbl">Amount Due</span><span class="val">KES ${Number(due).toLocaleString()}</span></div>
+      <div class="row"><span class="lbl">Amount Paid</span><span class="val">KES ${Number(paid).toLocaleString()}</span></div>
+      <div class="row total"><span class="lbl">Balance</span><span class="val">KES ${balance.toLocaleString()}</span></div>
+      <div class="payment-block">
+        <div class="pb-title">Payment Details</div>
+        <div class="pb-row"><span class="lbl">Bank</span><span class="val">KCB Bank Kenya</span></div>
+        <div class="pb-row"><span class="lbl">Paybill No.</span><span class="val">522522</span></div>
+        <div class="pb-row"><span class="lbl">Account No.</span><span class="val">1279021640</span></div>
+        <div class="pb-row"><span class="lbl">Account Name</span><span class="val" style="font-size:10.5px;">HERALD TRAINER AND CONSULTANT</span></div>
+      </div>
+      <div class="footer">
+        <strong>Thank you for your payment.</strong><br>
+        This is a computer-generated receipt and does not require a signature.
+      </div>
+      <script>window.onload = () => window.print();<\/script>
+    </body>
+    </html>`);
+  win.document.close();
+}
+
+// ---------- Assignment submission ----------
 function submitAssignment(assignmentId) {
-  // Build custom modal
   const overlay = document.createElement('div');
   overlay.className = 'modal-overlay';
   overlay.innerHTML = `
@@ -488,10 +441,6 @@ function submitAssignment(assignmentId) {
           <div class="file-upload-filename" id="fileName" style="display:none;"></div>
           <input type="file" id="fileInput" name="file" accept="application/pdf,.pdf" />
         </label>
-
-        <p class="hint" style="text-align:left; margin-top:4px;">
-          You can submit text, a PDF, or both. Files are stored securely on the server.
-        </p>
       </form>
       <div class="modal-actions">
         <button class="btn-ghost dark" type="button" data-cancel>Cancel</button>
@@ -505,7 +454,6 @@ function submitAssignment(assignmentId) {
   const fileDrop = overlay.querySelector('#fileDrop');
   const fileNameEl = overlay.querySelector('#fileName');
 
-  // File selection UI
   fileInput.addEventListener('change', () => {
     const f = fileInput.files[0];
     if (!f) return;
@@ -525,31 +473,6 @@ function submitAssignment(assignmentId) {
     fileDrop.querySelector('.file-upload-icon').textContent = 'File attached';
   });
 
-  // Drag & drop
-  ['dragover', 'dragenter'].forEach(ev =>
-    fileDrop.addEventListener(ev, e => {
-      e.preventDefault();
-      fileDrop.classList.add('has-file');
-    })
-  );
-  ['dragleave', 'drop'].forEach(ev =>
-    fileDrop.addEventListener(ev, e => {
-      e.preventDefault();
-      if (ev === 'dragleave') fileDrop.classList.remove('has-file');
-    })
-  );
-  fileDrop.addEventListener('drop', e => {
-    const f = e.dataTransfer.files[0];
-    if (!f) return;
-    if (f.type !== 'application/pdf' && !f.name.toLowerCase().endsWith('.pdf')) {
-      return alert('Only PDF files are allowed.');
-    }
-    const dt = new DataTransfer();
-    dt.items.add(f);
-    fileInput.files = dt.files;
-    fileInput.dispatchEvent(new Event('change'));
-  });
-
   overlay.addEventListener('click', e => {
     if (e.target === overlay || e.target.closest('[data-cancel]')) overlay.remove();
   });
@@ -565,7 +488,6 @@ function submitAssignment(assignmentId) {
       const res = await fetch(`/api/submit/${assignmentId}`, {
         method: 'POST',
         body: fd
-        // NOTE: do NOT set Content-Type — browser sets multipart boundary
       });
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));

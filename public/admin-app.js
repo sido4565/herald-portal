@@ -162,6 +162,8 @@ if ($('#adminName')) {
       case 'fees':          return loadFees();
       case 'timetable':     return loadTimetable();
       case 'assignments':   return loadAssignments();
+      case 'attendance':    return loadAttendance();
+      case 'liveclasses':   return loadLiveClasses();
     }
   }
 
@@ -372,6 +374,57 @@ if ($('#adminName')) {
         await loadAssignments();
       });
     });
+
+    // ---- Attendance ----
+    const attFilter = $('#attCourseFilter');
+    if (attFilter) {
+      attFilter.addEventListener('change', () => loadAttendance(attFilter.value));
+    }
+
+    const takeAttBtn = $('#takeAttendanceBtn');
+    if (takeAttBtn) {
+      takeAttBtn.addEventListener('click', () => openTakeAttendanceModal());
+    }
+
+    // ---- Live Classes ----
+    const addLiveBtn = $('#addLiveClassBtn');
+    if (addLiveBtn) {
+      addLiveBtn.addEventListener('click', async () => {
+        try { await ensureCache(); } catch (e) { return toast(e.message, 'error'); }
+        openModal('Schedule Live Class', [
+          { name: 'course_id', label: 'Course', type: 'select', required: true,
+            options: coursesCache.map(c => ({ value: c.id, label: `${c.code} — ${c.title}` })) },
+          { name: 'title', label: 'Class Title', required: true },
+          { name: 'description', label: 'Description / Agenda', type: 'textarea' },
+          { name: 'meeting_url', label: 'Meeting Link (Google Meet / Zoom / Jitsi)', required: true },
+          { name: 'scheduled_at', label: 'Date & Time', type: 'datetime-local', required: true },
+          { name: 'duration_minutes', label: 'Duration (minutes)', type: 'number', value: 60, required: true }
+        ], async d => {
+          d.course_id = Number(d.course_id);
+          d.duration_minutes = Number(d.duration_minutes);
+          await api('/api/admin/live-classes', { method: 'POST', body: d });
+          await loadLiveClasses();
+        });
+      });
+    }
+
+    // ---- Manual backup ----
+    const backupBtn = $('#backupNowBtn');
+    if (backupBtn) {
+      backupBtn.addEventListener('click', async () => {
+        backupBtn.classList.add('btn-loading');
+        backupBtn.disabled = true;
+        try {
+          const r = await api('/api/admin/backup', { method: 'POST' });
+          toast(`Backup saved (${(r.size / 1024).toFixed(1)} KB)`);
+        } catch (e) {
+          toast(e.message, 'error');
+        } finally {
+          backupBtn.classList.remove('btn-loading');
+          backupBtn.disabled = false;
+        }
+      });
+    }
   }
 
   // ---------------- Students ----------------
@@ -417,6 +470,8 @@ if ($('#adminName')) {
         if (act === 'del-tt')        return delTT(id);
         if (act === 'view-subs')     return viewSubs(id);
         if (act === 'del-asg')       return delAsg(id);
+        if (act === 'del-att')       return delAtt(id);
+        if (act === 'del-lc')        return delLiveClass(id);
       } catch (err) { toast(err.message, 'error'); }
     });
   }
@@ -586,22 +641,6 @@ if ($('#adminName')) {
     const summary = await api('/api/admin/fees/summary');
     const outstanding = summary.total_due - summary.total_paid;
 
-        // Payment info banner (rendered once)
-    let banner = document.querySelector('.payment-banner');
-    if (!banner) {
-      banner = document.createElement('div');
-      banner.className = 'payment-banner';
-      const panel = document.querySelector('#panel-fees');
-      const head = panel.querySelector('.panel-head');
-      head.insertAdjacentElement('afterend', banner);
-    }
-    banner.innerHTML = `
-      <span><strong>Payment Collection:</strong> KCB Bank Kenya</span>
-      <span class="payment-inline"><span class="lbl">Paybill</span>522522</span>
-      <span class="payment-inline"><span class="lbl">Account</span>1279021640</span>
-      <span class="payment-inline"><span class="lbl">Name</span>HERALD TRAINER AND CONSULTANT</span>
-    `;
-
     let bar = document.querySelector('.fees-summary-bar');
     if (!bar) {
       bar = document.createElement('div');
@@ -769,7 +808,7 @@ if ($('#adminName')) {
     } catch (e) { toast(e.message, 'error'); }
   }
 
-    // ---------------- Assignments ----------------
+  // ---------------- Assignments ----------------
   async function loadAssignments() {
     const rows = await api('/api/admin/assignments');
     const tb = $('#asgTable tbody');
@@ -788,7 +827,6 @@ if ($('#adminName')) {
       const subCount = a.submission_count || 0;
       const gradedCount = a.graded_count || 0;
       const fileCount = a.file_count || 0;
-
       const gradedBadge = subCount
         ? `<span class="pill ${gradedCount === subCount ? 'pill-green' : 'pill-amber'}">${gradedCount}/${subCount}</span>`
         : '<span class="pill pill-red">0</span>';
@@ -818,7 +856,7 @@ if ($('#adminName')) {
     } catch (e) { toast(e.message, 'error'); }
   }
 
-    async function viewSubs(id) {
+  async function viewSubs(id) {
     const subs = await api(`/api/admin/assignments/${id}/submissions`);
     const assignments = await api('/api/admin/assignments');
     const asg = assignments.find(a => a.id === id);
@@ -833,26 +871,19 @@ if ($('#adminName')) {
             <button class="btn-xs" data-save-all type="button">Save All Grades</button>
           </div>
         </div>
-        <div style="max-height:65vh; overflow:auto;">
+        <div style="max-height:60vh; overflow:auto;">
           ${subs.map(s => `
             <div class="sub-card" data-sub="${s.id}">
               <div class="sub-head">
                 <strong>${esc(s.reg_no)} — ${esc(s.student_name)}</strong>
                 <span class="sub-date">${new Date(s.submitted_at).toLocaleString()}</span>
               </div>
-
               ${s.file_path ? `
-                <div style="margin:10px 0;">
-                  <a class="pdf-link"
-                     href="/api/admin/submission/${s.id}/file"
-                     target="_blank"
-                     rel="noopener">${esc(s.file_name || 'submission.pdf')}</a>
+                <div style="margin:8px 0;">
+                  <a class="pdf-link" href="/api/admin/submission/${s.id}/file" target="_blank" rel="noopener">${esc(s.file_name || 'submission.pdf')}</a>
                 </div>
               ` : ''}
-
               ${s.content ? `<div class="sub-content">${esc(s.content)}</div>` : ''}
-              ${!s.content && !s.file_path ? '<p style="color:var(--muted); font-size:12px; font-style:italic;">(No content or file submitted)</p>' : ''}
-
               <div class="sub-grade-row">
                 <div>
                   <label>Grade</label>
@@ -911,21 +942,202 @@ if ($('#adminName')) {
     });
   }
 
-  // ---------- Auto-logout after 30 min inactivity ----------
-  (function autoLogout() {
-    const TIMEOUT = 30 * 60 * 1000;
-    let timer;
-    function reset() {
-      clearTimeout(timer);
-      timer = setTimeout(() => {
-        fetch('/api/admin/logout', { method: 'POST' })
-          .catch(() => {})
-          .finally(() => location.href = 'admin-login.html');
-      }, TIMEOUT);
+  // ---------------- Attendance ----------------
+  async function loadAttendance(preselectedCourseId) {
+    await ensureCache();
+
+    const filter = $('#attCourseFilter');
+    if (filter && filter.options.length <= 1) {
+      coursesCache.forEach(c => {
+        const opt = document.createElement('option');
+        opt.value = c.id;
+        opt.textContent = `${c.code} — ${c.title}`;
+        filter.appendChild(opt);
+      });
     }
-    ['click', 'keypress', 'scroll', 'mousemove'].forEach(ev =>
-      document.addEventListener(ev, reset, { passive: true })
-    );
-    reset();
-  })();
+
+    const courseId = preselectedCourseId || filter?.value || '';
+    if (!courseId) {
+      $('#attSummary').innerHTML = '<p class="empty">Select a course to view attendance.</p>';
+      $('#attTable tbody').innerHTML = '';
+      return;
+    }
+
+    filter.value = courseId;
+
+    const summary = await api(`/api/admin/attendance-summary/${courseId}`);
+    $('#attSummary').innerHTML = summary.length ? `
+      <table>
+        <thead><tr><th>Reg No</th><th>Name</th><th>Total</th><th>Present</th><th>Absent</th><th>Late</th><th>Rate</th></tr></thead>
+        <tbody>
+          ${summary.map(s => {
+            const rate = s.total ? Math.round((s.present / s.total) * 100) : 0;
+            const pillCls = rate >= 75 ? 'pill-green' : rate >= 50 ? 'pill-amber' : 'pill-red';
+            return `
+              <tr>
+                <td>${esc(s.reg_no)}</td>
+                <td>${esc(s.name)}</td>
+                <td>${s.total || 0}</td>
+                <td>${s.present || 0}</td>
+                <td>${s.absent || 0}</td>
+                <td>${s.late || 0}</td>
+                <td><span class="pill ${pillCls}">${rate}%</span></td>
+              </tr>`;
+          }).join('')}
+        </tbody>
+      </table>
+    ` : '<p class="empty">No students enrolled in this course.</p>';
+
+    const records = await api(`/api/admin/attendance/${courseId}`);
+    const tb = $('#attTable tbody');
+    tb.innerHTML = records.map(r => `
+      <tr>
+        <td>${esc(r.date)}</td>
+        <td>${esc(r.reg_no)} — ${esc(r.student_name)}</td>
+        <td><span class="pill ${r.status === 'present' ? 'pill-green' : r.status === 'absent' ? 'pill-red' : 'pill-amber'}">${esc(r.status)}</span></td>
+        <td>${esc(r.notes || '')}</td>
+        <td><button class="btn-xs danger" data-act="del-att" data-id="${r.id}" type="button">Delete</button></td>
+      </tr>`).join('') || '<tr><td colspan="5" class="empty">No records.</td></tr>';
+
+    wireTableActions(tb);
+  }
+
+  async function delAtt(id) {
+    if (!confirm('Delete this attendance record?')) return;
+    try {
+      await api(`/api/admin/attendance/${id}`, { method: 'DELETE' });
+      await loadAttendance();
+      toast('Record deleted.');
+    } catch (e) { toast(e.message, 'error'); }
+  }
+
+  async function openTakeAttendanceModal() {
+    await ensureCache();
+
+    const overlay = document.createElement('div');
+    overlay.className = 'modal-overlay';
+    overlay.innerHTML = `
+      <div class="modal" style="max-width:720px;">
+        <h3>Take Attendance</h3>
+        <form id="attForm" class="modal-form">
+          <label>Course</label>
+          <select name="course_id" id="attFormCourse" required>
+            <option value="">— Select course —</option>
+            ${coursesCache.map(c => `<option value="${c.id}">${esc(c.code)} — ${esc(c.title)}</option>`).join('')}
+          </select>
+
+          <label>Date</label>
+          <input type="date" name="date" id="attFormDate" value="${new Date().toISOString().slice(0,10)}" required />
+
+          <label>Students</label>
+          <div id="attStudentsList" style="max-height:50vh; overflow:auto; border:1px solid var(--border); border-radius:var(--radius-sm); padding:12px;">
+            <p style="color:var(--muted); font-size:13px;">Select a course to load students.</p>
+          </div>
+        </form>
+        <div class="modal-actions">
+          <button class="btn-ghost dark" data-close type="button">Cancel</button>
+          <button class="btn-primary" id="attSaveBtn" type="button">Save Attendance</button>
+        </div>
+      </div>`;
+    document.body.appendChild(overlay);
+
+    overlay.addEventListener('click', e => {
+      if (e.target === overlay || e.target.closest('[data-close]')) overlay.remove();
+    });
+
+    const courseSelect = overlay.querySelector('#attFormCourse');
+
+    async function loadStudents() {
+      const cid = courseSelect.value;
+      const list = overlay.querySelector('#attStudentsList');
+      if (!cid) {
+        list.innerHTML = '<p style="color:var(--muted); font-size:13px;">Select a course to load students.</p>';
+        return;
+      }
+      const students = await api(`/api/admin/courses/${cid}/students`);
+      if (!students.length) {
+        list.innerHTML = '<p style="color:var(--muted); font-size:13px;">No students enrolled.</p>';
+        return;
+      }
+      list.innerHTML = students.map(s => `
+        <div style="display:flex; align-items:center; justify-content:space-between; padding:8px 0; border-bottom:1px solid var(--border-soft); gap:12px;">
+          <div>
+            <strong style="font-size:13px;">${esc(s.name)}</strong>
+            <div style="font-size:11px; color:var(--muted); font-family:var(--font-mono);">${esc(s.reg_no)}</div>
+          </div>
+          <select class="att-status" data-student-id="${s.id}" style="padding:6px; border-radius:6px; border:1px solid var(--border); background:var(--card); color:var(--text); font-family:inherit;">
+            <option value="present">Present</option>
+            <option value="absent">Absent</option>
+            <option value="late">Late</option>
+          </select>
+        </div>`).join('');
+    }
+
+    courseSelect.addEventListener('change', loadStudents);
+
+    overlay.querySelector('#attSaveBtn').addEventListener('click', async () => {
+      const cid = Number(courseSelect.value);
+      const date = overlay.querySelector('#attFormDate').value;
+      if (!cid || !date) return toast('Select course and date', 'error');
+
+      const selects = overlay.querySelectorAll('.att-status');
+      if (!selects.length) return toast('No students to mark', 'error');
+
+      const records = [...selects].map(s => ({
+        student_id: Number(s.dataset.studentId),
+        status: s.value
+      }));
+
+      try {
+        await api('/api/admin/attendance', { method: 'POST', body: { course_id: cid, date, records } });
+        overlay.remove();
+        toast(`Attendance saved for ${records.length} students`);
+        if ($('#attCourseFilter').value === String(cid)) {
+          await loadAttendance(cid);
+        } else {
+          $('#attCourseFilter').value = cid;
+          await loadAttendance(cid);
+        }
+      } catch (e) { toast(e.message, 'error'); }
+    });
+  }
+
+  // ---------------- Live Classes ----------------
+  async function loadLiveClasses() {
+    const rows = await api('/api/admin/live-classes');
+    const tb = $('#liveClassesTable tbody');
+    const now = new Date();
+
+    tb.innerHTML = rows.map(c => {
+      const start = new Date(c.scheduled_at);
+      const end = new Date(start.getTime() + c.duration_minutes * 60000);
+      let status = 'Upcoming', pillCls = 'pill-amber';
+      if (now >= start && now <= end) { status = 'Live Now'; pillCls = 'pill-green'; }
+      else if (now > end) { status = 'Ended'; pillCls = 'pill-red'; }
+
+      return `
+        <tr>
+          <td>${esc(c.code)}</td>
+          <td>${esc(c.title)}</td>
+          <td>${start.toLocaleString()}</td>
+          <td>${c.duration_minutes} min</td>
+          <td><span class="pill ${pillCls}">${status}</span></td>
+          <td>
+            <a class="btn-xs" href="${esc(c.meeting_url)}" target="_blank" rel="noopener" style="text-decoration:none; display:inline-block;">Open</a>
+            <button class="btn-xs danger" data-act="del-lc" data-id="${c.id}" type="button">Delete</button>
+          </td>
+        </tr>`;
+    }).join('') || '<tr><td colspan="6" class="empty">No live classes scheduled.</td></tr>';
+
+    wireTableActions(tb);
+  }
+
+  async function delLiveClass(id) {
+    if (!confirm('Delete this live class?')) return;
+    try {
+      await api(`/api/admin/live-classes/${id}`, { method: 'DELETE' });
+      await loadLiveClasses();
+      toast('Live class deleted.');
+    } catch (e) { toast(e.message, 'error'); }
+  }
 }
