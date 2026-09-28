@@ -257,6 +257,7 @@ if ($('#adminName')) {
       await api('/api/admin/students', { method: 'POST', body: d });
       studentsCache = [];
       await loadStudents();
+      toast('Student added. Welcome email sent if configured.');
     }));
 
     $('#addCourseBtn').addEventListener('click', () => openModal('Add Course', [
@@ -309,6 +310,25 @@ if ($('#adminName')) {
         await loadFees();
       });
     });
+
+    // ---- Fee reminders ----
+    const feeReminderBtn = $('#sendFeeRemindersBtn');
+    if (feeReminderBtn) {
+      feeReminderBtn.addEventListener('click', async () => {
+        if (!confirm('Send fee reminder emails to all students with outstanding balances?')) return;
+        feeReminderBtn.classList.add('btn-loading');
+        feeReminderBtn.disabled = true;
+        try {
+          const r = await api('/api/admin/send-fee-reminders', { method: 'POST' });
+          toast(`Sent ${r.sent} of ${r.total} reminder email(s)`);
+        } catch (e) {
+          toast(e.message, 'error');
+        } finally {
+          feeReminderBtn.classList.remove('btn-loading');
+          feeReminderBtn.disabled = false;
+        }
+      });
+    }
 
     $('#addTTBtn').addEventListener('click', async () => {
       try { await ensureCache(); } catch (e) { return toast(e.message, 'error'); }
@@ -398,12 +418,15 @@ if ($('#adminName')) {
           { name: 'description', label: 'Description / Agenda', type: 'textarea' },
           { name: 'meeting_url', label: 'Meeting Link (Google Meet / Zoom / Jitsi)', required: true },
           { name: 'scheduled_at', label: 'Date & Time', type: 'datetime-local', required: true },
-          { name: 'duration_minutes', label: 'Duration (minutes)', type: 'number', value: 60, required: true }
+          { name: 'duration_minutes', label: 'Duration (minutes)', type: 'number', value: 60, required: true },
+          { name: 'notify', label: 'Email enrolled students? (yes/no)', value: 'yes' }
         ], async d => {
           d.course_id = Number(d.course_id);
           d.duration_minutes = Number(d.duration_minutes);
+          d.notify = /^(yes|1|true|y)$/i.test(String(d.notify || '').trim());
           await api('/api/admin/live-classes', { method: 'POST', body: d });
           await loadLiveClasses();
+          toast(d.notify ? 'Class scheduled. Emails queued.' : 'Class scheduled.');
         });
       });
     }
@@ -912,7 +935,7 @@ if ($('#adminName')) {
           const feedback = overlay.querySelector(`[data-field="feedback"][data-id="${subId}"]`).value;
           try {
             await api(`/api/admin/submissions/${subId}`, { method: 'PUT', body: { grade, feedback } });
-            toast('Grade saved.');
+            toast(grade ? 'Grade saved. Student notified.' : 'Saved.');
           } catch (err) { toast(err.message, 'error'); }
         }
 
@@ -923,7 +946,7 @@ if ($('#adminName')) {
               const feedback = overlay.querySelector(`[data-field="feedback"][data-id="${s.id}"]`).value;
               await api(`/api/admin/submissions/${s.id}`, { method: 'PUT', body: { grade, feedback } });
             }
-            toast('All grades saved.');
+            toast('All grades saved. Students notified.');
           } catch (err) { toast(err.message, 'error'); }
         }
 

@@ -114,7 +114,10 @@
     <section class="admin-panel" id="panel-fees">
       <div class="panel-head">
         <h2>Fee Records</h2>
-        <button class="btn-primary" id="addFeeBtn" type="button">Add Fee Record</button>
+        <div style="display:flex; gap:8px; flex-wrap:wrap;">
+          <button class="btn-ghost dark" id="sendFeeRemindersBtn" type="button">Send Fee Reminders</button>
+          <button class="btn-primary" id="addFeeBtn" type="button">Add Fee Record</button>
+        </div>
       </div>
       <div class="table-wrap">
         <table id="feesTable">
