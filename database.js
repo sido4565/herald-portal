@@ -135,6 +135,32 @@ CREATE TABLE IF NOT EXISTS submissions (
   FOREIGN KEY(assignment_id) REFERENCES assignments(id),
   FOREIGN KEY(student_id) REFERENCES students(id)
 );
+
+CREATE TABLE IF NOT EXISTS attendance (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  course_id INTEGER NOT NULL,
+  student_id INTEGER NOT NULL,
+  date TEXT NOT NULL,
+  status TEXT NOT NULL DEFAULT 'present',
+  marked_by INTEGER,
+  notes TEXT,
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY(course_id) REFERENCES courses(id),
+  FOREIGN KEY(student_id) REFERENCES students(id)
+);
+
+CREATE TABLE IF NOT EXISTS live_classes (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  course_id INTEGER NOT NULL,
+  title TEXT NOT NULL,
+  description TEXT,
+  meeting_url TEXT NOT NULL,
+  scheduled_at DATETIME NOT NULL,
+  duration_minutes INTEGER DEFAULT 60,
+  created_by INTEGER,
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY(course_id) REFERENCES courses(id)
+);
 `);
 
 // ---------- Safe migrations for existing DBs ----------

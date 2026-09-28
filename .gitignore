@@ -28,3 +28,4 @@ server.log
 Thumbs.db
 .vscode/
 .idea/
+.env.mail
