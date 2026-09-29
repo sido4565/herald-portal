@@ -9,11 +9,37 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="style.css" />
+  <style>
+    .auth-body {
+      background-image: url('images/login-background.png');
+      background-size: cover;
+      background-position: center;
+      background-attachment: fixed;
+      position: relative;
+    }
+    .auth-body::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: rgba(11, 26, 51, 0.55);
+      backdrop-filter: blur(3px);
+    }
+    .auth-card {
+      position: relative;
+      z-index: 2;
+    }
+    .login-logo {
+      display: block;
+      max-width: 180px;
+      margin: 0 auto 8px;
+    }
+  </style>
 </head>
 <body class="auth-body">
   <div class="auth-card">
-    <h1>Herald Portal</h1>
-    <p class="subtitle">Student Access</p>
+    <img src="images/herald-logo.png" alt="Herald Trainer and Consultant" class="login-logo" />
+    <h1>Student Portal</h1>
+    <p class="subtitle">Your Learning Journey, Our Commitment</p>
 
     <div class="tabs">
       <button class="tab active" data-tab="login" type="button">Sign In</button>
@@ -22,44 +48,44 @@
 
     <form id="loginForm" class="auth-form">
       <label for="login-reg">Registration Number</label>
-      <input id="login-reg" name="reg_no" placeholder="STU001" required />
+      <input id="login-reg" name="reg_no" placeholder="e.g. HRL-2026-0001" required />
       <label for="login-pwd">Password</label>
       <input id="login-pwd" name="password" type="password" required />
       <button type="submit" class="btn-primary">Sign In</button>
     </form>
 
     <form id="registerForm" class="auth-form hidden">
-  <label for="reg-name">Full Name</label>
-  <input id="reg-name" name="name" required />
+      <label for="reg-name">Full Name</label>
+      <input id="reg-name" name="name" required />
 
-  <label for="reg-email">Email Address</label>
-  <input id="reg-email" name="email" type="email" required />
+      <label for="reg-email">Email Address</label>
+      <input id="reg-email" name="email" type="email" required />
 
-  <label for="reg-password">Password (min 6 characters)</label>
-  <input id="reg-password" name="password" type="password" minlength="6" required />
+      <label for="reg-password">Password (min 6 characters)</label>
+      <input id="reg-password" name="password" type="password" minlength="6" required />
 
-  <label for="reg-course">Program of Study</label>
-  <select id="reg-course" name="course" required>
-    <option value="">— Select a course —</option>
-  </select>
+      <label for="reg-course">Program of Study</label>
+      <select id="reg-course" name="course" required>
+        <option value="">— Select a course —</option>
+      </select>
 
-  <p class="hint" style="text-align:left; margin:4px 0 0;">
-    Your registration number will be generated automatically and sent to your email.
-  </p>
+      <p class="hint" style="text-align:left; margin:4px 0 0;">
+        Your registration number will be generated automatically and sent to your email.
+      </p>
 
-  <button type="submit" class="btn-primary">Create Account</button>
-</form>
+      <button type="submit" class="btn-primary">Create Account</button>
+    </form>
 
-<div id="regSuccess" class="hidden" style="margin-top:20px; padding:20px; background:var(--bg-alt); border-radius:8px; border-left:4px solid var(--success);">
-  <h3 style="margin:0 0 8px; font-size:16px; color:var(--text);">Registration Successful</h3>
-  <p style="margin:0 0 12px; color:var(--text-soft); font-size:13px;">Your registration number is:</p>
-  <div id="regNoDisplay" style="font-family:var(--font-mono); font-size:22px; font-weight:700; color:var(--navy-700); letter-spacing:0.05em; padding:12px; background:var(--card); border-radius:6px; text-align:center; margin-bottom:12px;">HRL-2025-0001</div>
-  <p style="margin:0; color:var(--muted); font-size:12px; line-height:1.5;">
-    We've emailed this to you. Use it to log in from now on.<br>
-    <strong>Save this number — you'll need it every time.</strong>
-  </p>
-  <button type="button" id="goToLogin" class="btn-primary" style="margin-top:16px; width:100%;">Continue to Login</button>
-</div>
+    <div id="regSuccess" class="hidden" style="margin-top:20px; padding:20px; background:var(--bg-alt); border-radius:8px; border-left:4px solid var(--success);">
+      <h3 style="margin:0 0 8px; font-size:16px; color:var(--text);">Registration Successful</h3>
+      <p style="margin:0 0 12px; color:var(--text-soft); font-size:13px;">Your registration number is:</p>
+      <div id="regNoDisplay" style="font-family:var(--font-mono); font-size:22px; font-weight:700; color:var(--navy-700); letter-spacing:0.05em; padding:12px; background:var(--card); border-radius:6px; text-align:center; margin-bottom:12px;">HRL-2026-0001</div>
+      <p style="margin:0; color:var(--muted); font-size:12px; line-height:1.5;">
+        We've emailed this to you. Use it to log in from now on.<br>
+        <strong>Save this number — you'll need it every time.</strong>
+      </p>
+      <button type="button" id="goToLogin" class="btn-primary" style="margin-top:16px; width:100%;">Continue to Login</button>
+    </div>
 
     <p id="authMsg" class="msg"></p>
 
