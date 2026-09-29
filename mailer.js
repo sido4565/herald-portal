@@ -5,12 +5,14 @@ const ENABLED = !!(process.env.BREVO_SMTP_KEY && process.env.BREVO_SMTP_LOGIN);
 
 const transporter = ENABLED ? nodemailer.createTransport({
   host: 'smtp-relay.brevo.com',
-  port: 587,
-  secure: false, // STARTTLS
+  port: 465,
+  secure: true, // SSL
   auth: {
     user: process.env.BREVO_SMTP_LOGIN,
     pass: process.env.BREVO_SMTP_KEY,
   },
+  connectionTimeout: 15000, // 15 seconds
+  socketTimeout: 15000,
 }) : null;
 
 const FROM = process.env.MAIL_FROM || 'Herald Trainer Consultant <sidzac33@gmail.com>';
