@@ -15,23 +15,6 @@ app.use(express.json());
 app.use(cookieParser());
 app.use(express.static(path.join(__dirname, 'public')));
 
-app.get('/api/debug/send-email', async (req, res) => {
-  try {
-    const { sendMail, ENABLED } = require('./mailer');
-    if (!ENABLED) {
-      return res.json({ ok: false, error: 'mailer disabled', ENABLED });
-    }
-    const r = await sendMail({
-      to: 'osidonge@gmail.com',
-      subject: 'Render Debug Test ' + Date.now(),
-      html: '<h2>Render Debug Test</h2><p>Direct test from /api/debug/send-email</p>',
-    });
-    res.json({ ok: true, result: r });
-  } catch (err) {
-    res.json({ ok: false, error: err.message });
-  }
-});
-
 // ---------- File uploads ----------
 const UPLOAD_DIR = process.env.UPLOAD_DIR || path.join(__dirname, 'uploads');
 if (!fs.existsSync(UPLOAD_DIR)) fs.mkdirSync(UPLOAD_DIR, { recursive: true });
@@ -46,16 +29,13 @@ const storage = multer.diskStorage({
 
 const upload = multer({
   storage,
-  limits: { fileSize: 10 * 1024 * 1024 }, // 10 MB
+  limits: { fileSize: 10 * 1024 * 1024 },
   fileFilter: (req, file, cb) => {
-    if (file.mimetype !== 'application/pdf') {
-      return cb(new Error('Only PDF files are allowed'));
-    }
+    if (file.mimetype !== 'application/pdf') return cb(new Error('Only PDF files are allowed'));
     cb(null, true);
   }
 });
 
-// Serve uploaded PDFs (protected — only authenticated users via /api route)
 app.use('/uploads', express.static(UPLOAD_DIR, {
   setHeaders: (res) => {
     res.setHeader('Content-Type', 'application/pdf');
@@ -82,19 +62,23 @@ function authAdmin(req, res, next) {
   } catch { res.status(401).json({ error: 'Not authenticated' }); }
 }
 
-// ==================== STUDENT ROUTES ====================
-app.post('/api/login', (req, res) => {
-  const { reg_no, password } = req.body;
-  if (!reg_no || !password) return res.status(400).json({ error: 'Missing credentials' });
-  const s = db.prepare('SELECT * FROM students WHERE reg_no = ?').get(reg_no);
-  if (!s || !bcrypt.compareSync(password, s.password))
-    return res.status(401).json({ error: 'Invalid registration number or password' });
-  if (!s.active) return res.status(403).json({ error: 'Account deactivated. Contact admin.' });
-  res.cookie('token', signStudent(s), { httpOnly: true, sameSite: 'lax' });
-  res.json({ ok: true, name: s.name });
-});
+// ---------- Mailer helpers ----------
+let mailer = null;
+try { mailer = require('./mailer'); } catch (_) {}
 
-// Helper: generate next registration number for the current year
+function sendMailSafe(fnName, payload) {
+  if (!mailer || !mailer.ENABLED) {
+    console.log(`[mail:skipped] ${fnName} (mailer disabled)`);
+    return;
+  }
+  if (typeof mailer[fnName] !== 'function') {
+    console.log(`[mail:skipped] ${fnName} (function missing)`);
+    return;
+  }
+  mailer[fnName](payload).catch(err => console.error(`✉️  ${fnName} failed:`, err.message));
+}
+
+// Helper: generate next registration number for current year
 function generateRegNo() {
   const year = new Date().getFullYear();
   const prefix = `HRL-${year}-`;
@@ -110,23 +94,24 @@ function generateRegNo() {
   return `${prefix}${String(nextNum).padStart(4, '0')}`;
 }
 
+// ==================== STUDENT ROUTES ====================
+app.post('/api/login', (req, res) => {
+  const { reg_no, password } = req.body;
+  if (!reg_no || !password) return res.status(400).json({ error: 'Missing credentials' });
+  const s = db.prepare('SELECT * FROM students WHERE reg_no = ?').get(reg_no);
+  if (!s || !bcrypt.compareSync(password, s.password))
+    return res.status(401).json({ error: 'Invalid registration number or password' });
+  if (!s.active) return res.status(403).json({ error: 'Account deactivated. Contact admin.' });
+  res.cookie('token', signStudent(s), { httpOnly: true, sameSite: 'lax' });
+  res.json({ ok: true, name: s.name });
+});
+
 app.post('/api/register', async (req, res) => {
   const { name, email, password, course } = req.body;
 
-  // Validate required fields
-  if (!name || !email || !password || !course) {
-    return res.status(400).json({ error: 'All fields are required.' });
-  }
-
-  // Password validation
-  if (password.length < 6) {
-    return res.status(400).json({ error: 'Password must be at least 6 characters.' });
-  }
-
-  // Basic email validation
-  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-    return res.status(400).json({ error: 'Please enter a valid email address.' });
-  }
+  if (!name || !email || !password || !course) return res.status(400).json({ error: 'All fields are required.' });
+  if (password.length < 6) return res.status(400).json({ error: 'Password must be at least 6 characters.' });
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return res.status(400).json({ error: 'Please enter a valid email address.' });
 
   try {
     const hash = bcrypt.hashSync(password, 10);
@@ -139,20 +124,12 @@ app.post('/api/register', async (req, res) => {
     const s = db.prepare('SELECT * FROM students WHERE id = ?').get(info.lastInsertRowid);
     res.cookie('token', signStudent(s), { httpOnly: true, sameSite: 'lax' });
 
-    // Send welcome email with generated reg_no
-    if (process.env.GMAIL_USER) {
-      try {
-        const { sendWelcomeEmail } = require('./mailer');
-        sendWelcomeEmail({
-          to: s.email,
-          studentName: s.name,
-          regNo: s.reg_no,
-          course: s.course,
-        }).catch(err => console.error('Welcome email failed:', err.message));
-      } catch (e) {
-        console.error('Welcome email error:', e.message);
-      }
-    }
+    sendMailSafe('sendWelcomeEmail', {
+      to: s.email,
+      studentName: s.name,
+      regNo: s.reg_no,
+      course: s.course,
+    });
 
     res.json({
       ok: true,
@@ -175,7 +152,6 @@ app.get('/api/me', authStudent, (req, res) => {
   res.json(db.prepare('SELECT id, reg_no, name, email, course FROM students WHERE id = ?').get(req.user.id));
 });
 
-// Public: list course names for the registration dropdown
 app.get('/api/public/courses', (req, res) => {
   const rows = db.prepare('SELECT DISTINCT title FROM courses ORDER BY title').all();
   res.json(rows.map(r => r.title));
@@ -244,9 +220,7 @@ app.post('/api/submit/:assignmentId', authStudent, upload.single('file'), (req, 
   const filePath = req.file ? `/uploads/${req.file.filename}` : null;
   const fileName = req.file ? req.file.originalname : null;
 
-  if (!content && !filePath) {
-    return res.status(400).json({ error: 'Provide text and/or a PDF file' });
-  }
+  if (!content && !filePath) return res.status(400).json({ error: 'Provide text and/or a PDF file' });
 
   const existing = db.prepare('SELECT * FROM submissions WHERE assignment_id = ? AND student_id = ?').get(aid, req.user.id);
 
@@ -257,9 +231,7 @@ app.post('/api/submit/:assignmentId', authStudent, upload.single('file'), (req, 
     }
     db.prepare(`
       UPDATE submissions
-      SET content = ?,
-          file_path = COALESCE(?, file_path),
-          file_name = COALESCE(?, file_name),
+      SET content = ?, file_path = COALESCE(?, file_path), file_name = COALESCE(?, file_name),
           submitted_at = CURRENT_TIMESTAMP
       WHERE id = ?
     `).run(content, filePath, fileName, existing.id);
@@ -274,15 +246,9 @@ app.post('/api/submit/:assignmentId', authStudent, upload.single('file'), (req, 
 });
 
 app.get('/api/submission/:id/file', authStudent, (req, res) => {
-  const sub = db.prepare(`
-    SELECT sub.*, a.student_id AS owner_id
-    FROM submissions sub
-    JOIN assignments a ON a.id = sub.assignment_id
-    WHERE sub.id = ?
-  `).get(req.params.id);
+  const sub = db.prepare('SELECT * FROM submissions WHERE id = ?').get(req.params.id);
   if (!sub || !sub.file_path) return res.status(404).json({ error: 'No file' });
   if (sub.student_id !== req.user.id) return res.status(403).json({ error: 'Not yours' });
-
   const fullPath = path.join(__dirname, sub.file_path);
   if (!fs.existsSync(fullPath)) return res.status(404).json({ error: 'File missing' });
   res.setHeader('Content-Type', 'application/pdf');
@@ -290,14 +256,43 @@ app.get('/api/submission/:id/file', authStudent, (req, res) => {
   fs.createReadStream(fullPath).pipe(res);
 });
 
-app.get('/api/admin/submission/:id/file', authAdmin, (req, res) => {
-  const sub = db.prepare('SELECT * FROM submissions WHERE id = ?').get(req.params.id);
-  if (!sub || !sub.file_path) return res.status(404).json({ error: 'No file' });
-  const fullPath = path.join(__dirname, sub.file_path);
-  if (!fs.existsSync(fullPath)) return res.status(404).json({ error: 'File missing' });
-  res.setHeader('Content-Type', 'application/pdf');
-  res.setHeader('Content-Disposition', `inline; filename="${sub.file_name || 'submission.pdf'}"`);
-  fs.createReadStream(fullPath).pipe(res);
+app.get('/api/my-attendance', authStudent, (req, res) => {
+  const records = db.prepare(`
+    SELECT a.id, a.date, a.status, a.notes, c.code, c.title
+    FROM attendance a JOIN courses c ON c.id = a.course_id
+    WHERE a.student_id = ? ORDER BY a.date DESC LIMIT 100
+  `).all(req.user.id);
+
+  const summary = db.prepare(`
+    SELECT c.code, c.title, COUNT(*) AS total,
+      SUM(CASE WHEN a.status = 'present' THEN 1 ELSE 0 END) AS present,
+      SUM(CASE WHEN a.status = 'absent' THEN 1 ELSE 0 END) AS absent,
+      SUM(CASE WHEN a.status = 'late' THEN 1 ELSE 0 END) AS late
+    FROM attendance a JOIN courses c ON c.id = a.course_id
+    WHERE a.student_id = ? GROUP BY c.id
+  `).all(req.user.id);
+
+  res.json({ records, summary });
+});
+
+app.get('/api/my-live-classes', authStudent, (req, res) => {
+  const rows = db.prepare(`
+    SELECT lc.*, c.code, c.title AS course_title
+    FROM live_classes lc JOIN courses c ON c.id = lc.course_id
+    JOIN enrollments e ON e.course_id = lc.course_id
+    WHERE e.student_id = ? ORDER BY lc.scheduled_at ASC
+  `).all(req.user.id);
+
+  const now = new Date();
+  const enriched = rows.map(r => {
+    const start = new Date(r.scheduled_at);
+    const end = new Date(start.getTime() + r.duration_minutes * 60000);
+    let status = 'upcoming';
+    if (now >= start && now <= end) status = 'live';
+    else if (now > end) status = 'ended';
+    return { ...r, status, ends_at: end.toISOString() };
+  });
+  res.json(enriched);
 });
 
 // ==================== ADMIN ROUTES ====================
@@ -326,77 +321,47 @@ app.get('/api/admin/stats', authAdmin, (req, res) => {
   });
 });
 
-// ---------- Manual backup trigger ----------
 app.post('/api/admin/backup', authAdmin, async (req, res) => {
   try {
     const { uploadBackup, createSnapshot, ENABLED } = require('./backup');
     if (!ENABLED) return res.status(400).json({ error: 'Backup not configured' });
-
     const snapshotPath = path.join('/tmp', `herald-snapshot-${Date.now()}.db`);
-
-    // 1. Create a consistent snapshot using SQLite's backup API
-    //    This captures ALL data including uncommitted WAL pages.
     await createSnapshot(db, snapshotPath);
-
-    // 2. Log snapshot size for diagnostics
     const stats = fs.statSync(snapshotPath);
     console.log(`📊 Snapshot size: ${stats.size} bytes`);
-
-    // 3. Upload the snapshot
     const result = await uploadBackup(snapshotPath);
-
-    // 4. Cleanup snapshot
     fs.unlinkSync(snapshotPath);
-
-    res.json({
-      ok: true,
-      size: result.size,
-      snapshot_size: stats.size,
-      at: new Date().toISOString()
-    });
+    res.json({ ok: true, size: result.size, snapshot_size: stats.size, at: new Date().toISOString() });
   } catch (err) {
     console.error('Backup error:', err);
     res.status(500).json({ error: err.message });
   }
 });
 
+// --- Students
 app.get('/api/admin/students', authAdmin, (req, res) => {
   res.json(db.prepare('SELECT id, reg_no, name, email, course, active, created_at FROM students ORDER BY id DESC').all());
 });
 
 app.post('/api/admin/students', authAdmin, (req, res) => {
   let { reg_no, name, email, password, course } = req.body;
-  if (!name || !email || !password || !course) {
-    return res.status(400).json({ error: 'Name, email, password, and course are required.' });
-  }
-  if (!reg_no) {
-    reg_no = generateRegNo();  // auto-generate if blank
-  }
+  if (!name || !email || !password || !course) return res.status(400).json({ error: 'Name, email, password, and course are required.' });
+  if (!reg_no) reg_no = generateRegNo();
   try {
     const hash = bcrypt.hashSync(password, 10);
     db.prepare('INSERT INTO students (reg_no, name, email, password, course) VALUES (?, ?, ?, ?, ?)')
       .run(reg_no, name, email.trim().toLowerCase(), hash, course);
-
-    if (process.env.GMAIL_USER) {
-      try {
-        const { sendWelcomeEmail } = require('./mailer');
-        sendWelcomeEmail({ to: email, studentName: name, regNo: reg_no, course })
-          .catch(err => console.error('Welcome email error:', err.message));
-      } catch (e) { console.error(e.message); }
-    }
-
+    sendMailSafe('sendWelcomeEmail', { to: email, studentName: name, regNo: reg_no, course });
     res.json({ ok: true, reg_no });
   } catch (err) {
-    if (String(err.message).includes('UNIQUE')) {
-      return res.status(400).json({ error: 'Reg no or email already exists.' });
-    }
+    if (String(err.message).includes('UNIQUE')) return res.status(400).json({ error: 'Reg no or email already exists.' });
     res.status(500).json({ error: err.message });
   }
 });
 
 app.post('/api/admin/send-fee-reminders', authAdmin, async (req, res) => {
   try {
-    const { sendFeeReminder } = require('./mailer');
+    if (!mailer || !mailer.ENABLED) return res.status(400).json({ error: 'Mailer not configured' });
     const rows = db.prepare(`
       SELECT f.amount_due - f.amount_paid AS balance, f.term, s.email, s.name
       FROM fees f JOIN students s ON s.id = f.student_id
@@ -406,16 +371,10 @@ app.post('/api/admin/send-fee-reminders', authAdmin, async (req, res) => {
     let sent = 0;
     for (const r of rows) {
       try {
-        await sendFeeReminder({
-          to: r.email,
-          studentName: r.name,
-          term: r.term,
-          balance: r.balance,
-        });
+        await mailer.sendFeeReminder({ to: r.email, studentName: r.name, term: r.term, balance: r.balance });
         sent++;
       } catch (e) { console.error('Fee reminder failed:', e.message); }
     }
-
     res.json({ ok: true, sent, total: rows.length });
   } catch (e) {
     res.status(500).json({ error: e.message });
@@ -438,39 +397,28 @@ app.delete('/api/admin/students/:id', authAdmin, (req, res) => {
 
 app.post('/api/admin/students/:id/reset-password', authAdmin, async (req, res) => {
   const { newPassword } = req.body;
-  if (!newPassword || newPassword.length < 6) {
-    return res.status(400).json({ error: 'Password must be at least 6 characters.' });
-  }
+  if (!newPassword || newPassword.length < 6) return res.status(400).json({ error: 'Password must be at least 6 characters.' });
   try {
     db.prepare('UPDATE students SET password = ? WHERE id = ?')
       .run(bcrypt.hashSync(newPassword, 10), req.params.id);
-
-    // Optionally email the new password to the student
     const student = db.prepare('SELECT name, email, reg_no FROM students WHERE id = ?').get(req.params.id);
-    if (student && process.env.GMAIL_USER) {
-      try {
-        const { sendMail } = require('./mailer');
-        sendMail({
-          to: student.email,
-          subject: 'Your Herald Portal password has been reset',
-          html: `
-            <h2>Password Reset</h2>
-            <p>Hello ${student.name},</p>
-            <p>Your password has been reset by an administrator.</p>
-            <p><strong>New password:</strong> <code style="background:#f0f0f0; padding:4px 8px; border-radius:4px; font-family:monospace;">${newPassword}</code></p>
-            <p>Please log in and change it immediately if you wish.</p>
-            <p>Reg No: ${student.reg_no}</p>
-          `,
-        }).catch(err => console.error('Reset email failed:', err.message));
-      } catch (e) { console.error(e.message); }
+    if (student) {
+      sendMailSafe('sendMail', {
+        to: student.email,
+        subject: 'Your Herald Portal password has been reset',
+        html: `<h2>Password Reset</h2><p>Hello ${student.name},</p>
+               <p>Your password has been reset.</p>
+               <p><strong>New password:</strong> <code>${newPassword}</code></p>
+               <p>Reg No: ${student.reg_no}</p>`,
+      });
     }
-
-    res.json({ ok: true, emailed: !!(student && process.env.GMAIL_USER) });
+    res.json({ ok: true });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
 
+// --- Courses
 app.get('/api/admin/courses', authAdmin, (req, res) => {
   res.json(db.prepare(`
     SELECT c.*, (SELECT COUNT(*) FROM enrollments WHERE course_id = c.id) AS enrolled_count
@@ -509,6 +457,7 @@ app.get('/api/admin/courses/:id/students', authAdmin, (req, res) => {
   `).all(req.params.id));
 });
 
+// --- Announcements
 app.get('/api/admin/announcements', authAdmin, (req, res) => {
   res.json(db.prepare('SELECT * FROM announcements ORDER BY created_at DESC').all());
 });
@@ -531,6 +480,7 @@ app.delete('/api/admin/announcements/:id', authAdmin, (req, res) => {
   res.json({ ok: true });
 });
 
+// --- Results
 function calcGrade(m) {
   if (m >= 80) return 'A'; if (m >= 75) return 'A-'; if (m >= 70) return 'B+';
   if (m >= 65) return 'B'; if (m >= 60) return 'B-'; if (m >= 55) return 'C+';
@@ -559,6 +509,7 @@ app.delete('/api/admin/results/:id', authAdmin, (req, res) => {
   res.json({ ok: true });
 });
 
+// --- Fees
 app.get('/api/admin/fees', authAdmin, (req, res) => {
   res.json(db.prepare(`
     SELECT f.*, s.reg_no, s.name AS student_name
@@ -567,17 +518,14 @@ app.get('/api/admin/fees', authAdmin, (req, res) => {
 });
 
 app.get('/api/admin/fees/summary', authAdmin, (req, res) => {
-  const row = db.prepare(`
-    SELECT
-      COALESCE(SUM(amount_due), 0) AS total_due,
-      COALESCE(SUM(amount_paid), 0) AS total_paid,
+  res.json(db.prepare(`
+    SELECT COALESCE(SUM(amount_due), 0) AS total_due, COALESCE(SUM(amount_paid), 0) AS total_paid,
       COUNT(*) AS records,
       SUM(CASE WHEN status = 'paid' THEN 1 ELSE 0 END) AS paid_count,
       SUM(CASE WHEN status = 'partial' THEN 1 ELSE 0 END) AS partial_count,
       SUM(CASE WHEN status = 'unpaid' THEN 1 ELSE 0 END) AS unpaid_count
     FROM fees
-  `).get();
-  res.json(row);
+  `).get());
 });
 
 app.post('/api/admin/fees', authAdmin, (req, res) => {
@@ -616,6 +564,7 @@ app.delete('/api/admin/fees/:id', authAdmin, (req, res) => {
   res.json({ ok: true });
 });
 
+// --- Timetable
 app.get('/api/admin/timetable', authAdmin, (req, res) => {
   res.json(db.prepare(`
     SELECT t.*, c.code, c.title FROM timetable t JOIN courses c ON c.id = t.course_id
@@ -639,6 +588,7 @@ app.delete('/api/admin/timetable/:id', authAdmin, (req, res) => {
   res.json({ ok: true });
 });
 
+// --- Assignments
 app.get('/api/admin/assignments', authAdmin, (req, res) => {
   res.json(db.prepare(`
     SELECT a.*, c.code, c.title,
@@ -671,78 +621,55 @@ app.get('/api/admin/assignments/:id/submissions', authAdmin, (req, res) => {
   `).all(req.params.id));
 });
 
+app.get('/api/admin/submission/:id/file', authAdmin, (req, res) => {
+  const sub = db.prepare('SELECT * FROM submissions WHERE id = ?').get(req.params.id);
+  if (!sub || !sub.file_path) return res.status(404).json({ error: 'No file' });
+  const fullPath = path.join(__dirname, sub.file_path);
+  if (!fs.existsSync(fullPath)) return res.status(404).json({ error: 'File missing' });
+  res.setHeader('Content-Type', 'application/pdf');
+  res.setHeader('Content-Disposition', `inline; filename="${sub.file_name || 'submission.pdf'}"`);
+  fs.createReadStream(fullPath).pipe(res);
+});
+
 app.put('/api/admin/submissions/:id', authAdmin, async (req, res) => {
   const { grade, feedback } = req.body;
   db.prepare('UPDATE submissions SET grade = ?, feedback = ? WHERE id = ?')
     .run(grade || '', feedback || '', req.params.id);
 
-  // Notify student (fire-and-forget)
-  try {
-    if (process.env.GMAIL_USER) {
-      const sub = db.prepare(`
-        SELECT sub.*, s.email, s.name AS student_name, a.title AS assignment_title, c.code AS course_code
-        FROM submissions sub
-        JOIN students s ON s.id = sub.student_id
-        JOIN assignments a ON a.id = sub.assignment_id
-        JOIN courses c ON c.id = a.course_id
-        WHERE sub.id = ?
-      `).get(req.params.id);
+  if (grade) {
+    const sub = db.prepare(`
+      SELECT sub.*, s.email, s.name AS student_name, a.title AS assignment_title, c.code AS course_code
+      FROM submissions sub
+      JOIN students s ON s.id = sub.student_id
+      JOIN assignments a ON a.id = sub.assignment_id
+      JOIN courses c ON c.id = a.course_id
+      WHERE sub.id = ?
+    `).get(req.params.id);
 
-      if (sub && grade) {
-        const { sendAssignmentGraded } = require('./mailer');
-        sendAssignmentGraded({
-          to: sub.email,
-          studentName: sub.student_name,
-          assignmentTitle: sub.assignment_title,
-          courseCode: sub.course_code,
-          grade,
-          feedback,
-        }).catch(e => console.error('Email error:', e.message));
-      }
+    if (sub) {
+      sendMailSafe('sendAssignmentGraded', {
+        to: sub.email,
+        studentName: sub.student_name,
+        assignmentTitle: sub.assignment_title,
+        courseCode: sub.course_code,
+        grade,
+        feedback,
+      });
     }
-  } catch (e) { console.error('Notification error:', e.message); }
+  }
 
   res.json({ ok: true });
 });
 
-// ==================== ATTENDANCE — STUDENT ====================
-app.get('/api/my-attendance', authStudent, (req, res) => {
-  const rows = db.prepare(`
-    SELECT a.id, a.date, a.status, a.notes, c.code, c.title
-    FROM attendance a
-    JOIN courses c ON c.id = a.course_id
-    WHERE a.student_id = ?
-    ORDER BY a.date DESC
-    LIMIT 100
-  `).all(req.user.id);
-
-  // Summary per course
-  const summary = db.prepare(`
-    SELECT c.code, c.title,
-      COUNT(*) AS total,
-      SUM(CASE WHEN a.status = 'present' THEN 1 ELSE 0 END) AS present,
-      SUM(CASE WHEN a.status = 'absent' THEN 1 ELSE 0 END) AS absent,
-      SUM(CASE WHEN a.status = 'late' THEN 1 ELSE 0 END) AS late
-    FROM attendance a
-    JOIN courses c ON c.id = a.course_id
-    WHERE a.student_id = ?
-    GROUP BY c.id
-  `).all(req.user.id);
-
-  res.json({ records: rows, summary });
-});
-
-// ==================== ATTENDANCE — ADMIN ====================
+// --- Attendance (admin)
 app.get('/api/admin/attendance/:courseId', authAdmin, (req, res) => {
-  const rows = db.prepare(`
+  res.json(db.prepare(`
     SELECT a.*, s.reg_no, s.name AS student_name
-    FROM attendance a
-    JOIN students s ON s.id = a.student_id
+    FROM attendance a JOIN students s ON s.id = a.student_id
     WHERE a.course_id = ?
     ORDER BY a.date DESC, s.name ASC
     LIMIT 500
-  `).all(req.params.courseId);
-  res.json(rows);
+  `).all(req.params.courseId));
 });
 
 app.post('/api/admin/attendance', authAdmin, (req, res) => {
@@ -750,16 +677,8 @@ app.post('/api/admin/attendance', authAdmin, (req, res) => {
   if (!course_id || !date || !Array.isArray(records)) {
     return res.status(400).json({ error: 'course_id, date, records[] required' });
   }
-
-  const insert = db.prepare(`
-    INSERT INTO attendance (course_id, student_id, date, status, marked_by, notes)
-    VALUES (?, ?, ?, ?, ?, ?)
-  `);
-
-  const del = db.prepare(`
-    DELETE FROM attendance WHERE course_id = ? AND student_id = ? AND date = ?
-  `);
-
+  const insert = db.prepare(`INSERT INTO attendance (course_id, student_id, date, status, marked_by, notes) VALUES (?, ?, ?, ?, ?, ?)`);
+  const del = db.prepare(`DELETE FROM attendance WHERE course_id = ? AND student_id = ? AND date = ?`);
   const tx = db.transaction(() => {
     records.forEach(r => {
       del.run(course_id, r.student_id, date);
@@ -767,12 +686,11 @@ app.post('/api/admin/attendance', authAdmin, (req, res) => {
     });
   });
   tx();
-
   res.json({ ok: true, count: records.length });
 });
 
 app.get('/api/admin/attendance-summary/:courseId', authAdmin, (req, res) => {
-  const rows = db.prepare(`
+  res.json(db.prepare(`
     SELECT s.id, s.reg_no, s.name,
       COUNT(a.id) AS total,
       SUM(CASE WHEN a.status = 'present' THEN 1 ELSE 0 END) AS present,
@@ -781,10 +699,8 @@ app.get('/api/admin/attendance-summary/:courseId', authAdmin, (req, res) => {
     FROM students s
     JOIN enrollments e ON e.student_id = s.id AND e.course_id = ?
     LEFT JOIN attendance a ON a.student_id = s.id AND a.course_id = ?
-    GROUP BY s.id
-    ORDER BY s.name
-  `).all(req.params.courseId, req.params.courseId);
-  res.json(rows);
+    GROUP BY s.id ORDER BY s.name
+  `).all(req.params.courseId, req.params.courseId));
 });
 
 app.delete('/api/admin/attendance/:id', authAdmin, (req, res) => {
@@ -792,177 +708,13 @@ app.delete('/api/admin/attendance/:id', authAdmin, (req, res) => {
   res.json({ ok: true });
 });
 
-// ==================== LIVE CLASSES ====================
-app.get('/api/my-live-classes', authStudent, (req, res) => {
-  const rows = db.prepare(`
-    SELECT lc.*, c.code, c.title AS course_title
-    FROM live_classes lc
-    JOIN courses c ON c.id = lc.course_id
-    JOIN enrollments e ON e.course_id = lc.course_id
-    WHERE e.student_id = ?
-    ORDER BY lc.scheduled_at ASC
-  `).all(req.user.id);
-
-  const now = new Date();
-  const enriched = rows.map(r => {
-    const start = new Date(r.scheduled_at);
-    const end = new Date(start.getTime() + r.duration_minutes * 60000);
-    let status = 'upcoming';
-    if (now >= start && now <= end) status = 'live';
-    else if (now > end) status = 'ended';
-    return { ...r, status, ends_at: end.toISOString() };
-  });
-
-  res.json(enriched);
-});
-
+// --- Live Classes (admin)
 app.get('/api/admin/live-classes', authAdmin, (req, res) => {
-  const rows = db.prepare(`
+  res.json(db.prepare(`
     SELECT lc.*, c.code, c.title AS course_title
-    FROM live_classes lc
-    JOIN courses c ON c.id = lc.course_id
+    FROM live_classes lc JOIN courses c ON c.id = lc.course_id
     ORDER BY lc.scheduled_at DESC
-  `).all();
-  res.json(rows);
-});
-
-app.post('/api/admin/live-classes', authAdmin, (req, res) => {
-  const { course_id, title, description, meeting_url, scheduled_at, duration_minutes } = req.body;
-  if (!course_id || !title || !meeting_url || !scheduled_at) {
-    return res.status(400).json({ error: 'course_id, title, meeting_url, scheduled_at required' });
-  }
-  db.prepare(`
-    INSERT INTO live_classes (course_id, title, description, meeting_url, scheduled_at, duration_minutes, created_by)
-    VALUES (?, ?, ?, ?, ?, ?, ?)
-  `).run(
-    course_id, title, description || '', meeting_url,
-    scheduled_at, Number(duration_minutes) || 60, req.admin.id
-  );
-  res.json({ ok: true });
-});
-
-app.delete('/api/admin/live-classes/:id', authAdmin, (req, res) => {
-  db.prepare('DELETE FROM live_classes WHERE id = ?').run(req.params.id);
-  res.json({ ok: true });
-});
-
-// ==================== ATTENDANCE — STUDENT ====================
-app.get('/api/my-attendance', authStudent, (req, res) => {
-  const records = db.prepare(`
-    SELECT a.id, a.date, a.status, a.notes, c.code, c.title
-    FROM attendance a
-    JOIN courses c ON c.id = a.course_id
-    WHERE a.student_id = ?
-    ORDER BY a.date DESC
-    LIMIT 100
-  `).all(req.user.id);
-
-  const summary = db.prepare(`
-    SELECT c.code, c.title,
-      COUNT(*) AS total,
-      SUM(CASE WHEN a.status = 'present' THEN 1 ELSE 0 END) AS present,
-      SUM(CASE WHEN a.status = 'absent' THEN 1 ELSE 0 END) AS absent,
-      SUM(CASE WHEN a.status = 'late' THEN 1 ELSE 0 END) AS late
-    FROM attendance a
-    JOIN courses c ON c.id = a.course_id
-    WHERE a.student_id = ?
-    GROUP BY c.id
-  `).all(req.user.id);
-
-  res.json({ records, summary });
-});
-
-// ==================== ATTENDANCE — ADMIN ====================
-app.get('/api/admin/attendance/:courseId', authAdmin, (req, res) => {
-  const rows = db.prepare(`
-    SELECT a.*, s.reg_no, s.name AS student_name
-    FROM attendance a
-    JOIN students s ON s.id = a.student_id
-    WHERE a.course_id = ?
-    ORDER BY a.date DESC, s.name ASC
-    LIMIT 500
-  `).all(req.params.courseId);
-  res.json(rows);
-});
-
-app.post('/api/admin/attendance', authAdmin, (req, res) => {
-  const { course_id, date, records } = req.body;
-  if (!course_id || !date || !Array.isArray(records)) {
-    return res.status(400).json({ error: 'course_id, date, records[] required' });
-  }
-
-  const insert = db.prepare(`
-    INSERT INTO attendance (course_id, student_id, date, status, marked_by, notes)
-    VALUES (?, ?, ?, ?, ?, ?)
-  `);
-  const del = db.prepare(`
-    DELETE FROM attendance WHERE course_id = ? AND student_id = ? AND date = ?
-  `);
-
-  const tx = db.transaction(() => {
-    records.forEach(r => {
-      del.run(course_id, r.student_id, date);
-      insert.run(course_id, r.student_id, date, r.status || 'present', req.admin.id, r.notes || '');
-    });
-  });
-  tx();
-
-  res.json({ ok: true, count: records.length });
-});
-
-app.get('/api/admin/attendance-summary/:courseId', authAdmin, (req, res) => {
-  const rows = db.prepare(`
-    SELECT s.id, s.reg_no, s.name,
-      COUNT(a.id) AS total,
-      SUM(CASE WHEN a.status = 'present' THEN 1 ELSE 0 END) AS present,
-      SUM(CASE WHEN a.status = 'absent' THEN 1 ELSE 0 END) AS absent,
-      SUM(CASE WHEN a.status = 'late' THEN 1 ELSE 0 END) AS late
-    FROM students s
-    JOIN enrollments e ON e.student_id = s.id AND e.course_id = ?
-    LEFT JOIN attendance a ON a.student_id = s.id AND a.course_id = ?
-    GROUP BY s.id
-    ORDER BY s.name
-  `).all(req.params.courseId, req.params.courseId);
-  res.json(rows);
-});
-
-app.delete('/api/admin/attendance/:id', authAdmin, (req, res) => {
-  db.prepare('DELETE FROM attendance WHERE id = ?').run(req.params.id);
-  res.json({ ok: true });
-});
-
-// ==================== LIVE CLASSES ====================
-app.get('/api/my-live-classes', authStudent, (req, res) => {
-  const rows = db.prepare(`
-    SELECT lc.*, c.code, c.title AS course_title
-    FROM live_classes lc
-    JOIN courses c ON c.id = lc.course_id
-    JOIN enrollments e ON e.course_id = lc.course_id
-    WHERE e.student_id = ?
-    ORDER BY lc.scheduled_at ASC
-  `).all(req.user.id);
-
-  const now = new Date();
-  const enriched = rows.map(r => {
-    const start = new Date(r.scheduled_at);
-    const end = new Date(start.getTime() + r.duration_minutes * 60000);
-    let status = 'upcoming';
-    if (now >= start && now <= end) status = 'live';
-    else if (now > end) status = 'ended';
-    return { ...r, status, ends_at: end.toISOString() };
-  });
-
-  res.json(enriched);
-});
-
-app.get('/api/admin/live-classes', authAdmin, (req, res) => {
-  const rows = db.prepare(`
-    SELECT lc.*, c.code, c.title AS course_title
-    FROM live_classes lc
-    JOIN courses c ON c.id = lc.course_id
-    ORDER BY lc.scheduled_at DESC
-  `).all();
-  res.json(rows);
+  `).all());
 });
 
 app.post('/api/admin/live-classes', authAdmin, async (req, res) => {
@@ -970,29 +722,21 @@ app.post('/api/admin/live-classes', authAdmin, async (req, res) => {
   if (!course_id || !title || !meeting_url || !scheduled_at) {
     return res.status(400).json({ error: 'course_id, title, meeting_url, scheduled_at required' });
   }
-
   const info = db.prepare(`
     INSERT INTO live_classes (course_id, title, description, meeting_url, scheduled_at, duration_minutes, created_by)
     VALUES (?, ?, ?, ?, ?, ?, ?)
-  `).run(
-    course_id, title, description || '', meeting_url,
-    scheduled_at, Number(duration_minutes) || 60, req.admin.id
-  );
+  `).run(course_id, title, description || '', meeting_url, scheduled_at, Number(duration_minutes) || 60, req.admin.id);
 
-  // Optional: send email notifications to enrolled students
-  if (notify && process.env.GMAIL_USER && process.env.GMAIL_PASS) {
+  if (notify && mailer && mailer.ENABLED) {
     try {
       const students = db.prepare(`
         SELECT s.email, s.name FROM students s
         JOIN enrollments e ON e.student_id = s.id
         WHERE e.course_id = ?
       `).all(course_id);
-
       const course = db.prepare('SELECT code, title FROM courses WHERE id = ?').get(course_id);
-      const { sendLiveClassNotification } = require('./mailer');
-
       for (const s of students) {
-        sendLiveClassNotification({
+        mailer.sendLiveClassNotification({
           to: s.email,
           studentName: s.name,
           courseCode: course.code,
@@ -1000,10 +744,10 @@ app.post('/api/admin/live-classes', authAdmin, async (req, res) => {
           classTitle: title,
           scheduledAt: new Date(scheduled_at),
           meetingUrl: meeting_url,
-        }).catch(err => console.error('Email failed:', err.message));
+        }).catch(err => console.error('Class email failed:', err.message));
       }
     } catch (e) {
-      console.error('Notification error:', e.message);
+      console.error('Class notification error:', e.message);
     }
   }
 
