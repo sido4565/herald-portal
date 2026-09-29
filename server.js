@@ -15,6 +15,40 @@ app.use(express.json());
 app.use(cookieParser());
 app.use(express.static(path.join(__dirname, 'public')));
 
+// ─── TEMPORARY DEBUG ENDPOINTS — REMOVE AFTER TESTING ───
+app.get('/api/debug/env', (req, res) => {
+  const key = process.env.TURBOSMTP_KEY || '';
+  const secret = process.env.TURBOSMTP_SECRET || '';
+  res.json({
+    turbosmtp_key_set: !!key,
+    turbosmtp_key_length: key.length,
+    turbosmtp_key_preview: key ? key.slice(0, 8) + '...' : null,
+    turbosmtp_secret_set: !!secret,
+    turbosmtp_secret_length: secret.length,
+    turbosmtp_secret_preview: secret ? secret.slice(0, 8) + '...' : null,
+    mail_from: process.env.MAIL_FROM || null,
+    app_url: process.env.APP_URL || null,
+    mailer_enabled: require('./mailer').ENABLED,
+  });
+});
+
+app.get('/api/debug/send-email', async (req, res) => {
+  try {
+    const { sendMail, ENABLED } = require('./mailer');
+    if (!ENABLED) {
+      return res.json({ ok: false, error: 'mailer disabled', ENABLED });
+    }
+    const r = await sendMail({
+      to: 'osidonge@gmail.com',
+      subject: 'Render Debug Test ' + Date.now(),
+      html: '<h2>Render Debug Test</h2><p>Direct test from /api/debug/send-email</p>',
+    });
+    res.json({ ok: true, result: r });
+  } catch (err) {
+    res.json({ ok: false, error: err.message });
+  }
+});
+
 // ---------- File uploads ----------
 const UPLOAD_DIR = process.env.UPLOAD_DIR || path.join(__dirname, 'uploads');
 if (!fs.existsSync(UPLOAD_DIR)) fs.mkdirSync(UPLOAD_DIR, { recursive: true });
