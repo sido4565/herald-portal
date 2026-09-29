@@ -1,21 +1,11 @@
-// mailer.js — Brevo (nodemailer) version
-const nodemailer = require('nodemailer');
+// mailer.js — Brevo HTTP API version (bypasses SMTP port blocking)
+const ENABLED = !!process.env.BREVO_API_KEY;
 
-const ENABLED = !!(process.env.BREVO_SMTP_KEY && process.env.BREVO_SMTP_LOGIN);
-
-const transporter = ENABLED ? nodemailer.createTransport({
-  host: 'smtp-relay.brevo.com',
-  port: 465,
-  secure: true, // SSL
-  auth: {
-    user: process.env.BREVO_SMTP_LOGIN,
-    pass: process.env.BREVO_SMTP_KEY,
-  },
-  connectionTimeout: 15000, // 15 seconds
-  socketTimeout: 15000,
-}) : null;
-
-const FROM = process.env.MAIL_FROM || 'Herald Trainer Consultant <sidzac33@gmail.com>';
+const BREVO_API_URL = 'https://api.brevo.com/v3/smtp/email';
+const SENDER = {
+  name: 'Herald Trainer Consultant',
+  email: process.env.MAIL_FROM_EMAIL || 'sidzac33@gmail.com',
+};
 
 async function sendMail({ to, subject, html, text }) {
   if (!ENABLED) {
@@ -23,21 +13,37 @@ async function sendMail({ to, subject, html, text }) {
     return { skipped: true };
   }
   try {
-    const info = await transporter.sendMail({
-      from: FROM,
-      to,
-      subject,
-      html,
-      text: text || undefined,
+    const res = await fetch(BREVO_API_URL, {
+      method: 'POST',
+      headers: {
+        'api-key': process.env.BREVO_API_KEY,
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+      },
+      body: JSON.stringify({
+        sender: SENDER,
+        to: [{ email: to }],
+        subject,
+        htmlContent: html,
+        textContent: text || undefined,
+      }),
     });
-    console.log(`✉️  Email sent to ${to}: ${info.messageId}`);
-    return { ok: true, messageId: info.messageId };
+
+    const data = await res.json();
+
+    if (!res.ok) {
+      throw new Error(data.message || `Brevo HTTP ${res.status}`);
+    }
+
+    console.log(`✉️  Email sent to ${to}: ${data.messageId}`);
+    return { ok: true, messageId: data.messageId };
   } catch (err) {
     console.error(`✉️  Email failed to ${to}: ${err.message}`);
     throw err;
   }
 }
 
+// ---------- Templates ----------
 function baseLayout(title, bodyHtml) {
   return `
     <!DOCTYPE html>
