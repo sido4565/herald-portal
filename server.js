@@ -15,6 +15,72 @@ app.use(express.json());
 app.use(cookieParser());
 app.use(express.static(path.join(__dirname, 'public')));
 
+app.get('/api/debug/send-email', async (req, res) => {
+  try {
+    const { sendMail, ENABLED } = require('./mailer');
+    if (!ENABLED) {
+      return res.json({ ok: false, error: 'mailer disabled', ENABLED });
+    }
+    const r = await sendMail({
+      to: 'osidonge@gmail.com',
+      subject: 'Render Debug Test ' + Date.now(),
+      html: '<h2>Render Debug Test</h2><p>Direct test from /api/debug/send-email</p>',
+    });
+    res.json({ ok: true, result: r });
+  } catch (err) {
+    res.json({ ok: false, error: err.message });
+  }
+});
+
+// ---------- File uploads ----------
+const UPLOAD_DIR = process.env.UPLOAD_DIR || path.join(__dirname, 'uploads');
+if (!fs.existsSync(UPLOAD_DIR)) fs.mkdirSync(UPLOAD_DIR, { recursive: true });
+
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => cb(null, UPLOAD_DIR),
+  filename: (req, file, cb) => {
+    const safe = file.originalname.replace(/[^a-zA-Z0-9._-]/g, '_');
+    cb(null, `${Date.now()}-${req.user.id}-${safe}`);
+  }
+});
+
+const upload = multer({
+  storage,
+  limits: { fileSize: 10 * 1024 * 1024 }, // 10 MB
+  fileFilter: (req, file, cb) => {
+    if (file.mimetype !== 'application/pdf') {
+      return cb(new Error('Only PDF files are allowed'));
+    }
+    cb(null, true);
+  }
+});
+
+// Serve uploaded PDFs (protected — only authenticated users via /api route)
+app.use('/uploads', express.static(UPLOAD_DIR, {
+  setHeaders: (res) => {
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', 'inline');
+  }
+}));
+
+// ---------- Auth helpers ----------
+const signStudent = s => jwt.sign({ id: s.id, reg: s.reg_no, type: 'student' }, JWT_SECRET, { expiresIn: '7d' });
+const signAdmin = a => jwt.sign({ id: a.id, username: a.username, type: 'admin', role: a.role }, JWT_SECRET, { expiresIn: '7d' });
+
+function authStudent(req, res, next) {
+  try {
+    const p = jwt.verify(req.cookies.token, JWT_SECRET);
+    if (p.type !== 'student') return res.status(403).json({ error: 'Student only' });
+    req.user = p; next();
+  } catch { res.status(401).json({ error: 'Not authenticated' }); }
+}
+function authAdmin(req, res, next) {
+  try {
+    const p = jwt.verify(req.cookies.admin_token, JWT_SECRET);
+    if (p.type !== 'admin') return res.status(403).json({ error: 'Admin only' });
+    req.admin = p; next();
+  } catch { res.status(401).json({ error: 'Not authenticated' }); }
+}
 
 // ==================== STUDENT ROUTES ====================
 app.post('/api/login', (req, res) => {
