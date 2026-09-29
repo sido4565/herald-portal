@@ -1,11 +1,16 @@
-// mailer.js — TurboSMTP version
-const { TurboSmtp } = require('@turbosmtp/mail');
+// mailer.js — Brevo (nodemailer) version
+const nodemailer = require('nodemailer');
 
-const ENABLED = !!(process.env.TURBOSMTP_KEY && process.env.TURBOSMTP_SECRET);
+const ENABLED = !!(process.env.BREVO_SMTP_KEY && process.env.BREVO_SMTP_LOGIN);
 
-const mailer = ENABLED ? new TurboSmtp({
-  key: process.env.TURBOSMTP_KEY,
-  secret: process.env.TURBOSMTP_SECRET,
+const transporter = ENABLED ? nodemailer.createTransport({
+  host: 'smtp-relay.brevo.com',
+  port: 587,
+  secure: false, // STARTTLS
+  auth: {
+    user: process.env.BREVO_SMTP_LOGIN,
+    pass: process.env.BREVO_SMTP_KEY,
+  },
 }) : null;
 
 const FROM = process.env.MAIL_FROM || 'Herald Trainer Consultant <sidzac33@gmail.com>';
@@ -16,22 +21,21 @@ async function sendMail({ to, subject, html, text }) {
     return { skipped: true };
   }
   try {
-    const result = await mailer.send({
+    const info = await transporter.sendMail({
       from: FROM,
-      to: [to],
+      to,
       subject,
       html,
       text: text || undefined,
     });
-    console.log(`✉️  Email sent to ${to}: ${result.mid}`);
-    return { ok: true, messageId: result.mid };
+    console.log(`✉️  Email sent to ${to}: ${info.messageId}`);
+    return { ok: true, messageId: info.messageId };
   } catch (err) {
     console.error(`✉️  Email failed to ${to}: ${err.message}`);
     throw err;
   }
 }
 
-// Template layout (same as before)
 function baseLayout(title, bodyHtml) {
   return `
     <!DOCTYPE html>
