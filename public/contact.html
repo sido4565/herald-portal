@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Contact — Herald Trainer and Consultant</title>
+  <link rel="icon" type="image/svg+xml" href="favicon.svg" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="site.css" />
+</head>
+<body>
+
+  <header class="site-header">
+    <div class="header-inner">
+      <a href="index.html"><img src="images/herald-logo.png" alt="Herald" class="brand-logo" /></a>
+      <nav>
+        <ul class="nav-links">
+          <li><a href="about.html">About</a></li>
+          <li><a href="services.html">Services</a></li>
+          <li><a href="courses.html">Courses</a></li>
+          <li><a href="why-us.html">Why Us</a></li>
+          <li><a href="contact.html">Contact</a></li>
+        </ul>
+      </nav>
+      <div class="nav-actions">
+        <a href="login.html" class="btn btn-primary">Student Portal</a>
+        <a href="admin-login.html" class="btn btn-outline">Admin</a>
+      </div>
+    </div>
+  </header>
+
+  <section class="page-banner">
+    <div class="breadcrumbs"><a href="index.html">Home</a> / Contact</div>
+    <h1 class="reveal">Get in Touch</h1>
+    <p class="reveal reveal-delay-1">Have a question or want to enroll? Reach out — we respond within 24 hours.</p>
+  </section>
+
+  <section class="contact-section">
+    <div class="container">
+      <div class="contact-grid">
+        <div class="contact-info">
+          <div class="contact-item reveal">
+            <div class="icon">📍</div>
+            <div><h4>Location</h4><p>Nairobi, Kenya</p></div>
+          </div>
+          <div class="contact-item reveal reveal-delay-1">
+            <div class="icon">📞</div>
+            <div><h4>Phone</h4><p><a href="tel:+254700000000">+254 700 000 000</a></p></div>
+          </div>
+          <div class="contact-item reveal reveal-delay-2">
+            <div class="icon">✉️</div>
+            <div><h4>Email</h4><p><a href="mailto:info@heraldconsultant.com">info@heraldconsultant.com</a></p></div>
+          </div>
+          <div class="contact-item reveal reveal-delay-3">
+            <div class="icon">🕐</div>
+            <div><h4>Office Hours</h4><p>Mon – Fri: 8:00 AM – 5:00 PM<br />Sat: 9:00 AM – 1:00 PM</p></div>
+          </div>
+          <a href="https://wa.me/254700000000" target="_blank" rel="noopener" class="btn btn-gold reveal" style="margin-top: 8px;">💬 Chat on WhatsApp</a>
+        </div>
+
+        <form class="contact-form reveal reveal-delay-1" onsubmit="handleContactSubmit(event)">
+          <div class="form-group">
+            <label for="c-name">Your Name</label>
+            <input id="c-name" name="name" required />
+          </div>
+          <div class="form-group">
+            <label for="c-email">Email Address</label>
+            <input id="c-email" name="email" type="email" required />
+          </div>
+          <div class="form-group">
+            <label for="c-phone">Phone (optional)</label>
+            <input id="c-phone" name="phone" type="tel" />
+          </div>
+          <div class="form-group">
+            <label for="c-subject">Subject</label>
+            <select id="c-subject" name="subject">
+              <option>Course Enrollment</option>
+              <option>Consultancy Inquiry</option>
+              <option>Corporate Training</option>
+              <option>General Question</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label for="c-message">Message</label>
+            <textarea id="c-message" name="message" required></textarea>
+          </div>
+          <button type="submit" class="btn btn-primary" style="width:100%;">Send Message</button>
+          <p id="contactMsg" style="margin-top:12px; font-size:14px; text-align:center;"></p>
+        </form>
+      </div>
+    </div>
+  </section>
+
+  <footer class="site-footer">
+    <div class="footer-grid">
+      <div class="footer-brand">
+        <img src="images/herald-logo.png" alt="Herald" />
+        <p>Empowering individuals and organizations with skills that build better futures.</p>
+      </div>
+      <div class="footer-col"><h4>Explore</h4><ul>
+        <li><a href="about.html">About Us</a></li><li><a href="services.html">Services</a></li>
+        <li><a href="courses.html">Courses</a></li><li><a href="contact.html">Contact</a></li>
+      </ul></div>
+      <div class="footer-col"><h4>Portal</h4><ul>
+        <li><a href="login.html">Student Login</a></li><li><a href="admin-login.html">Admin Login</a></li>
+      </ul></div>
+      <div class="footer-col"><h4>Contact</h4><ul>
+        <li><a href="mailto:info@heraldconsultant.com">info@heraldconsultant.com</a></li>
+        <li><a href="tel:+254700000000">+254 700 000 000</a></li>
+        <li>Nairobi, Kenya</li>
+      </ul></div>
+    </div>
+    <div class="footer-bottom">
+      <span>© <span id="year"></span> Herald Trainer and Consultant. All rights reserved.</span>
+      <span>Skills • Knowledge • Better Futures</span>
+    </div>
+  </footer>
+
+  <div class="floating-actions">
+    <a href="https://wa.me/254700000000" target="_blank" rel="noopener" class="fab wa" title="WhatsApp">💬</a>
+    <button class="fab top" id="backToTop" title="Back to top">↑</button>
+  </div>
+
+  <script src="site.js"></script>
+</body>
+</html>
