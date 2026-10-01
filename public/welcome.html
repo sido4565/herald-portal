@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Welcome — Herald Trainer and Consultant</title>
+  <link rel="icon" type="image/svg+xml" href="favicon.svg" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="style.css" />
+  <style>
+    body {
+      margin: 0;
+      background: #0b1a33;
+      color: #ffffff;
+      font-family: 'Inter', -apple-system, sans-serif;
+    }
+    .landing-hero {
+      position: relative;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 40px 20px;
+      text-align: center;
+    }
+    .landing-video {
+      width: 100%;
+      max-width: 960px;
+      border-radius: 12px;
+      box-shadow: 0 24px 60px rgba(0,0,0,0.5);
+      margin-bottom: 32px;
+      background: #000;
+    }
+    .landing-logo {
+      max-width: 200px;
+      margin-bottom: 24px;
+    }
+    .landing-h1 {
+      font-size: clamp(28px, 5vw, 48px);
+      font-weight: 800;
+      letter-spacing: -0.02em;
+      margin: 0 0 12px;
+      color: #ffffff;
+    }
+    .landing-h1 span { color: #e6b84c; }
+    .landing-sub {
+      font-size: clamp(15px, 2vw, 19px);
+      color: rgba(255,255,255,0.75);
+      max-width: 640px;
+      margin: 0 auto 40px;
+      line-height: 1.6;
+    }
+    .landing-cta {
+      display: inline-flex;
+      gap: 12px;
+      flex-wrap: wrap;
+      justify-content: center;
+    }
+    .landing-btn {
+      display: inline-block;
+      padding: 14px 28px;
+      border-radius: 8px;
+      font-size: 15px;
+      font-weight: 600;
+      text-decoration: none;
+      transition: transform 0.15s, background 0.15s;
+      font-family: inherit;
+    }
+    .landing-btn:hover { transform: translateY(-2px); text-decoration: none; }
+    .landing-btn.primary {
+      background: #b8860b;
+      color: #ffffff;
+    }
+    .landing-btn.primary:hover { background: #d4a017; }
+    .landing-btn.ghost {
+      background: transparent;
+      color: #ffffff;
+      border: 1px solid rgba(255,255,255,0.3);
+    }
+    .landing-btn.ghost:hover { background: rgba(255,255,255,0.1); }
+
+    .landing-footer {
+      text-align: center;
+      padding: 32px 20px;
+      color: rgba(255,255,255,0.5);
+      font-size: 13px;
+      border-top: 1px solid rgba(255,255,255,0.08);
+      margin-top: 40px;
+    }
+    .landing-footer strong { color: #e6b84c; }
+  </style>
+</head>
+<body>
+  <main class="landing-hero">
+    <img src="images/herald-logo.png" alt="Herald Trainer and Consultant" class="landing-logo" />
+
+    <h1 class="landing-h1">Your Learning Journey,<br><span>Our Commitment</span></h1>
+
+    <p class="landing-sub">
+      Welcome to Herald Trainer and Consultant. Watch how we're shaping the next
+      generation of business leaders through physical classes and online courses.
+    </p>
+
+    <video class="landing-video" controls autoplay muted playsinline poster="images/login-background.png">
+      <source src="videos/herald-promo.mp4" type="video/mp4" />
+      Your browser does not support video playback.
+    </video>
+
+    <div class="landing-cta">
+      <a href="login.html" class="landing-btn primary">Enter Student Portal</a>
+      <a href="admin-login.html" class="landing-btn ghost">Admin Access</a>
+    </div>
+  </main>
+
+  <footer class="landing-footer">
+    <strong>HERALD TRAINER AND CONSULTANT</strong><br>
+    Skills &middot; Knowledge &middot; Better Futures
+  </footer>
+</body>
+</html>

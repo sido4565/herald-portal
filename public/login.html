@@ -10,32 +10,58 @@
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="style.css" />
   <style>
-    .auth-body {
-      background-image: url('images/login-background.png');
-      background-size: cover;
-      background-position: center;
-      background-attachment: fixed;
-      position: relative;
-    }
-    .auth-body::before {
-      content: '';
-      position: absolute;
-      inset: 0;
-      background: rgba(11, 26, 51, 0.55);
-      backdrop-filter: blur(3px);
-    }
-    .auth-card {
-      position: relative;
-      z-index: 2;
-    }
-    .login-logo {
-      display: block;
-      max-width: 180px;
-      margin: 0 auto 8px;
-    }
-  </style>
+  .auth-body {
+    position: relative;
+    overflow: hidden;
+    background: #0b1a33; /* fallback color */
+  }
+
+  /* Video background */
+  .auth-video-bg {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    object-fit: cover;
+    z-index: 0;
+    pointer-events: none;
+  }
+
+  /* Dark overlay for readability */
+  .auth-body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background: rgba(11, 26, 51, 0.7);
+    z-index: 1;
+  }
+
+  /* Login card sits above */
+  .auth-card {
+    position: relative;
+    z-index: 2;
+  }
+
+  .login-logo {
+    display: block;
+    max-width: 180px;
+    margin: 0 auto 8px;
+  }
+</style>
 </head>
 <body class="auth-body">
+  <!-- Background video (muted autoplay loop) -->
+  <video
+    class="auth-video-bg"
+    autoplay
+    muted
+    loop
+    playsinline
+    poster="images/login-background.png"
+  >
+    <source src="videos/herald-promo.mp4" type="video/mp4" />
+  </video>
   <div class="auth-card">
     <img src="images/herald-logo.png" alt="Herald Trainer and Consultant" class="login-logo" />
     <h1>Student Portal</h1>
