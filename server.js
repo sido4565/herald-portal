@@ -312,6 +312,82 @@ app.get('/api/admin/me', authAdmin, (req, res) => {
   res.json(db.prepare('SELECT id, username, name, role FROM admins WHERE id = ?').get(req.admin.id));
 });
 
+// ---------- Backup management ----------
+app.get('/api/admin/backups/list', authAdmin, async (req, res) => {
+  try {
+    const { listBackupsOnDrive, ENABLED } = require('./backup');
+    if (!ENABLED) return res.status(400).json({ error: 'Backup not configured' });
+    const backups = await listBackupsOnDrive();
+    res.json(backups);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/admin/backups/restore/:name', authAdmin, async (req, res) => {
+  try {
+    const { downloadBackupByName, ENABLED } = require('./backup');
+    if (!ENABLED) return res.status(400).json({ error: 'Backup not configured' });
+
+    const name = req.params.name;
+    const tempPath = path.join('/tmp', `restore-${Date.now()}.db`);
+
+    const result = await downloadBackupByName(name, tempPath);
+    if (!result.ok) return res.status(404).json({ error: 'Backup not found' });
+
+    const stats = fs.statSync(tempPath);
+    if (stats.size < 4096) {
+      fs.unlinkSync(tempPath);
+      return res.status(400).json({ error: 'Backup file too small (likely corrupt)' });
+    }
+
+    const DB_PATH = path.join(process.env.DATA_DIR || __dirname, 'herald.db');
+    db.pragma('wal_checkpoint(TRUNCATE)');
+
+    const oldPath = `${DB_PATH}.old-${Date.now()}`;
+    fs.renameSync(DB_PATH, oldPath);
+    fs.copyFileSync(tempPath, DB_PATH);
+    fs.unlinkSync(tempPath);
+
+    console.log(`✅ Restored backup: ${name} (${stats.size} bytes)`);
+    res.json({
+      ok: true,
+      restored_from: name,
+      size: stats.size,
+      old_backup: oldPath,
+      note: 'Restart the server to load the restored DB',
+    });
+  } catch (err) {
+    console.error('Restore error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/admin/backup', authAdmin, async (req, res) => {
+  try {
+    const { uploadBackup, createSnapshot, ENABLED } = require('./backup');
+    if (!ENABLED) return res.status(400).json({ error: 'Backup not configured' });
+
+    const snapshotPath = path.join('/tmp', `herald-snapshot-${Date.now()}.db`);
+    await createSnapshot(db, snapshotPath);
+    const stats = fs.statSync(snapshotPath);
+    console.log(`📊 Snapshot size: ${stats.size} bytes`);
+
+    const result = await uploadBackup(snapshotPath, { force: true });
+    fs.unlinkSync(snapshotPath);
+
+    res.json({
+      ok: true,
+      size: result.size,
+      filename: result.filename,
+      snapshot_size: stats.size,
+      at: new Date().toISOString(),
+    });
+  } catch (err) {
+    console.error('Backup error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
 app.get('/api/admin/stats', authAdmin, (req, res) => {
   res.json({
     students: db.prepare('SELECT COUNT(*) AS c FROM students').get().c,

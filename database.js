@@ -212,15 +212,42 @@ if (ENABLED) {
       const { createSnapshot } = require('./backup');
       await createSnapshot(db, snapshotPath);
       const stats = fs.statSync(snapshotPath);
+
+      // Safety: don't upload if file too small
+      if (stats.size < 4096) {
+        console.warn(`⚠️  Snapshot too small (${stats.size} bytes), skipping auto-backup`);
+        fs.unlinkSync(snapshotPath);
+        return;
+      }
+
       console.log(`📊 [auto] Snapshot size: ${stats.size} bytes`);
-      await uploadBackup(snapshotPath);
+      const result = await uploadBackup(snapshotPath);
       fs.unlinkSync(snapshotPath);
-      console.log(`☁️  Auto-backup uploaded @ ${new Date().toISOString()}`);
+
+      if (result.ok) console.log(`☁️  Auto-backup uploaded @ ${new Date().toISOString()}`);
+      else if (result.skipped) console.log(`⏭️  Auto-backup skipped: ${result.reason || 'disabled'}`);
     } catch (err) {
       console.error('⚠️  Auto-backup failed:', err.message);
     }
   }, 2 * 60 * 1000);
+
+  // Shutdown backup
+  const shutdown = async (signal) => {
+    console.log(`\n${signal} received — backing up before exit...`);
+    try {
+      const snapshotPath = path.join('/tmp', `herald-exit-${Date.now()}.db`);
+      const { createSnapshot } = require('./backup');
+      await createSnapshot(db, snapshotPath);
+      await uploadBackup(snapshotPath);
+      fs.unlinkSync(snapshotPath);
+      console.log('✅ Final backup saved');
+    } catch (err) {
+      console.error('⚠️  Final backup failed:', err.message);
+    }
+    process.exit(0);
+  };
+  process.on('SIGTERM', () => shutdown('SIGTERM'));
+  process.on('SIGINT', () => shutdown('SIGINT'));
 }
 
-// ---------- Export ----------
 module.exports = db;

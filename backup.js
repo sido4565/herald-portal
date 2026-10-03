@@ -60,73 +60,165 @@ function getClient() {
   return oauth2Client;
 }
 
-// ---------- Helpers ----------
-const FILE_NAME = 'herald.db';
+// ---------- Constants ----------
+const LATEST_MARKER = 'herald-latest.txt';
+const BACKUP_PREFIX = 'herald-';
+const RETENTION_DAYS = 30;
 
-async function findFileId(drive) {
+// ---------- Helpers ----------
+function timestampKey(date = new Date()) {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, '0');
+  const d = String(date.getDate()).padStart(2, '0');
+  const h = String(date.getHours()).padStart(2, '0');
+  const min = String(date.getMinutes()).padStart(2, '0');
+  const sec = String(date.getSeconds()).padStart(2, '0');
+  return `${y}${m}${d}-${h}${min}${sec}`;
+}
+
+async function listBackups(drive) {
   const res = await drive.files.list({
-    q: `name='${FILE_NAME}' and trashed=false`,
-    fields: 'files(id, name, modifiedTime, size)',
-    spaces: 'drive',
+    q: `name contains '${BACKUP_PREFIX}' and trashed=false`,
+    fields: 'files(id, name, modifiedTime, size, mimeType)',
+    orderBy: 'name desc',
   });
-  const files = res.data.files || [];
-  return files.length ? files[0] : null;
+  return (res.data.files || []).filter(f => f.mimeType !== 'application/vnd.google-apps.folder');
+}
+
+async function findFile(drive, name) {
+  const res = await drive.files.list({
+    q: `name='${name}' and trashed=false`,
+    fields: 'files(id, name, modifiedTime, size)',
+  });
+  return (res.data.files || [])[0] || null;
 }
 
 // ---------- Snapshot via better-sqlite3 ----------
-// Creates a consistent copy of the DB even in WAL mode
 async function createSnapshot(db, snapshotPath) {
   if (typeof db.backup !== 'function') {
-    // Fallback for older better-sqlite3
-    throw new Error('better-sqlite3 backup() not available — upgrade to >=8.0.0');
+    throw new Error('better-sqlite3 backup() not available');
   }
   await db.backup(snapshotPath);
   return snapshotPath;
 }
 
-// ---------- Public API ----------
-async function uploadBackup(localPath) {
+// ---------- Upload a NEW dated backup ----------
+async function uploadBackup(localPath, { force = false } = {}) {
   if (!ENABLED) return { skipped: true };
+
   if (!fs.existsSync(localPath)) throw new Error(`Local file not found: ${localPath}`);
 
   const auth = getClient();
   const drive = google.drive({ version: 'v3', auth });
 
-  const existing = await findFileId(drive);
-  const media = {
-    mimeType: 'application/octet-stream',
-    body: fs.createReadStream(localPath),
-  };
+  const stats = fs.statSync(localPath);
+  const size = stats.size;
 
-  if (existing) {
-    const res = await drive.files.update({
-      fileId: existing.id,
-      media,
+  // Safety: refuse to upload suspiciously small files
+  if (size < 4096 && !force) {
+    console.warn(`⚠️  File too small (${size} bytes), skipping upload`);
+    return { skipped: true, reason: 'too-small' };
+  }
+
+  // Safety: refuse if size dropped >50% vs most recent
+  const existing = await listBackups(drive);
+  if (existing.length && !force) {
+    const mostRecent = existing[0];
+    const lastSize = Number(mostRecent.size || 0);
+    if (lastSize > 0) {
+      const ratio = size / lastSize;
+      if (ratio < 0.5) {
+        console.warn(`⚠️  Size dropped from ${lastSize} to ${size} bytes (${Math.round(ratio*100)}%). Skipping for safety. Use force=true to override.`);
+        return { skipped: true, reason: 'size-regression', lastSize, newSize: size };
+      }
+    }
+  }
+
+  // Upload new dated file
+  const key = timestampKey();
+  const filename = `${BACKUP_PREFIX}${key}.db`;
+
+  const created = await drive.files.create({
+    requestBody: { name: filename },
+    media: {
+      mimeType: 'application/octet-stream',
+      body: fs.createReadStream(localPath),
+    },
+    fields: 'id, name',
+  });
+
+  // Update "latest" pointer
+  const markerContent = `${filename}\n${new Date().toISOString()}\n${size}\n`;
+  const markerExisting = await findFile(drive, LATEST_MARKER);
+
+  if (markerExisting) {
+    await drive.files.update({
+      fileId: markerExisting.id,
+      media: { mimeType: 'text/plain', body: markerContent },
     });
-    const size = fs.statSync(localPath).size;
-    return { ok: true, size, id: res.data.id, updated: true };
   } else {
-    const res = await drive.files.create({
-      requestBody: { name: FILE_NAME },
-      media,
+    await drive.files.create({
+      requestBody: { name: LATEST_MARKER },
+      media: { mimeType: 'text/plain', body: markerContent },
       fields: 'id, name',
     });
-    const size = fs.statSync(localPath).size;
-    return { ok: true, size, id: res.data.id, created: true };
   }
+
+  // Cleanup old backups
+  const cutoff = Date.now() - RETENTION_DAYS * 24 * 60 * 60 * 1000;
+  const old = existing.filter(f => {
+    if (f.name === LATEST_MARKER) return false;
+    const modified = new Date(f.modifiedTime).getTime();
+    return modified < cutoff;
+  });
+  for (const f of old) {
+    try {
+      await drive.files.delete({ fileId: f.id });
+      console.log(`🗑️  Deleted old backup: ${f.name}`);
+    } catch (e) {
+      console.warn(`Could not delete ${f.name}:`, e.message);
+    }
+  }
+
+  console.log(`☁️  Backup uploaded: ${filename} (${size} bytes)`);
+  return { ok: true, size, id: created.data.id, filename };
 }
 
+// ---------- Download the LATEST backup ----------
 async function downloadBackup(localPath) {
   if (!ENABLED) return { skipped: true };
 
   const auth = getClient();
   const drive = google.drive({ version: 'v3', auth });
 
-  const existing = await findFileId(drive);
-  if (!existing) return { notFound: true };
+  // Read latest marker
+  const marker = await findFile(drive, LATEST_MARKER);
+  let targetName = null;
+
+  if (marker) {
+    try {
+      const res = await drive.files.get(
+        { fileId: marker.id, alt: 'media' },
+        { responseType: 'text' }
+      );
+      targetName = String(res.data).split('\n')[0].trim();
+    } catch (e) {
+      console.warn('Could not read latest marker:', e.message);
+    }
+  }
+
+  // Fallback: most recent backup
+  if (!targetName) {
+    const backups = await listBackups(drive);
+    if (!backups.length) return { notFound: true };
+    targetName = backups[0].name;
+  }
+
+  const file = await findFile(drive, targetName);
+  if (!file) return { notFound: true };
 
   const res = await drive.files.get(
-    { fileId: existing.id, alt: 'media' },
+    { fileId: file.id, alt: 'media' },
     { responseType: 'stream' }
   );
 
@@ -136,19 +228,65 @@ async function downloadBackup(localPath) {
   });
 
   const size = fs.statSync(localPath).size;
-  return { ok: true, size };
+  console.log(`☁️  Restored from ${targetName} (${size} bytes)`);
+  return { ok: true, size, filename: targetName };
+}
+
+// ---------- Download a SPECIFIC backup ----------
+async function downloadBackupByName(name, localPath) {
+  if (!ENABLED) return { skipped: true };
+
+  const auth = getClient();
+  const drive = google.drive({ version: 'v3', auth });
+
+  const file = await findFile(drive, name);
+  if (!file) return { notFound: true };
+
+  const res = await drive.files.get(
+    { fileId: file.id, alt: 'media' },
+    { responseType: 'stream' }
+  );
+
+  await new Promise((resolve, reject) => {
+    const dest = fs.createWriteStream(localPath);
+    res.data.on('end', resolve).on('error', reject).pipe(dest);
+  });
+
+  const size = fs.statSync(localPath).size;
+  console.log(`☁️  Restored ${name} (${size} bytes)`);
+  return { ok: true, size, filename: name };
+}
+
+// ---------- List all backups ----------
+async function listBackupsOnDrive() {
+  if (!ENABLED) return [];
+  const auth = getClient();
+  const drive = google.drive({ version: 'v3', auth });
+  const backups = await listBackups(drive);
+  return backups.map(f => ({
+    name: f.name,
+    size: Number(f.size || 0),
+    modified: f.modifiedTime,
+    id: f.id,
+  }));
 }
 
 async function remoteExists() {
   if (!ENABLED) return false;
   try {
-    const auth = getClient();
-    const drive = google.drive({ version: 'v3', auth });
-    const existing = await findFileId(drive);
-    return !!existing;
+    const backups = await listBackupsOnDrive();
+    return backups.length > 0;
   } catch {
     return false;
   }
 }
 
-module.exports = { uploadBackup, downloadBackup, remoteExists, createSnapshot, ENABLED };
+module.exports = {
+  uploadBackup,
+  downloadBackup,
+  downloadBackupByName,
+  listBackupsOnDrive,
+  remoteExists,
+  createSnapshot,
+  ENABLED,
+};
