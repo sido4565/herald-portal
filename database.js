@@ -10,8 +10,6 @@ if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
 const DB_PATH = path.join(DATA_DIR, 'herald.db');
 
 // ---------- Sync-restore workaround ----------
-// If DB is missing AND cloud backup is enabled, download it synchronously
-// using a child process so the require returns a fully-formed db.
 if (ENABLED && !fs.existsSync(DB_PATH)) {
   console.log('🔄 Local DB missing — downloading from Google Drive (sync)...');
   try {
@@ -22,7 +20,22 @@ if (ENABLED && !fs.existsSync(DB_PATH)) {
   }
 }
 
-// ---------- Open DB (now schema exists) ----------
+// Safety: if restore left a corrupted DB, remove it and seed fresh
+if (fs.existsSync(DB_PATH)) {
+  try {
+    const test = new Database(DB_PATH, { readonly: true });
+    test.prepare('PRAGMA integrity_check').get();
+    test.close();
+  } catch (e) {
+    console.error(`⚠️  Downloaded DB is corrupt: ${e.message}`);
+    console.error('🗑️  Deleting corrupt DB and seeding fresh...');
+    try { fs.unlinkSync(DB_PATH); } catch (_) {}
+    try { fs.unlinkSync(DB_PATH + '-shm'); } catch (_) {}
+    try { fs.unlinkSync(DB_PATH + '-wal'); } catch (_) {}
+  }
+}
+
+// ---------- Open DB ----------
 const db = new Database(DB_PATH);
 db.pragma('journal_mode = WAL');
 
@@ -208,19 +221,22 @@ try {
 if (ENABLED) {
   setInterval(async () => {
     try {
-      const snapshotPath = path.join('/tmp', `herald-auto-${Date.now()}.db`);
-      const { createSnapshot } = require('./backup');
-      await createSnapshot(db, snapshotPath);
-      const stats = fs.statSync(snapshotPath);
+      // CRITICAL: Force WAL checkpoint so all data is in main file
+      db.pragma('wal_checkpoint(TRUNCATE)');
 
-      // Safety: don't upload if file too small
-      if (stats.size < 4096) {
-        console.warn(`⚠️  Snapshot too small (${stats.size} bytes), skipping auto-backup`);
+      const snapshotPath = path.join('/tmp', `herald-auto-${Date.now()}.db`);
+      const { createSnapshot, validateDbFile } = require('./backup');
+      await createSnapshot(db, snapshotPath);
+
+      // Validate before upload
+      const validation = validateDbFile(snapshotPath);
+      if (!validation.ok) {
+        console.warn(`⚠️  Snapshot validation failed: ${validation.reason} — NOT uploading`);
         fs.unlinkSync(snapshotPath);
         return;
       }
 
-      console.log(`📊 [auto] Snapshot size: ${stats.size} bytes`);
+      console.log(`📊 [auto] Snapshot size: ${validation.size} bytes (validated ✅)`);
       const result = await uploadBackup(snapshotPath);
       fs.unlinkSync(snapshotPath);
 
@@ -235,12 +251,20 @@ if (ENABLED) {
   const shutdown = async (signal) => {
     console.log(`\n${signal} received — backing up before exit...`);
     try {
+      db.pragma('wal_checkpoint(TRUNCATE)');
       const snapshotPath = path.join('/tmp', `herald-exit-${Date.now()}.db`);
-      const { createSnapshot } = require('./backup');
+      const { createSnapshot, validateDbFile } = require('./backup');
       await createSnapshot(db, snapshotPath);
-      await uploadBackup(snapshotPath);
-      fs.unlinkSync(snapshotPath);
-      console.log('✅ Final backup saved');
+
+      const validation = validateDbFile(snapshotPath);
+      if (!validation.ok) {
+        console.error(`⚠️  Exit snapshot invalid: ${validation.reason}`);
+        fs.unlinkSync(snapshotPath);
+      } else {
+        await uploadBackup(snapshotPath);
+        fs.unlinkSync(snapshotPath);
+        console.log('✅ Final backup saved');
+      }
     } catch (err) {
       console.error('⚠️  Final backup failed:', err.message);
     }

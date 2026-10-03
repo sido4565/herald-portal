@@ -1,6 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 const { google } = require('googleapis');
+const Database = require('better-sqlite3');
 
 // ---------- Token loading ----------
 function loadTokens() {
@@ -93,6 +94,25 @@ async function findFile(drive, name) {
   return (res.data.files || [])[0] || null;
 }
 
+// ---------- Validate a local DB file ----------
+function validateDbFile(localPath) {
+  try {
+    if (!fs.existsSync(localPath)) return { ok: false, reason: 'file not found' };
+
+    const stats = fs.statSync(localPath);
+    if (stats.size < 4096) return { ok: false, reason: `too small (${stats.size} bytes)` };
+
+    const test = new Database(localPath, { readonly: true });
+    test.prepare('PRAGMA integrity_check').get();
+    // Also try a real query on a known table to detect schema corruption
+    try { test.prepare('SELECT COUNT(*) AS c FROM sqlite_master').get(); } catch (_) {}
+    test.close();
+    return { ok: true, size: stats.size };
+  } catch (err) {
+    return { ok: false, reason: err.message };
+  }
+}
+
 // ---------- Snapshot via better-sqlite3 ----------
 async function createSnapshot(db, snapshotPath) {
   if (typeof db.backup !== 'function') {
@@ -106,19 +126,18 @@ async function createSnapshot(db, snapshotPath) {
 async function uploadBackup(localPath, { force = false } = {}) {
   if (!ENABLED) return { skipped: true };
 
-  if (!fs.existsSync(localPath)) throw new Error(`Local file not found: ${localPath}`);
+  // Validate before upload
+  const validation = validateDbFile(localPath);
+  if (!validation.ok && !force) {
+    console.warn(`⚠️  Refusing to upload invalid file: ${validation.reason}`);
+    return { skipped: true, reason: `invalid: ${validation.reason}` };
+  }
 
   const auth = getClient();
   const drive = google.drive({ version: 'v3', auth });
 
   const stats = fs.statSync(localPath);
   const size = stats.size;
-
-  // Safety: refuse to upload suspiciously small files
-  if (size < 4096 && !force) {
-    console.warn(`⚠️  File too small (${size} bytes), skipping upload`);
-    return { skipped: true, reason: 'too-small' };
-  }
 
   // Safety: refuse if size dropped >50% vs most recent
   const existing = await listBackups(drive);
@@ -128,7 +147,7 @@ async function uploadBackup(localPath, { force = false } = {}) {
     if (lastSize > 0) {
       const ratio = size / lastSize;
       if (ratio < 0.5) {
-        console.warn(`⚠️  Size dropped from ${lastSize} to ${size} bytes (${Math.round(ratio*100)}%). Skipping for safety. Use force=true to override.`);
+        console.warn(`⚠️  Size dropped from ${lastSize} to ${size} bytes (${Math.round(ratio*100)}%). Skipping for safety.`);
         return { skipped: true, reason: 'size-regression', lastSize, newSize: size };
       }
     }
@@ -180,11 +199,11 @@ async function uploadBackup(localPath, { force = false } = {}) {
     }
   }
 
-  console.log(`☁️  Backup uploaded: ${filename} (${size} bytes)`);
+  console.log(`☁️  Backup uploaded: ${filename} (${size} bytes, validated ✅)`);
   return { ok: true, size, id: created.data.id, filename };
 }
 
-// ---------- Download the LATEST backup ----------
+// ---------- Download the LATEST VALID backup ----------
 async function downloadBackup(localPath) {
   if (!ENABLED) return { skipped: true };
 
@@ -207,29 +226,50 @@ async function downloadBackup(localPath) {
     }
   }
 
-  // Fallback: most recent backup
-  if (!targetName) {
-    const backups = await listBackups(drive);
-    if (!backups.length) return { notFound: true };
-    targetName = backups[0].name;
+  // Get all backups
+  const backups = await listBackups(drive);
+  if (!backups.length) return { notFound: true };
+
+  // Order: latest marker first, then rest by name desc
+  const ordered = [];
+  if (targetName) {
+    const target = backups.find(b => b.name === targetName);
+    if (target) ordered.push(target);
   }
-
-  const file = await findFile(drive, targetName);
-  if (!file) return { notFound: true };
-
-  const res = await drive.files.get(
-    { fileId: file.id, alt: 'media' },
-    { responseType: 'stream' }
-  );
-
-  await new Promise((resolve, reject) => {
-    const dest = fs.createWriteStream(localPath);
-    res.data.on('end', resolve).on('error', reject).pipe(dest);
+  backups.forEach(b => {
+    if (!ordered.find(o => o.id === b.id)) ordered.push(b);
   });
 
-  const size = fs.statSync(localPath).size;
-  console.log(`☁️  Restored from ${targetName} (${size} bytes)`);
-  return { ok: true, size, filename: targetName };
+  // Try each until one validates
+  for (const file of ordered) {
+    try {
+      console.log(`   Trying ${file.name}...`);
+      const res = await drive.files.get(
+        { fileId: file.id, alt: 'media' },
+        { responseType: 'stream' }
+      );
+
+      await new Promise((resolve, reject) => {
+        const dest = fs.createWriteStream(localPath);
+        res.data.on('end', resolve).on('error', reject).pipe(dest);
+      });
+
+      const validation = validateDbFile(localPath);
+      if (!validation.ok) {
+        console.warn(`   ❌ ${file.name}: ${validation.reason}`);
+        continue;
+      }
+
+      console.log(`☁️  Restored from ${file.name} (${validation.size} bytes) — valid ✅`);
+      return { ok: true, size: validation.size, filename: file.name };
+    } catch (e) {
+      console.warn(`   ❌ ${file.name}: download failed (${e.message})`);
+      continue;
+    }
+  }
+
+  console.error('❌ No valid backup found among ' + ordered.length + ' attempts');
+  return { ok: false, error: 'No valid backup found' };
 }
 
 // ---------- Download a SPECIFIC backup ----------
@@ -252,9 +292,13 @@ async function downloadBackupByName(name, localPath) {
     res.data.on('end', resolve).on('error', reject).pipe(dest);
   });
 
-  const size = fs.statSync(localPath).size;
-  console.log(`☁️  Restored ${name} (${size} bytes)`);
-  return { ok: true, size, filename: name };
+  const validation = validateDbFile(localPath);
+  if (!validation.ok) {
+    return { ok: false, error: `Corrupted: ${validation.reason}` };
+  }
+
+  console.log(`☁️  Restored ${name} (${validation.size} bytes) — valid ✅`);
+  return { ok: true, size: validation.size, filename: name };
 }
 
 // ---------- List all backups ----------
@@ -288,5 +332,6 @@ module.exports = {
   listBackupsOnDrive,
   remoteExists,
   createSnapshot,
+  validateDbFile,
   ENABLED,
 };

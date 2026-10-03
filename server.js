@@ -326,20 +326,19 @@ app.get('/api/admin/backups/list', authAdmin, async (req, res) => {
 
 app.post('/api/admin/backups/restore/:name', authAdmin, async (req, res) => {
   try {
-    const { downloadBackupByName, ENABLED } = require('./backup');
+    const { downloadBackupByName, validateDbFile, ENABLED } = require('./backup');
     if (!ENABLED) return res.status(400).json({ error: 'Backup not configured' });
 
     const name = req.params.name;
     const tempPath = path.join('/tmp', `restore-${Date.now()}.db`);
 
     const result = await downloadBackupByName(name, tempPath);
-    if (!result.ok) return res.status(404).json({ error: 'Backup not found' });
-
-    const stats = fs.statSync(tempPath);
-    if (stats.size < 4096) {
-      fs.unlinkSync(tempPath);
-      return res.status(400).json({ error: 'Backup file too small (likely corrupt)' });
+    if (!result.ok) {
+      if (fs.existsSync(tempPath)) fs.unlinkSync(tempPath);
+      return res.status(400).json({ error: result.error || 'Backup not found' });
     }
+
+    // Validation already happened inside downloadBackupByName
 
     const DB_PATH = path.join(process.env.DATA_DIR || __dirname, 'herald.db');
     db.pragma('wal_checkpoint(TRUNCATE)');
@@ -349,11 +348,11 @@ app.post('/api/admin/backups/restore/:name', authAdmin, async (req, res) => {
     fs.copyFileSync(tempPath, DB_PATH);
     fs.unlinkSync(tempPath);
 
-    console.log(`✅ Restored backup: ${name} (${stats.size} bytes)`);
+    console.log(`✅ Restored backup: ${name} (${result.size} bytes)`);
     res.json({
       ok: true,
       restored_from: name,
-      size: stats.size,
+      size: result.size,
       old_backup: oldPath,
       note: 'Restart the server to load the restored DB',
     });
@@ -363,15 +362,26 @@ app.post('/api/admin/backups/restore/:name', authAdmin, async (req, res) => {
   }
 });
 
+// ---------- Manual backup trigger ----------
 app.post('/api/admin/backup', authAdmin, async (req, res) => {
   try {
-    const { uploadBackup, createSnapshot, ENABLED } = require('./backup');
+    const { uploadBackup, createSnapshot, validateDbFile, ENABLED } = require('./backup');
     if (!ENABLED) return res.status(400).json({ error: 'Backup not configured' });
+
+    // Force WAL checkpoint before snapshot
+    db.pragma('wal_checkpoint(TRUNCATE)');
 
     const snapshotPath = path.join('/tmp', `herald-snapshot-${Date.now()}.db`);
     await createSnapshot(db, snapshotPath);
-    const stats = fs.statSync(snapshotPath);
-    console.log(`📊 Snapshot size: ${stats.size} bytes`);
+
+    // Validate the snapshot
+    const validation = validateDbFile(snapshotPath);
+    if (!validation.ok) {
+      fs.unlinkSync(snapshotPath);
+      return res.status(500).json({ error: `Snapshot invalid: ${validation.reason}` });
+    }
+
+    console.log(`📊 Snapshot size: ${validation.size} bytes (validated ✅)`);
 
     const result = await uploadBackup(snapshotPath, { force: true });
     fs.unlinkSync(snapshotPath);
@@ -380,7 +390,7 @@ app.post('/api/admin/backup', authAdmin, async (req, res) => {
       ok: true,
       size: result.size,
       filename: result.filename,
-      snapshot_size: stats.size,
+      snapshot_size: validation.size,
       at: new Date().toISOString(),
     });
   } catch (err) {
