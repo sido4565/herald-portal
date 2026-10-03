@@ -172,15 +172,33 @@ async function loadDashboard() {
   try {
     const courseRes = await fetch('/api/courses');
     const courses = await courseRes.json();
-    document.getElementById('courses').innerHTML = courses.map(c => `
-      <li>
-        <strong>${esc(c.code)} &mdash; ${esc(c.title)}</strong>
-        <p>Trainer: ${esc(c.trainer)}</p>
+    const courseImageMap = {
+  'WD101':  'web.jpg',
+  'DB201':  'db.jpg',
+  'JS301':  'js.jpg',
+  'PY101':  'python.jpg',
+  'NET210': 'networking.jpg',
+};
+
+document.getElementById('courses').innerHTML = courses.map(c => {
+  const img = courseImageMap[c.code] || 'web.jpg';
+  return `
+    <li style="display: flex; gap: 16px; align-items: center; padding: 14px 0;">
+      <img
+        src="images/courses/${img}"
+        alt="${esc(c.title)}"
+        style="width: 84px; height: 84px; object-fit: cover; border-radius: 10px; flex-shrink: 0; border: 1px solid var(--border-soft);"
+        onerror="this.style.display='none'"
+      />
+      <div style="flex: 1; min-width: 0;">
+        <strong style="display: block; margin-bottom: 4px;">${esc(c.code)} — ${esc(c.title)}</strong>
+        <p style="margin: 0 0 6px; font-size: 12px; color: var(--muted);">Trainer: ${esc(c.trainer)}</p>
         ${c.enrolled
-          ? '<button class="btn-enroll" disabled>Enrolled</button>'
+          ? '<button class="btn-enroll" disabled>Enrolled ✓</button>'
           : `<button class="btn-enroll" data-id="${c.id}">Enroll</button>`}
-      </li>
-    `).join('');
+      </div>
+    </li>`;
+}).join('');
 
     document.querySelectorAll('.btn-enroll[data-id]').forEach(btn => {
       btn.addEventListener('click', async () => {
