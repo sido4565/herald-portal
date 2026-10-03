@@ -4,6 +4,12 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Welcome — Herald Trainer and Consultant</title>
+  <meta property="og:title" content="Herald Trainer and Consultant — Student Portal" />
+<meta property="og:description" content="Your Learning Journey, Our Commitment. Physical classes and online courses in business, tech, and leadership." />
+<meta property="og:image" content="https://herald-portal.onrender.com/images/og-image.jpg" />
+<meta property="og:type" content="website" />
+<meta property="og:url" content="https://herald-portal.onrender.com/" />
+<meta name="twitter:card" content="summary_large_image" />
   <link rel="icon" type="image/svg+xml" href="favicon.svg" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -11,11 +17,30 @@
   <link rel="stylesheet" href="style.css" />
   <style>
     body {
-      margin: 0;
-      background: #0b1a33;
-      color: #ffffff;
-      font-family: 'Inter', -apple-system, sans-serif;
-    }
+  margin: 0;
+  background-color: #0b1a33;
+  background-image: url('images/hero-landing.jpg');
+  background-size: cover;
+  background-position: center;
+  background-attachment: fixed;
+  color: #ffffff;
+  font-family: 'Inter', -apple-system, sans-serif;
+  position: relative;
+}
+
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background: linear-gradient(135deg, rgba(11, 26, 51, 0.85) 0%, rgba(11, 26, 51, 0.55) 100%);
+  z-index: 0;
+  pointer-events: none;
+}
+
+.landing-hero, .landing-footer {
+  position: relative;
+  z-index: 1;
+}
     .landing-hero {
       position: relative;
       min-height: 100vh;

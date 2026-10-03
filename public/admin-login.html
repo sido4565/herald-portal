@@ -11,10 +11,37 @@
   <link rel="stylesheet" href="style.css" />
   <style>
   .auth-body {
-    position: relative;
-    overflow: hidden;
-    background: #3d1a1a; /* fallback */
-  }
+  position: relative;
+  overflow: hidden;
+  background: #3d1a1a;
+}
+
+.auth-body .auth-photo-bg {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background-image: url('images/hero-admin.jpg');
+  background-size: cover;
+  background-position: center;
+  z-index: 0;
+  pointer-events: none;
+}
+
+.auth-body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background: linear-gradient(135deg, rgba(61, 26, 26, 0.80) 0%, rgba(61, 26, 26, 0.55) 100%);
+  z-index: 1;
+  pointer-events: none;
+}
+
+.auth-card {
+  position: relative;
+  z-index: 2;
+}
   .auth-video-bg {
     position: fixed;
     top: 0;
@@ -44,6 +71,7 @@
 </style>
 </head>
 <body class="auth-body admin-auth">
+  <div class="auth-photo-bg"></div>
   <video
   class="auth-video-bg"
   autoplay

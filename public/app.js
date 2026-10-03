@@ -165,7 +165,10 @@ async function loadDashboard() {
     const anns = await annRes.json();
     document.getElementById('announcements').innerHTML = anns.length
       ? anns.map(a => `<li><strong>${esc(a.title)}</strong><p>${esc(a.body)}</p></li>`).join('')
-      : '<li style="color:var(--muted);">No announcements at this time.</li>';
+      : `<li style="text-align:center; padding: 24px; color: var(--muted);">
+     <img src="images/empty-state.jpg" alt="" style="max-width: 180px; margin: 0 auto 12px; border-radius: 8px; opacity: 0.85;" />
+     <p style="margin: 0;">No announcements at this time.</p>
+   </li>`;
   } catch (e) { console.error(e); }
 
   // Courses

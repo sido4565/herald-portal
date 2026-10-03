@@ -11,10 +11,37 @@
   <link rel="stylesheet" href="style.css" />
   <style>
   .auth-body {
-    position: relative;
-    overflow: hidden;
-    background: #0b1a33; /* fallback color */
-  }
+  position: relative;
+  overflow: hidden;
+  background: #0b1a33;
+}
+
+.auth-body .auth-photo-bg {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background-image: url('images/hero-login.jpg');
+  background-size: cover;
+  background-position: center;
+  z-index: 0;
+  pointer-events: none;
+}
+
+.auth-body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background: linear-gradient(135deg, rgba(11, 26, 51, 0.75) 0%, rgba(11, 26, 51, 0.5) 100%);
+  z-index: 1;
+  pointer-events: none;
+}
+
+.auth-card {
+  position: relative;
+  z-index: 2;
+}
 
   /* Video background */
   .auth-video-bg {
@@ -51,6 +78,7 @@
 </style>
 </head>
 <body class="auth-body">
+  <div class="auth-photo-bg"></div>
   <!-- Background video (muted autoplay loop) -->
   <video
     class="auth-video-bg"
@@ -103,6 +131,7 @@
     </form>
 
     <div id="regSuccess" class="hidden" style="margin-top:20px; padding:20px; background:var(--bg-alt); border-radius:8px; border-left:4px solid var(--success);">
+      <img src="images/success.jpg" alt="Success" style="display: block; max-width: 140px; margin: 0 auto 16px; border-radius: 8px;" />
       <h3 style="margin:0 0 8px; font-size:16px; color:var(--text);">Registration Successful</h3>
       <p style="margin:0 0 12px; color:var(--text-soft); font-size:13px;">Your registration number is:</p>
       <div id="regNoDisplay" style="font-family:var(--font-mono); font-size:22px; font-weight:700; color:var(--navy-700); letter-spacing:0.05em; padding:12px; background:var(--card); border-radius:6px; text-align:center; margin-bottom:12px;">HRL-2026-0001</div>
