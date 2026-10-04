@@ -3,146 +3,1496 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Welcome — Herald Trainer and Consultant</title>
-  <meta property="og:title" content="Herald Trainer and Consultant — Student Portal" />
-<meta property="og:description" content="Your Learning Journey, Our Commitment. Physical classes and online courses in business, tech, and leadership." />
-<meta property="og:image" content="https://herald-portal.onrender.com/images/og-image.jpg" />
-<meta property="og:type" content="website" />
-<meta property="og:url" content="https://herald-portal.onrender.com/" />
-<meta name="twitter:card" content="summary_large_image" />
+  <title>Herald Trainer and Consultant — Skills, Knowledge, Better Futures</title>
   <link rel="icon" type="image/svg+xml" href="favicon.svg" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="style.css" />
+  <meta property="og:title" content="Herald Trainer and Consultant — Student Portal" />
+  <meta property="og:description" content="Skills. Knowledge. Better Futures. Physical classes and online courses in Mombasa, Kenya." />
+  <meta property="og:image" content="https://herald-portal.onrender.com/images/og-image.jpg" />
+  <meta property="og:type" content="website" />
+  <meta property="og:url" content="https://herald-portal.onrender.com/" />
+  <meta name="twitter:card" content="summary_large_image" />
   <style>
+    :root {
+      --navy: #0b1a33;
+      --gold: #b8860b;
+      --gold-light: #e6b84c;
+      --cream: #f7f5f0;
+      --text: #1a1f2e;
+      --muted: #64748b;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
     body {
-  margin: 0;
-  background-color: #0b1a33;
-  background-image: url('images/hero-landing.jpg');
-  background-size: cover;
-  background-position: center;
-  background-attachment: fixed;
-  color: #ffffff;
-  font-family: 'Inter', -apple-system, sans-serif;
-  position: relative;
-}
+      font-family: 'Inter', -apple-system, sans-serif;
+      background: var(--cream);
+      color: var(--text);
+      line-height: 1.6;
+      overflow-x: hidden;
+    }
+    a { text-decoration: none; color: inherit; }
+    img { max-width: 100%; display: block; }
 
-body::before {
-  content: '';
-  position: fixed;
-  inset: 0;
-  background: linear-gradient(135deg, rgba(11, 26, 51, 0.85) 0%, rgba(11, 26, 51, 0.55) 100%);
-  z-index: 0;
-  pointer-events: none;
-}
-
-.landing-hero, .landing-footer {
-  position: relative;
-  z-index: 1;
-}
-    .landing-hero {
+    /* ─── Top Navigation ─── */
+    .nav {
+      position: fixed;
+      top: 0; left: 0; right: 0;
+      z-index: 100;
+      background: rgba(11, 26, 51, 0.95);
+      backdrop-filter: blur(12px);
+      border-bottom: 1px solid rgba(255,255,255,0.08);
+      padding: 12px 24px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      transition: padding 0.3s;
+    }
+    .nav-brand {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      color: white;
+      font-weight: 700;
+      font-size: 15px;
+    }
+    .nav-brand img { width: 36px; height: 36px; border-radius: 6px; }
+    .nav-links {
+      display: flex;
+      gap: 28px;
+      list-style: none;
+    }
+    .nav-links a {
+      color: rgba(255,255,255,0.85);
+      font-size: 14px;
+      font-weight: 500;
+      transition: color 0.15s;
       position: relative;
+    }
+    .nav-links a:hover { color: var(--gold-light); }
+    .nav-cta {
+      background: var(--gold);
+      color: white;
+      padding: 9px 18px;
+      border-radius: 8px;
+      font-size: 13px;
+      font-weight: 600;
+      transition: background 0.15s;
+    }
+    .nav-cta:hover { background: var(--gold-light); }
+    @media (max-width: 768px) {
+      .nav-links { display: none; }
+    }
+
+    /* ─── Hero ─── */
+    .hero {
       min-height: 100vh;
       display: flex;
-      flex-direction: column;
       align-items: center;
       justify-content: center;
-      padding: 40px 20px;
       text-align: center;
+      padding: 100px 24px 60px;
+      background-image:
+        linear-gradient(135deg, rgba(11,26,51,0.88) 0%, rgba(11,26,51,0.75) 100%),
+        url('images/hero-landing.jpg');
+      background-size: cover;
+      background-position: center;
+      color: white;
+      position: relative;
     }
-    .landing-video {
-      width: 100%;
-      max-width: 960px;
-      border-radius: 12px;
-      box-shadow: 0 24px 60px rgba(0,0,0,0.5);
-      margin-bottom: 32px;
-      background: #000;
-    }
-    .landing-logo {
-      max-width: 200px;
+    .hero-content { max-width: 900px; }
+    .hero-badge {
+      display: inline-block;
+      background: rgba(230, 184, 76, 0.15);
+      border: 1px solid var(--gold-light);
+      color: var(--gold-light);
+      padding: 6px 16px;
+      border-radius: 999px;
+      font-size: 12px;
+      font-weight: 600;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
       margin-bottom: 24px;
     }
-    .landing-h1 {
-      font-size: clamp(28px, 5vw, 48px);
-      font-weight: 800;
-      letter-spacing: -0.02em;
-      margin: 0 0 12px;
-      color: #ffffff;
+    .hero h1 {
+      font-size: clamp(36px, 6vw, 68px);
+      font-weight: 900;
+      line-height: 1.05;
+      letter-spacing: -0.03em;
+      margin-bottom: 24px;
     }
-    .landing-h1 span { color: #e6b84c; }
-    .landing-sub {
-      font-size: clamp(15px, 2vw, 19px);
-      color: rgba(255,255,255,0.75);
+    .hero h1 span { color: var(--gold-light); }
+    .hero-sub {
+      font-size: clamp(16px, 2vw, 20px);
+      opacity: 0.85;
       max-width: 640px;
       margin: 0 auto 40px;
       line-height: 1.6;
     }
-    .landing-cta {
-      display: inline-flex;
-      gap: 12px;
-      flex-wrap: wrap;
+    .hero-cta {
+      display: flex;
+      gap: 14px;
       justify-content: center;
+      flex-wrap: wrap;
     }
-    .landing-btn {
-      display: inline-block;
-      padding: 14px 28px;
-      border-radius: 8px;
+    .btn-gold {
+      background: var(--gold);
+      color: white;
+      padding: 15px 30px;
+      border-radius: 10px;
       font-size: 15px;
       font-weight: 600;
-      text-decoration: none;
-      transition: transform 0.15s, background 0.15s;
+      transition: all 0.2s;
+      border: 2px solid var(--gold);
+    }
+    .btn-gold:hover {
+      background: var(--gold-light);
+      border-color: var(--gold-light);
+      transform: translateY(-2px);
+      box-shadow: 0 12px 32px rgba(230, 184, 76, 0.35);
+    }
+    .btn-outline-white {
+      background: transparent;
+      color: white;
+      padding: 15px 30px;
+      border-radius: 10px;
+      font-size: 15px;
+      font-weight: 600;
+      border: 2px solid rgba(255,255,255,0.4);
+      transition: all 0.2s;
+    }
+    .btn-outline-white:hover {
+      background: rgba(255,255,255,0.1);
+      border-color: white;
+    }
+
+    /* ─── Section Base ─── */
+    .section {
+      padding: 100px 24px;
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+    .section-head {
+      text-align: center;
+      margin-bottom: 64px;
+    }
+    .section-label {
+      display: inline-block;
+      color: var(--gold);
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+      margin-bottom: 12px;
+    }
+    .section-head h2 {
+      font-size: clamp(28px, 4vw, 42px);
+      font-weight: 800;
+      letter-spacing: -0.02em;
+      color: var(--navy);
+      margin-bottom: 16px;
+    }
+    .section-head p {
+      font-size: 16px;
+      color: var(--muted);
+      max-width: 620px;
+      margin: 0 auto;
+      line-height: 1.7;
+    }
+
+    /* ─── Stats Bar ─── */
+    .stats {
+      background: var(--navy);
+      color: white;
+      padding: 40px 24px;
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 32px;
+      max-width: 1200px;
+      margin: 0 auto;
+      border-radius: 16px;
+      margin-top: -60px;
+      position: relative;
+      z-index: 10;
+      box-shadow: 0 20px 60px rgba(11,26,51,0.25);
+    }
+    .stat-item { text-align: center; }
+    .stat-num {
+      font-size: 40px;
+      font-weight: 900;
+      color: var(--gold-light);
+      line-height: 1;
+      margin-bottom: 6px;
+      letter-spacing: -0.02em;
+    }
+    .stat-lbl {
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      opacity: 0.75;
+      font-weight: 600;
+    }
+
+    /* ─── What Guides Us (Interactive) ─── */
+    .guides {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+      gap: 20px;
+    }
+    .guide-card {
+      background: white;
+      border-radius: 16px;
+      padding: 32px 24px;
+      text-align: center;
+      border: 2px solid transparent;
+      cursor: pointer;
+      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+      position: relative;
+      overflow: hidden;
+    }
+    .guide-card::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      height: 4px;
+      background: var(--gold);
+      transform: scaleX(0);
+      transform-origin: left;
+      transition: transform 0.3s;
+    }
+    .guide-card:hover {
+      border-color: var(--gold);
+      transform: translateY(-6px);
+      box-shadow: 0 20px 40px rgba(11,26,51,0.12);
+    }
+    .guide-card:hover::before { transform: scaleX(1); }
+    .guide-card.active {
+      border-color: var(--gold);
+      background: #fefaf0;
+      box-shadow: 0 20px 40px rgba(184, 134, 11, 0.15);
+    }
+    .guide-card.active::before { transform: scaleX(1); }
+    .guide-icon {
+      width: 64px; height: 64px;
+      margin: 0 auto 20px;
+      background: linear-gradient(135deg, var(--navy) 0%, #1e3a5f 100%);
+      border-radius: 16px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--gold-light);
+      transition: transform 0.3s;
+    }
+    .guide-card:hover .guide-icon,
+    .guide-card.active .guide-icon {
+      transform: rotate(-6deg) scale(1.05);
+    }
+    .guide-icon svg { width: 32px; height: 32px; }
+    .guide-card h3 {
+      font-size: 18px;
+      font-weight: 700;
+      color: var(--navy);
+      margin-bottom: 10px;
+    }
+    .guide-card p {
+      font-size: 14px;
+      color: var(--muted);
+      line-height: 1.6;
+      margin-bottom: 16px;
+    }
+    .guide-detail {
+      max-height: 0;
+      overflow: hidden;
+      transition: max-height 0.4s ease;
+      text-align: left;
+    }
+    .guide-card.active .guide-detail { max-height: 500px; }
+    .guide-detail-inner {
+      border-top: 1px solid rgba(184, 134, 11, 0.2);
+      padding-top: 16px;
+      font-size: 13.5px;
+      color: var(--text);
+      line-height: 1.7;
+    }
+    .guide-detail-inner ul {
+      list-style: none;
+      padding: 0;
+    }
+    .guide-detail-inner li {
+      padding: 6px 0 6px 22px;
+      position: relative;
+    }
+    .guide-detail-inner li::before {
+      content: '→';
+      position: absolute;
+      left: 0;
+      color: var(--gold);
+      font-weight: 700;
+    }
+    .guide-expand-hint {
+      font-size: 12px;
+      color: var(--gold);
+      font-weight: 600;
+      letter-spacing: 0.03em;
+    }
+    .guide-card.active .guide-expand-hint { display: none; }
+
+    /* ─── Courses ─── */
+    .courses-tabs {
+      display: flex;
+      gap: 8px;
+      justify-content: center;
+      flex-wrap: wrap;
+      margin-bottom: 40px;
+    }
+    .course-tab {
+      background: white;
+      border: 2px solid #e5e8ed;
+      padding: 10px 20px;
+      border-radius: 999px;
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--muted);
+      cursor: pointer;
+      transition: all 0.2s;
       font-family: inherit;
     }
-    .landing-btn:hover { transform: translateY(-2px); text-decoration: none; }
-    .landing-btn.primary {
-      background: #b8860b;
-      color: #ffffff;
+    .course-tab:hover {
+      border-color: var(--gold);
+      color: var(--navy);
     }
-    .landing-btn.primary:hover { background: #d4a017; }
-    .landing-btn.ghost {
-      background: transparent;
-      color: #ffffff;
-      border: 1px solid rgba(255,255,255,0.3);
+    .course-tab.active {
+      background: var(--navy);
+      border-color: var(--navy);
+      color: white;
     }
-    .landing-btn.ghost:hover { background: rgba(255,255,255,0.1); }
-
-    .landing-footer {
-      text-align: center;
-      padding: 32px 20px;
-      color: rgba(255,255,255,0.5);
+    .courses-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+      gap: 24px;
+    }
+    .course-card {
+      background: white;
+      border-radius: 16px;
+      overflow: hidden;
+      cursor: pointer;
+      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+      border: 1px solid #e5e8ed;
+      display: flex;
+      flex-direction: column;
+    }
+    .course-card:hover {
+      transform: translateY(-8px);
+      box-shadow: 0 24px 48px rgba(11,26,51,0.15);
+      border-color: var(--gold);
+    }
+    .course-img-wrap {
+      position: relative;
+      height: 180px;
+      overflow: hidden;
+      background: #f0f0f0;
+    }
+    .course-img-wrap img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      transition: transform 0.4s;
+    }
+    .course-card:hover .course-img-wrap img { transform: scale(1.06); }
+    .course-badge {
+      position: absolute;
+      top: 12px; left: 12px;
+      background: var(--gold);
+      color: white;
+      padding: 4px 12px;
+      border-radius: 6px;
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+    }
+    .course-badge.priority {
+      background: #dc2626;
+    }
+    .course-body {
+      padding: 20px 22px 24px;
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+    }
+    .course-body h3 {
+      font-size: 16px;
+      font-weight: 700;
+      color: var(--navy);
+      margin-bottom: 6px;
+      line-height: 1.35;
+    }
+    .course-body .code {
+      font-size: 11px;
+      color: var(--gold);
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      margin-bottom: 10px;
+    }
+    .course-body p {
+      font-size: 13.5px;
+      color: var(--muted);
+      line-height: 1.55;
+      margin-bottom: 16px;
+      flex: 1;
+    }
+    .course-body .meta {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding-top: 14px;
+      border-top: 1px solid #e5e8ed;
+      font-size: 12px;
+      color: var(--muted);
+    }
+    .course-body .meta strong { color: var(--navy); }
+    .course-learn-more {
+      color: var(--gold);
+      font-weight: 700;
       font-size: 13px;
-      border-top: 1px solid rgba(255,255,255,0.08);
-      margin-top: 40px;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
     }
-    .landing-footer strong { color: #e6b84c; }
+    .course-learn-more::after {
+      content: '→';
+      transition: transform 0.2s;
+    }
+    .course-card:hover .course-learn-more::after { transform: translateX(4px); }
+
+    /* ─── Course Modal ─── */
+    .modal-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(11, 26, 51, 0.7);
+      backdrop-filter: blur(6px);
+      z-index: 200;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+      animation: fadeIn 0.2s;
+    }
+    .modal-overlay.active { display: flex; }
+    @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+    .modal-box {
+      background: white;
+      border-radius: 20px;
+      max-width: 640px;
+      width: 100%;
+      max-height: 90vh;
+      overflow-y: auto;
+      animation: slideUp 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+      position: relative;
+    }
+    @keyframes slideUp {
+      from { transform: translateY(30px); opacity: 0; }
+      to { transform: translateY(0); opacity: 1; }
+    }
+    .modal-img {
+      height: 220px;
+      overflow: hidden;
+      position: relative;
+    }
+    .modal-img img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+    .modal-close {
+      position: absolute;
+      top: 16px; right: 16px;
+      background: rgba(0,0,0,0.6);
+      color: white;
+      border: none;
+      width: 40px; height: 40px;
+      border-radius: 50%;
+      cursor: pointer;
+      font-size: 20px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: background 0.2s;
+    }
+    .modal-close:hover { background: rgba(0,0,0,0.85); }
+    .modal-body { padding: 32px 36px 36px; }
+    .modal-body .code {
+      color: var(--gold);
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      margin-bottom: 8px;
+    }
+    .modal-body h2 {
+      font-size: 26px;
+      font-weight: 800;
+      color: var(--navy);
+      margin-bottom: 16px;
+      line-height: 1.2;
+    }
+    .modal-body .desc {
+      color: var(--muted);
+      font-size: 15px;
+      line-height: 1.7;
+      margin-bottom: 24px;
+    }
+    .modal-body h4 {
+      font-size: 14px;
+      font-weight: 700;
+      color: var(--navy);
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      margin-bottom: 12px;
+    }
+    .modal-body ul.features {
+      list-style: none;
+      padding: 0;
+      margin-bottom: 24px;
+    }
+    .modal-body ul.features li {
+      padding: 8px 0 8px 26px;
+      position: relative;
+      font-size: 14px;
+      color: var(--text);
+      line-height: 1.5;
+    }
+    .modal-body ul.features li::before {
+      content: '✓';
+      position: absolute;
+      left: 0;
+      top: 8px;
+      color: var(--gold);
+      font-weight: 800;
+      font-size: 15px;
+    }
+    .modal-footer {
+      display: flex;
+      gap: 12px;
+      padding-top: 24px;
+      border-top: 1px solid #e5e8ed;
+    }
+    .modal-footer .btn-gold,
+    .modal-footer .btn-outline {
+      flex: 1;
+      text-align: center;
+    }
+    .btn-outline {
+      background: white;
+      color: var(--navy);
+      padding: 13px 24px;
+      border-radius: 10px;
+      font-size: 14px;
+      font-weight: 600;
+      border: 2px solid #e5e8ed;
+      transition: all 0.2s;
+      display: inline-block;
+    }
+    .btn-outline:hover { border-color: var(--navy); }
+    .modal-footer .btn-gold { padding: 13px 24px; font-size: 14px; }
+
+    /* ─── Contact ─── */
+    .contact-wrap {
+      background: var(--navy);
+      color: white;
+      border-radius: 20px;
+      padding: 60px 40px;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 48px;
+      align-items: center;
+    }
+    @media (max-width: 768px) {
+      .contact-wrap { grid-template-columns: 1fr; padding: 40px 24px; gap: 32px; }
+    }
+    .contact-wrap h2 {
+      font-size: 32px;
+      font-weight: 800;
+      margin-bottom: 16px;
+      line-height: 1.15;
+    }
+    .contact-wrap h2 span { color: var(--gold-light); }
+    .contact-wrap > div > p {
+      font-size: 15px;
+      opacity: 0.8;
+      line-height: 1.7;
+      margin-bottom: 32px;
+    }
+    .contact-items { display: flex; flex-direction: column; gap: 20px; }
+    .contact-item {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      padding: 18px;
+      background: rgba(255,255,255,0.06);
+      border-radius: 12px;
+      border: 1px solid rgba(255,255,255,0.1);
+      transition: all 0.2s;
+      color: white;
+    }
+    .contact-item:hover {
+      background: rgba(255,255,255,0.1);
+      border-color: var(--gold);
+      transform: translateX(4px);
+    }
+    .contact-item-icon {
+      width: 48px; height: 48px;
+      background: var(--gold);
+      border-radius: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      color: white;
+    }
+    .contact-item-icon svg { width: 22px; height: 22px; }
+    .contact-item-label {
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      opacity: 0.7;
+      font-weight: 600;
+      margin-bottom: 2px;
+    }
+    .contact-item-value {
+      font-size: 16px;
+      font-weight: 600;
+      color: white;
+    }
+
+    /* ─── Footer ─── */
+    .site-footer {
+      background: #061323;
+      color: rgba(255,255,255,0.6);
+      padding: 40px 24px 32px;
+      text-align: center;
+      font-size: 13px;
+      margin-top: 80px;
+    }
+    .site-footer strong { color: var(--gold-light); }
+    .site-footer .tagline {
+      margin-top: 8px;
+      font-size: 12px;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      opacity: 0.5;
+    }
+
+    /* ─── Services (icons grid) ─── */
+    .services-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+      gap: 20px;
+    }
+    .service-card {
+      background: white;
+      border-radius: 16px;
+      padding: 32px 26px;
+      border: 1px solid #e5e8ed;
+      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+      cursor: pointer;
+      display: flex;
+      flex-direction: column;
+      color: inherit;
+    }
+    .service-card:hover {
+      border-color: var(--gold);
+      transform: translateY(-6px);
+      box-shadow: 0 20px 40px rgba(11,26,51,0.12);
+    }
+    .service-icon {
+      width: 60px; height: 60px;
+      background: linear-gradient(135deg, var(--navy) 0%, #1e3a5f 100%);
+      border-radius: 14px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--gold-light);
+      margin-bottom: 20px;
+      transition: transform 0.3s;
+    }
+    .service-card:hover .service-icon { transform: rotate(-8deg) scale(1.05); }
+    .service-icon svg { width: 28px; height: 28px; }
+    .service-card h3 {
+      font-size: 17px;
+      font-weight: 700;
+      color: var(--navy);
+      margin-bottom: 10px;
+    }
+    .service-card p {
+      font-size: 14px;
+      color: var(--muted);
+      line-height: 1.6;
+      margin-bottom: 16px;
+      flex: 1;
+    }
+    .service-card .learn-more {
+      color: var(--gold);
+      font-weight: 700;
+      font-size: 13px;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .service-card .learn-more::after {
+      content: '→';
+      transition: transform 0.2s;
+    }
+    .service-card:hover .learn-more::after { transform: translateX(4px); }
+
+    /* ─── Services Detail Modal ─── */
+    .service-detail-modal .modal-body { padding: 40px 44px 44px; }
+    .service-detail-modal .icon-badge {
+      width: 72px; height: 72px;
+      background: linear-gradient(135deg, var(--navy), #1e3a5f);
+      border-radius: 18px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--gold-light);
+      margin-bottom: 20px;
+    }
+    .service-detail-modal .icon-badge svg { width: 36px; height: 36px; }
+    .service-detail-modal h2 {
+      font-size: 26px;
+      font-weight: 800;
+      color: var(--navy);
+      margin-bottom: 14px;
+    }
+    .service-detail-modal .lead {
+      color: var(--muted);
+      font-size: 15px;
+      line-height: 1.7;
+      margin-bottom: 28px;
+    }
+    .service-detail-modal h4 {
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--gold);
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      margin-bottom: 12px;
+      margin-top: 24px;
+    }
+    .service-detail-modal ul {
+      list-style: none;
+      padding: 0;
+    }
+    .service-detail-modal li {
+      padding: 8px 0 8px 26px;
+      position: relative;
+      font-size: 14px;
+      color: var(--text);
+      line-height: 1.55;
+    }
+    .service-detail-modal li::before {
+      content: '✓';
+      position: absolute;
+      left: 0;
+      top: 8px;
+      color: var(--gold);
+      font-weight: 800;
+    }
+
+    /* ─── Back to top ─── */
+    .back-to-top {
+      position: fixed;
+      bottom: 24px; right: 24px;
+      width: 48px; height: 48px;
+      background: var(--navy);
+      color: white;
+      border: none;
+      border-radius: 50%;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 8px 24px rgba(11,26,51,0.3);
+      z-index: 50;
+      opacity: 0;
+      pointer-events: none;
+      transition: all 0.3s;
+    }
+    .back-to-top.visible {
+      opacity: 1;
+      pointer-events: auto;
+    }
+    .back-to-top:hover { background: var(--gold); transform: translateY(-3px); }
   </style>
 </head>
 <body>
-  <main class="landing-hero">
-    <img src="images/herald-logo.png" alt="Herald Trainer and Consultant" class="landing-logo" />
 
-    <h1 class="landing-h1">Your Learning Journey,<br><span>Our Commitment</span></h1>
+<!-- Navigation -->
+<nav class="nav" id="nav">
+  <a href="#top" class="nav-brand">
+    <img src="images/herald-logo.png" alt="Herald" />
+    <span>HERALD</span>
+  </a>
+  <ul class="nav-links">
+    <li><a href="#guides">What Guides Us</a></li>
+    <li><a href="#services">Services</a></li>
+    <li><a href="#courses">Courses</a></li>
+    <li><a href="#contact">Contact</a></li>
+  </ul>
+  <a href="login.html" class="nav-cta">Student Portal →</a>
+</nav>
 
-    <p class="landing-sub">
-      Welcome to Herald Trainer and Consultant. Watch how we're shaping the next
-      generation of business leaders through physical classes and online courses.
+<!-- Hero -->
+<section class="hero" id="top">
+  <div class="hero-content">
+    <div class="hero-badge">Mombasa, Kenya</div>
+    <h1>Skills. Knowledge.<br><span>Better Futures.</span></h1>
+    <p class="hero-sub">
+      Herald Trainer and Consultant is your gateway to practical business, technical,
+      and professional skills. Learn online or in-person — your journey starts here.
     </p>
-
-    <video class="landing-video" controls autoplay muted playsinline poster="images/login-background.png">
-      <source src="videos/herald-promo.mp4" type="video/mp4" />
-      Your browser does not support video playback.
-    </video>
-
-    <div class="landing-cta">
-      <a href="login.html" class="landing-btn primary">Enter Student Portal</a>
-      <a href="admin-login.html" class="landing-btn ghost">Admin Access</a>
+    <div class="hero-cta">
+      <a href="register.html" class="btn-gold">Enroll Now</a>
+      <a href="#courses" class="btn-outline-white">View Courses</a>
     </div>
-  </main>
+  </div>
+</section>
 
-  <footer class="landing-footer">
-    <strong>HERALD TRAINER AND CONSULTANT</strong><br>
-    Skills &middot; Knowledge &middot; Better Futures
-  </footer>
+<!-- Stats -->
+<div class="stats">
+  <div class="stat-item"><div class="stat-num">500+</div><div class="stat-lbl">Students Trained</div></div>
+  <div class="stat-item"><div class="stat-num">15+</div><div class="stat-lbl">Courses Offered</div></div>
+  <div class="stat-item"><div class="stat-num">98%</div><div class="stat-lbl">Satisfaction Rate</div></div>
+  <div class="stat-item"><div class="stat-num">5+</div><div class="stat-lbl">Years of Excellence</div></div>
+</div>
+
+<!-- What Guides Us -->
+<section class="section" id="guides">
+  <div class="section-head">
+    <span class="section-label">Our Foundation</span>
+    <h2>What Guides Us</h2>
+    <p>Click any card below to see how we bring these values to life in every course and consultation.</p>
+  </div>
+  <div class="guides" id="guidesGrid"></div>
+</section>
+
+<!-- Services -->
+<section class="section" id="services" style="background: white; border-radius: 24px;">
+  <div class="section-head">
+    <span class="section-label">What We Offer</span>
+    <h2>Our Services</h2>
+    <p>From classroom training to corporate consulting — we deliver end-to-end solutions. Click any service to explore details.</p>
+  </div>
+  <div class="services-grid" id="servicesGrid"></div>
+</section>
+
+<!-- Courses -->
+<section class="section" id="courses">
+  <div class="section-head">
+    <span class="section-label">Course Catalog</span>
+    <h2>Explore Our Courses</h2>
+    <p>Business-first programs with technical depth. Click any course to view full details, modules, and prerequisites.</p>
+  </div>
+  <div class="courses-tabs" id="coursesTabs"></div>
+  <div class="courses-grid" id="coursesGrid"></div>
+</section>
+
+<!-- Contact -->
+<section class="section" id="contact">
+  <div class="contact-wrap">
+    <div>
+      <h2>Ready to Start Your<br><span>Learning Journey?</span></h2>
+      <p>Speak to our team today. We'll help you choose the right course for your goals — whether you're an individual or a company.</p>
+    </div>
+    <div class="contact-items">
+      <a class="contact-item" href="tel:+254796071997">
+        <div class="contact-item-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/>
+          </svg>
+        </div>
+        <div>
+          <div class="contact-item-label">Call / WhatsApp</div>
+          <div class="contact-item-value">+254 796 071 997</div>
+        </div>
+      </a>
+      <a class="contact-item" href="https://maps.google.com/?q=Mombasa,Kenya" target="_blank" rel="noopener">
+        <div class="contact-item-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/>
+            <circle cx="12" cy="10" r="3"/>
+          </svg>
+        </div>
+        <div>
+          <div class="contact-item-label">Visit Us</div>
+          <div class="contact-item-value">Mombasa, Kenya</div>
+        </div>
+      </a>
+      <a class="contact-item" href="mailto:sidzac33@gmail.com">
+        <div class="contact-item-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/>
+            <polyline points="22,6 12,13 2,6"/>
+          </svg>
+        </div>
+        <div>
+          <div class="contact-item-label">Email</div>
+          <div class="contact-item-value">sidzac33@gmail.com</div>
+        </div>
+      </a>
+    </div>
+  </div>
+</section>
+
+<!-- Footer -->
+<footer class="site-footer">
+  <div><strong>HERALD TRAINER AND CONSULTANT</strong></div>
+  <div class="tagline">Skills · Knowledge · Better Futures</div>
+</footer>
+
+<!-- Back to top -->
+<button class="back-to-top" id="backToTop" aria-label="Back to top">
+  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+    <polyline points="18 15 12 9 6 15"/>
+  </svg>
+</button>
+
+<!-- Modal -->
+<div class="modal-overlay" id="modal">
+  <div class="modal-box" id="modalBox">
+    <button class="modal-close" id="modalClose" aria-label="Close">×</button>
+    <div id="modalContent"></div>
+  </div>
+</div>
+
+<script>
+// ───────────────────────────────────────────────────────────
+// DATA
+// ───────────────────────────────────────────────────────────
+
+const GUIDES = [
+  {
+    title: 'Our Mission',
+    desc: 'To equip individuals and organizations with practical skills that create real economic value.',
+    icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg>',
+    detail: [
+      'Bridge the gap between theory and real-world practice',
+      'Focus on skills employers actually hire for',
+      'Make quality training accessible and affordable',
+      'Serve individuals, SMEs, and corporates alike'
+    ]
+  },
+  {
+    title: 'Our Vision',
+    desc: 'To be East Africa\'s most trusted partner for career-shaping and business-transforming training.',
+    icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>',
+    detail: [
+      'Recognized nationally for training excellence',
+      'A pipeline of skilled professionals across sectors',
+      'Strong partnerships with industry and government',
+      'Alumni leading enterprises across the region'
+    ]
+  },
+  {
+    title: 'Our Values',
+    desc: 'Integrity, excellence, and a relentless commitment to the success of every learner.',
+    icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>',
+    detail: [
+      'Integrity — honest advice, honest pricing',
+      'Excellence — every session prepared and delivered to a high standard',
+      'Respect — treat every learner as a future leader',
+      'Accountability — we measure outcomes, not just attendance'
+    ]
+  },
+  {
+    title: 'Our Approach',
+    desc: 'Hands-on, practical, and tailored — because one size does not fit all.',
+    icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>',
+    detail: [
+      'Learn-by-doing — real projects, real scenarios',
+      'Small class sizes for individual attention',
+      'Blended learning: in-person + online + self-paced',
+      'Post-training support and mentorship'
+    ]
+  }
+];
+
+const SERVICES = [
+  {
+    key: 'corporate',
+    title: 'Corporate Training',
+    desc: 'Customized in-house programs for teams, departments, and management.',
+    icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/></svg>',
+    lead: 'We design and deliver tailored training programs for organizations that want to upskill their teams, improve performance, and build internal capability.',
+    points: [
+      'Needs assessment and skills-gap analysis',
+      'Custom curriculum aligned to your KPIs',
+      'Delivered on-site or at our Mombasa facility',
+      'Post-training evaluation and reporting',
+      'Ideal for banks, SACCOs, SMEs, NGOs, and government'
+    ]
+  },
+  {
+    key: 'individual',
+    title: 'Individual Courses',
+    desc: 'Join scheduled classes or learn at your own pace online.',
+    icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>',
+    lead: 'From short courses to full certificate programs — pick the pace and format that fits your life.',
+    points: [
+      'Morning, evening, and weekend classes',
+      'Fully online options with live sessions',
+      'Certificate issued on completion',
+      'Access to student portal with assignments and progress tracking',
+      'Flexible payment plans'
+    ]
+  },
+  {
+    key: 'consulting',
+    title: 'Business Consulting',
+    desc: 'Strategy, operations, and growth advisory for startups and established firms.',
+    icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>',
+    lead: 'Hands-on consulting that goes beyond recommendations. We work with you to implement and measure results.',
+    points: [
+      'Business plan and pitch deck development',
+      'Financial modeling and feasibility studies',
+      'Operations and process improvement',
+      'Market research and go-to-market strategy',
+      'Growth roadmaps and KPI frameworks'
+    ]
+  },
+  {
+    key: 'career',
+    title: 'Career Coaching',
+    desc: 'One-on-one guidance to land the job, grow the role, or pivot industries.',
+    icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="7"/><polyline points="8.21 13.89 7 23 12 20 17 23 15.79 13.88"/></svg>',
+    lead: 'Personalized coaching to help you define goals, sharpen your profile, and get hired or promoted.',
+    points: [
+      'CV, LinkedIn, and portfolio review',
+      'Interview preparation and mock sessions',
+      'Career path mapping and skill planning',
+      'Salary negotiation strategies',
+      'Ongoing mentorship'
+    ]
+  }
+];
+
+const COURSES = [
+  {
+    code: 'BIZ101',
+    title: 'Business Management Fundamentals',
+    category: 'Business',
+    priority: true,
+    image: 'images/courses/business.jpg',
+    short: 'Master the essentials of running and growing a business — from planning to people.',
+    full: 'A comprehensive introduction to business management for entrepreneurs, supervisors, and aspiring managers. You will learn how businesses are structured, how decisions get made, and how to build and lead effective teams.',
+    duration: '8 weeks',
+    level: 'Beginner',
+    trainer: 'Mr. Herald K.',
+    features: [
+      'Business structures and legal forms in Kenya',
+      'Strategic planning and goal setting',
+      'Operations and supply chain basics',
+      'Financial literacy for managers',
+      'Team leadership and communication'
+    ]
+  },
+  {
+    code: 'MKT201',
+    title: 'Digital Marketing & Sales',
+    category: 'Business',
+    priority: true,
+    image: 'images/courses/marketing.jpg',
+    short: 'Reach customers, build brands, and drive sales using modern digital tools.',
+    full: 'Learn how to plan, execute, and measure digital marketing campaigns across social media, search, and email. Ideal for business owners, marketers, and anyone responsible for revenue.',
+    duration: '6 weeks',
+    level: 'Beginner',
+    trainer: 'Ms. Amina T.',
+    features: [
+      'Social media strategy (Facebook, Instagram, TikTok, LinkedIn)',
+      'Google Ads and SEO fundamentals',
+      'Email marketing and automation',
+      'Content planning and copywriting',
+      'Analytics — measuring what matters'
+    ]
+  },
+  {
+    code: 'FIN301',
+    title: 'Finance for Decision Makers',
+    category: 'Business',
+    priority: true,
+    image: 'images/courses/finance.jpg',
+    short: 'Read the numbers, understand cash flow, and make confident financial calls.',
+    full: 'A practical finance course for managers and business owners. Not accounting theory — real-world financial decision-making you can apply immediately.',
+    duration: '8 weeks',
+    level: 'Intermediate',
+    trainer: 'Mr. Brian W.',
+    features: [
+      'Understanding P&L, balance sheet, and cash flow',
+      'Budgeting and forecasting',
+      'Cost control and pricing strategy',
+      'Investment appraisal basics',
+      'Financial risk management'
+    ]
+  },
+  {
+    code: 'ENT401',
+    title: 'Entrepreneurship & Startup Building',
+    category: 'Business',
+    priority: true,
+    image: 'images/courses/entrepreneur.jpg',
+    short: 'From idea to first customer — build a real, sustainable business.',
+    full: 'A hands-on program for aspiring and early-stage founders. You will not just learn about entrepreneurship — you will work on your actual business idea throughout the course.',
+    duration: '10 weeks',
+    level: 'Beginner',
+    trainer: 'Mr. Herald K.',
+    features: [
+      'Validating your business idea',
+      'Business Model Canvas and Lean Startup',
+      'Minimum Viable Product (MVP) development',
+      'Pricing, unit economics, and break-even',
+      'Pitching to investors and partners'
+    ]
+  },
+  {
+    code: 'LDR501',
+    title: 'Leadership & Strategy',
+    category: 'Business',
+    priority: true,
+    image: 'images/courses/leadership.jpg',
+    short: 'Step into leadership with tools that inspire teams and drive results.',
+    full: 'Designed for supervisors, managers, and executives who want to lead with clarity, empathy, and strategic thinking.',
+    duration: '6 weeks',
+    level: 'Advanced',
+    trainer: 'Dr. Otieno M.',
+    features: [
+      'Leadership styles and emotional intelligence',
+      'Strategic thinking and decision frameworks',
+      'Performance management and feedback',
+      'Change management',
+      'Building high-trust teams'
+    ]
+  },
+  {
+    code: 'ELE101',
+    title: 'Electrical Engineering Basics',
+    category: 'Technical',
+    priority: true,
+    image: 'images/courses/electrical.jpg',
+    short: 'Start a career in electrical work — theory plus hands-on practice.',
+    full: 'An entry-level program for aspiring electricians and technicians. Covers electrical theory, safety, wiring, and installation practices in residential and commercial settings.',
+    duration: '12 weeks',
+    level: 'Beginner',
+    trainer: 'Mr. Brian W.',
+    features: [
+      'Electrical safety and code compliance',
+      'Basic circuits, voltage, current, resistance',
+      'Wiring residential installations',
+      'Motor controls and simple panel work',
+      'Reading electrical diagrams'
+    ]
+  },
+  {
+    code: 'WEB101',
+    title: 'Web Development Fundamentals',
+    category: 'Technical',
+    image: 'images/courses/web.jpg',
+    short: 'Build responsive websites from scratch with HTML, CSS, and JavaScript.',
+    full: 'A beginner-friendly journey into web development. By the end you will have built and deployed real websites.',
+    duration: '10 weeks',
+    level: 'Beginner',
+    trainer: 'Mr. Herald K.',
+    features: [
+      'HTML structure and semantic markup',
+      'CSS layout, flexbox, and grid',
+      'JavaScript basics and DOM manipulation',
+      'Responsive design principles',
+      'Deploying to the web'
+    ]
+  },
+  {
+    code: 'DB201',
+    title: 'Database Design & SQL',
+    category: 'Technical',
+    image: 'images/courses/db.jpg',
+    short: 'Design and query databases like a pro — the backbone of every app.',
+    full: 'Learn how data is structured, stored, and queried. Practical, project-based, and using tools you will use in the real world.',
+    duration: '8 weeks',
+    level: 'Intermediate',
+    trainer: 'Ms. Amina T.',
+    features: [
+      'Relational database concepts',
+      'ER diagrams and normalization',
+      'SQL queries — from basic to advanced joins',
+      'Indexes, keys, and constraints',
+      'Intro to NoSQL'
+    ]
+  },
+  {
+    code: 'JS301',
+    title: 'Advanced JavaScript',
+    category: 'Technical',
+    image: 'images/courses/js.jpg',
+    short: 'Level up your JS skills — async, APIs, and modern patterns.',
+    full: 'For developers who know the basics and want to build serious applications. Covers the modern JS toolchain and patterns used in production.',
+    duration: '8 weeks',
+    level: 'Advanced',
+    trainer: 'Mr. Herald K.',
+    features: [
+      'ES6+, modules, and modern syntax',
+      'Async/await and Promises',
+      'Working with APIs and fetch',
+      'State management and design patterns',
+      'Introduction to frameworks (React/Vue)'
+    ]
+  },
+  {
+    code: 'PY101',
+    title: 'Python Programming',
+    category: 'Technical',
+    image: 'images/courses/python.jpg',
+    short: 'The world\'s most versatile language — from scripts to AI.',
+    full: 'Learn Python from zero. Whether your goal is automation, data, AI, or web apps — Python is the best starting point.',
+    duration: '10 weeks',
+    level: 'Beginner',
+    trainer: 'Dr. Otieno M.',
+    features: [
+      'Python syntax and core concepts',
+      'Object-oriented programming',
+      'Working with files and APIs',
+      'Intro to data analysis (pandas)',
+      'Automating real tasks'
+    ]
+  },
+  {
+    code: 'NET210',
+    title: 'Networking Essentials',
+    category: 'Technical',
+    image: 'images/courses/networking.jpg',
+    short: 'Understand how networks really work — from home Wi-Fi to enterprise.',
+    full: 'A practical networking course covering everything from IP addresses to routers, switches, and security.',
+    duration: '8 weeks',
+    level: 'Beginner',
+    trainer: 'Mr. Brian W.',
+    features: [
+      'OSI model and TCP/IP',
+      'IP addressing and subnetting',
+      'Routers, switches, and Wi-Fi',
+      'Basic network security',
+      'Troubleshooting real issues'
+    ]
+  }
+];
+
+// ───────────────────────────────────────────────────────────
+// RENDER: Guides (Interactive)
+// ───────────────────────────────────────────────────────────
+const guidesGrid = document.getElementById('guidesGrid');
+guidesGrid.innerHTML = GUIDES.map((g, i) => `
+  <div class="guide-card" data-guide="${i}">
+    <div class="guide-icon">${g.icon}</div>
+    <h3>${g.title}</h3>
+    <p>${g.desc}</p>
+    <div class="guide-detail">
+      <div class="guide-detail-inner">
+        <ul>${g.detail.map(d => `<li>${d}</li>`).join('')}</ul>
+      </div>
+    </div>
+    <div class="guide-expand-hint">Click to expand →</div>
+  </div>
+`).join('');
+
+guidesGrid.querySelectorAll('.guide-card').forEach(card => {
+  card.addEventListener('click', () => {
+    const isActive = card.classList.contains('active');
+    guidesGrid.querySelectorAll('.guide-card').forEach(c => c.classList.remove('active'));
+    if (!isActive) card.classList.add('active');
+  });
+});
+
+// ───────────────────────────────────────────────────────────
+// RENDER: Services
+// ───────────────────────────────────────────────────────────
+const servicesGrid = document.getElementById('servicesGrid');
+servicesGrid.innerHTML = SERVICES.map((s, i) => `
+  <div class="service-card" data-service="${i}">
+    <div class="service-icon">${s.icon}</div>
+    <h3>${s.title}</h3>
+    <p>${s.desc}</p>
+    <span class="learn-more">Learn more</span>
+  </div>
+`).join('');
+
+servicesGrid.querySelectorAll('.service-card').forEach(card => {
+  card.addEventListener('click', () => {
+    const service = SERVICES[card.dataset.service];
+    openServiceModal(service);
+  });
+});
+
+// ───────────────────────────────────────────────────────────
+// RENDER: Courses (with tabs)
+// ───────────────────────────────────────────────────────────
+const categories = ['All', 'Business', 'Technical'];
+const coursesTabs = document.getElementById('coursesTabs');
+let activeCategory = 'All';
+
+function renderTabs() {
+  coursesTabs.innerHTML = categories.map(c => `
+    <button class="course-tab ${c === activeCategory ? 'active' : ''}" data-cat="${c}">
+      ${c === 'All' ? 'All Courses' : c}
+    </button>
+  `).join('');
+
+  coursesTabs.querySelectorAll('.course-tab').forEach(tab => {
+    tab.addEventListener('click', () => {
+      activeCategory = tab.dataset.cat;
+      renderTabs();
+      renderCourses();
+    });
+  });
+}
+
+function renderCourses() {
+  const list = activeCategory === 'All'
+    ? COURSES
+    : COURSES.filter(c => c.category === activeCategory);
+
+  document.getElementById('coursesGrid').innerHTML = list.map((c, i) => {
+    const realIdx = COURSES.indexOf(c);
+    return `
+      <div class="course-card" data-course="${realIdx}">
+        <div class="course-img-wrap">
+          <img src="${c.image}" alt="${c.title}" onerror="this.style.display='none'" />
+          ${c.priority ? '<span class="course-badge priority">Priority</span>' : ''}
+          ${!c.priority && c.category === 'Technical' ? '<span class="course-badge">Technical</span>' : ''}
+        </div>
+        <div class="course-body">
+          <div class="code">${c.code}</div>
+          <h3>${c.title}</h3>
+          <p>${c.short}</p>
+          <div class="meta">
+            <span><strong>${c.duration}</strong> · ${c.level}</span>
+            <span class="course-learn-more">View</span>
+          </div>
+        </div>
+      </div>
+    `;
+  }).join('');
+
+  document.querySelectorAll('.course-card').forEach(card => {
+    card.addEventListener('click', () => {
+      const course = COURSES[Number(card.dataset.course)];
+      openCourseModal(course);
+    });
+  });
+}
+
+renderTabs();
+renderCourses();
+
+// ───────────────────────────────────────────────────────────
+// MODAL logic
+// ───────────────────────────────────────────────────────────
+const modal = document.getElementById('modal');
+const modalBox = document.getElementById('modalBox');
+const modalContent = document.getElementById('modalContent');
+const modalClose = document.getElementById('modalClose');
+
+function closeModal() {
+  modal.classList.remove('active');
+  document.body.style.overflow = '';
+}
+
+modalClose.addEventListener('click', closeModal);
+modal.addEventListener('click', (e) => { if (e.target === modal) closeModal(); });
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeModal(); });
+
+function openCourseModal(course) {
+  modalBox.className = 'modal-box';
+  modalContent.innerHTML = `
+    <div class="modal-img">
+      <img src="${course.image}" alt="${course.title}" onerror="this.style.display='none'" />
+    </div>
+    <div class="modal-body">
+      <div class="code">${course.code} · ${course.category}</div>
+      <h2>${course.title}</h2>
+      <p class="desc">${course.full}</p>
+
+      <h4>What You'll Learn</h4>
+      <ul class="features">
+        ${course.features.map(f => `<li>${f}</li>`).join('')}
+      </ul>
+
+      <div class="meta" style="display:flex; gap:32px; padding:16px 0; border-top:1px solid #e5e8ed; border-bottom:1px solid #e5e8ed; margin-bottom:24px;">
+        <div><div style="font-size:11px; color:#94a3b8; text-transform:uppercase; font-weight:700; letter-spacing:0.06em; margin-bottom:4px;">Duration</div><div style="font-weight:700; color:#0b1a33;">${course.duration}</div></div>
+        <div><div style="font-size:11px; color:#94a3b8; text-transform:uppercase; font-weight:700; letter-spacing:0.06em; margin-bottom:4px;">Level</div><div style="font-weight:700; color:#0b1a33;">${course.level}</div></div>
+        <div><div style="font-size:11px; color:#94a3b8; text-transform:uppercase; font-weight:700; letter-spacing:0.06em; margin-bottom:4px;">Trainer</div><div style="font-weight:700; color:#0b1a33;">${course.trainer}</div></div>
+      </div>
+
+      <div class="modal-footer">
+        <a href="register.html?course=${encodeURIComponent(course.title)}" class="btn-gold">Enroll Now</a>
+        <a href="https://wa.me/254796071997?text=${encodeURIComponent('Hi, I am interested in ' + course.title)}" target="_blank" rel="noopener" class="btn-outline">Ask a Question</a>
+      </div>
+    </div>
+  `;
+  modal.classList.add('active');
+  document.body.style.overflow = 'hidden';
+}
+
+function openServiceModal(service) {
+  modalBox.className = 'modal-box service-detail-modal';
+  modalContent.innerHTML = `
+    <div class="modal-body" style="padding: 40px 44px 44px;">
+      <div class="icon-badge">${service.icon}</div>
+      <h2>${service.title}</h2>
+      <p class="lead">${service.lead}</p>
+
+      <h4>What's Included</h4>
+      <ul>
+        ${service.points.map(p => `<li>${p}</li>`).join('')}
+      </ul>
+
+      <div class="modal-footer" style="margin-top:32px;">
+        <a href="https://wa.me/254796071997?text=${encodeURIComponent('Hi, I am interested in ' + service.title)}" target="_blank" rel="noopener" class="btn-gold">Talk to Us</a>
+        <a href="mailto:sidzac33@gmail.com?subject=${encodeURIComponent('Inquiry: ' + service.title)}" class="btn-outline">Email Us</a>
+      </div>
+    </div>
+  `;
+  modal.classList.add('active');
+  document.body.style.overflow = 'hidden';
+}
+
+// ───────────────────────────────────────────────────────────
+// Back to top
+// ───────────────────────────────────────────────────────────
+const backToTop = document.getElementById('backToTop');
+window.addEventListener('scroll', () => {
+  backToTop.classList.toggle('visible', window.scrollY > 500);
+});
+backToTop.addEventListener('click', () => {
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+});
+
+// ───────────────────────────────────────────────────────────
+// Smooth scroll for nav links
+// ───────────────────────────────────────────────────────────
+document.querySelectorAll('.nav-links a, .hero-cta a[href^="#"]').forEach(link => {
+  link.addEventListener('click', (e) => {
+    const href = link.getAttribute('href');
+    if (href.startsWith('#') && href.length > 1) {
+      e.preventDefault();
+      const target = document.querySelector(href);
+      if (target) {
+        const offset = 80;
+        const top = target.getBoundingClientRect().top + window.scrollY - offset;
+        window.scrollTo({ top, behavior: 'smooth' });
+      }
+    }
+  });
+});
+</script>
+
 </body>
 </html>
