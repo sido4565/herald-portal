@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Lecturer Registration — Herald</title>
+  <link rel="icon" type="image/svg+xml" href="favicon.svg" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="style.css" />
+  <style>
+    body {
+      margin: 0;
+      font-family: 'Inter', -apple-system, sans-serif;
+      background-image:
+        linear-gradient(135deg, rgba(11,26,51,0.92) 0%, rgba(11,26,51,0.80) 100%),
+        url('images/hero-landing.jpg');
+      background-size: cover;
+      background-position: center;
+      background-attachment: fixed;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 40px 20px;
+    }
+    .wrap {
+      width: 100%; max-width: 600px;
+      background: #fff; border-radius: 20px;
+      box-shadow: 0 40px 80px rgba(0,0,0,0.4);
+      overflow: hidden;
+    }
+    .head {
+      background: #6b2c2c; color: white;
+      padding: 32px 40px 28px; text-align: center;
+      border-bottom: 4px solid #b8860b;
+    }
+    .head img { max-width: 90px; margin: 0 auto 14px; display: block; }
+    .head h1 { font-size: 22px; font-weight: 800; margin: 0 0 6px; }
+    .head p { font-size: 13px; color: rgba(255,255,255,0.75); margin: 0; }
+    .body { padding: 32px 40px 36px; }
+    .form-group { margin-bottom: 18px; }
+    .form-group label {
+      display: block; font-size: 12px; font-weight: 700;
+      color: #4a5260; text-transform: uppercase;
+      letter-spacing: 0.05em; margin-bottom: 8px;
+    }
+    .form-group input, .form-group textarea, .form-group select {
+      width: 100%; padding: 12px 14px;
+      border: 1px solid #d8dce2; border-radius: 8px;
+      font-size: 14.5px; font-family: inherit;
+      background: #fff; color: #1a1f2e;
+      outline: none; box-sizing: border-box;
+    }
+    .form-group input:focus, .form-group textarea:focus {
+      border-color: #3b82f6;
+      box-shadow: 0 0 0 3px rgba(59,130,246,0.15);
+    }
+    .form-group textarea { resize: vertical; min-height: 80px; }
+    .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+    @media (max-width: 500px) { .form-row { grid-template-columns: 1fr; } }
+    .btn {
+      width: 100%; padding: 14px;
+      background: #6b2c2c; color: white;
+      border: none; border-radius: 10px;
+      font-size: 15px; font-weight: 700;
+      cursor: pointer; font-family: inherit;
+      transition: all 0.15s; margin-top: 8px;
+    }
+    .btn:hover { background: #8b3a3a; }
+    .btn:disabled { background: #cbd5e1; cursor: not-allowed; }
+    .hint { text-align: center; font-size: 12px; color: #6b7280; margin-top: 18px; }
+    .hint a { color: #b8860b; font-weight: 600; text-decoration: none; }
+    .msg { text-align: center; margin-top: 16px; font-size: 13px; padding: 10px; border-radius: 8px; }
+    .msg.error { color: #b91c1c; background: #fee2e2; }
+    .msg.success { color: #15803d; background: #dcfce7; }
+    .msg:empty { display: none; }
+    .success-panel { text-align: center; padding: 20px; }
+    .success-panel h3 { font-size: 20px; color: #0b1a33; margin: 0 0 8px; }
+    .staff-box {
+      background: #fef9e7; border: 2px dashed #b8860b;
+      border-radius: 12px; padding: 18px; margin: 20px 0;
+    }
+    .staff-lbl { font-size: 11px; text-transform: uppercase; color: #92400e; font-weight: 700; letter-spacing: 0.1em; }
+    .staff-no { font-family: monospace; font-size: 22px; font-weight: 800; color: #0b1a33; margin-top: 6px; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div id="formView">
+      <div class="head">
+        <img src="images/herald-logo.png" alt="Herald" />
+        <h1>Lecturer Registration</h1>
+        <p>Join the Herald teaching team</p>
+      </div>
+      <div class="body">
+        <form id="lecturerRegForm">
+          <div class="form-group">
+            <label for="name">Full Name</label>
+            <input id="name" name="name" required />
+          </div>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label for="email">Email</label>
+              <input id="email" name="email" type="email" required />
+            </div>
+            <div class="form-group">
+              <label for="phone">Phone</label>
+              <input id="phone" name="phone" placeholder="+254..." />
+            </div>
+          </div>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label for="qualification">Highest Qualification</label>
+              <input id="qualification" name="qualification" placeholder="e.g. MBA, BSc" />
+            </div>
+            <div class="form-group">
+              <label for="specialization">Specialization</label>
+              <input id="specialization" name="specialization" placeholder="e.g. Marketing, Finance" />
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label for="bio">Short Bio</label>
+            <textarea id="bio" name="bio" placeholder="Tell us about your teaching experience..."></textarea>
+          </div>
+
+          <div class="form-group">
+            <label for="password">Password (min 6 characters)</label>
+            <input id="password" name="password" type="password" minlength="6" required />
+          </div>
+
+          <button type="submit" class="btn" id="submitBtn">Apply to Teach</button>
+          <p class="msg" id="formMsg"></p>
+
+          <p class="hint">
+            Already approved? <a href="lecturer-login.html">Log in here</a><br>
+            <a href="welcome.html">← Back to Herald</a>
+          </p>
+        </form>
+      </div>
+    </div>
+
+    <div id="successView" style="display:none;">
+      <div class="head">
+        <img src="images/herald-logo.png" alt="Herald" />
+        <h1>Application Submitted ✅</h1>
+        <p>Awaiting superadmin approval</p>
+      </div>
+      <div class="body">
+        <div class="success-panel">
+          <h3>Your application is pending review</h3>
+          <p style="color:#4a5260; font-size:14px;">You'll receive an email once your account is approved.</p>
+
+          <div class="staff-box">
+            <div class="staff-lbl">Your Staff Number</div>
+            <div class="staff-no" id="staffNoDisplay">HRD-LECT-XXXX-XXXX</div>
+          </div>
+
+          <p style="font-size:13px; color:#6b7280; line-height:1.6;">
+            Save this number. You'll use it to log in once approved.
+          </p>
+
+          <a href="lecturer-login.html" class="btn" style="display:block; text-decoration:none; text-align:center; margin-top:24px;">
+            Go to Login →
+          </a>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const $ = (s) => document.querySelector(s);
+
+    $('#lecturerRegForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const form = e.target;
+      const btn = $('#submitBtn');
+      const msg = $('#formMsg');
+
+      msg.className = 'msg';
+      msg.textContent = '';
+      btn.disabled = true;
+      btn.textContent = 'Submitting...';
+
+      const data = {
+        name: form.name.value.trim(),
+        email: form.email.value.trim().toLowerCase(),
+        phone: form.phone.value.trim(),
+        qualification: form.qualification.value.trim(),
+        specialization: form.specialization.value.trim(),
+        bio: form.bio.value.trim(),
+        password: form.password.value,
+      };
+
+      try {
+        const res = await fetch('/api/lecturer/register', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(data),
+        });
+        const json = await res.json();
+
+        if (res.ok) {
+          $('#staffNoDisplay').textContent = json.staff_no;
+          $('#formView').style.display = 'none';
+          $('#successView').style.display = 'block';
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+        } else {
+          msg.className = 'msg error';
+          msg.textContent = json.error || 'Registration failed';
+          btn.disabled = false;
+          btn.textContent = 'Apply to Teach';
+        }
+      } catch (err) {
+        msg.className = 'msg error';
+        msg.textContent = 'Network error. Please try again.';
+        btn.disabled = false;
+        btn.textContent = 'Apply to Teach';
+      }
+    });
+  </script>
+</body>
+</html>

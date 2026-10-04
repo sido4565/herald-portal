@@ -1,0 +1,396 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Lecturer Dashboard — Herald</title>
+  <link rel="icon" type="image/svg+xml" href="favicon.svg" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="style.css" />
+  <style>
+    .admin-topbar { background: #6b2c2c !important; }
+    .admin-topbar .brand::before { background: #b8860b !important; }
+  </style>
+</head>
+<body class="admin-body">
+  <header class="topbar admin-topbar">
+    <div class="brand">Herald Lecturer</div>
+    <div class="user-box">
+      <span id="lecturerName">…</span>
+      <span class="role-badge" id="lecturerStaffNo"></span>
+      <button class="theme-toggle" id="themeToggle" type="button">Theme</button>
+      <button id="logoutBtn" class="btn-ghost" type="button">Sign Out</button>
+    </div>
+  </header>
+
+  <main class="container">
+    <nav class="admin-tabs">
+      <button class="admin-tab active" data-panel="overview" type="button">Overview</button>
+      <button class="admin-tab" data-panel="profile" type="button">My Profile</button>
+      <button class="admin-tab" data-panel="courses" type="button">My Courses</button>
+      <button class="admin-tab" data-panel="results" type="button">Results</button>
+      <button class="admin-tab" data-panel="attendance" type="button">Attendance</button>
+      <button class="admin-tab" data-panel="announcements" type="button">Announcements</button>
+    </nav>
+
+    <!-- Overview -->
+    <section class="admin-panel active" id="panel-overview">
+      <h2>Welcome back</h2>
+      <div class="stats-grid">
+        <div class="stat-card"><div class="stat-num" id="statCourses">0</div><div class="stat-lbl">My Courses</div></div>
+        <div class="stat-card"><div class="stat-num" id="statStudents">0</div><div class="stat-lbl">My Students</div></div>
+        <div class="stat-card"><div class="stat-num" id="statResults">0</div><div class="stat-lbl">Results Entered</div></div>
+        <div class="stat-card"><div class="stat-num" id="statStatus">—</div><div class="stat-lbl">Account Status</div></div>
+      </div>
+    </section>
+
+    <!-- Profile -->
+    <section class="admin-panel" id="panel-profile">
+      <h2>My Profile</h2>
+      <div style="max-width:600px;">
+        <div id="profileView"></div>
+        <hr style="margin:32px 0; border:none; border-top:1px solid var(--border-soft);">
+        <h3 style="font-size:14px; text-transform:uppercase; letter-spacing:0.06em; color:var(--text-soft); margin-bottom:16px;">Change Password</h3>
+        <form id="pwdForm" class="modal-form">
+          <label>Current Password</label>
+          <input name="currentPassword" type="password" required />
+          <label>New Password (min 6 chars)</label>
+          <input name="newPassword" type="password" minlength="6" required />
+          <button type="submit" class="btn-primary">Change Password</button>
+        </form>
+      </div>
+    </section>
+
+    <!-- Courses -->
+    <section class="admin-panel" id="panel-courses">
+      <h2>My Courses</h2>
+      <div id="coursesList"></div>
+    </section>
+
+    <!-- Results -->
+    <section class="admin-panel" id="panel-results">
+      <div class="panel-head">
+        <h2>Results</h2>
+        <button class="btn-primary" id="addResultBtn" type="button">Add Result</button>
+      </div>
+      <div class="table-wrap">
+        <table id="resultsTable">
+          <thead><tr><th>Student</th><th>Course</th><th>Marks</th><th>Grade</th><th>Term</th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- Attendance -->
+    <section class="admin-panel" id="panel-attendance">
+      <div class="panel-head">
+        <h2>Attendance</h2>
+        <button class="btn-primary" id="takeAttBtn" type="button">Take Attendance</button>
+      </div>
+      <div class="table-wrap">
+        <table id="attTable">
+          <thead><tr><th>Date</th><th>Student</th><th>Status</th><th>Notes</th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- Announcements -->
+    <section class="admin-panel" id="panel-announcements">
+      <div class="panel-head">
+        <h2>Announcements</h2>
+        <button class="btn-primary" id="addAnnBtn" type="button">Post Announcement</button>
+      </div>
+      <div id="annList" class="ann-admin-list"></div>
+    </section>
+  </main>
+
+  <div class="modal-overlay hidden" id="modal">
+    <div class="modal">
+      <h3 id="modalTitle"></h3>
+      <form id="modalForm" class="modal-form"></form>
+      <div class="modal-actions">
+        <button class="btn-ghost dark" id="modalCancel" type="button">Cancel</button>
+        <button class="btn-primary" id="modalSave" type="submit" form="modalForm">Save</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="toastWrap" class="toast-wrap"></div>
+
+  <script>
+    const $ = (s) => document.querySelector(s);
+    const $$ = (s) => [...document.querySelectorAll(s)];
+    const esc = (s) => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+
+    function toast(msg, type = 'success') {
+      const el = document.createElement('div');
+      el.className = `toast toast-${type}`;
+      el.textContent = msg;
+      $('#toastWrap').appendChild(el);
+      requestAnimationFrame(() => el.classList.add('show'));
+      setTimeout(() => { el.classList.remove('show'); setTimeout(() => el.remove(), 300); }, 3000);
+    }
+
+    async function api(url, opts = {}) {
+      const res = await fetch(url, {
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'same-origin',
+        ...opts,
+        body: opts.body ? JSON.stringify(opts.body) : undefined
+      });
+      if (res.status === 401 && !url.includes('/login')) {
+        location.href = 'lecturer-login.html';
+        return;
+      }
+      let data = {};
+      try { data = await res.json(); } catch (_) {}
+      if (!res.ok) throw new Error(data.error || `Request failed (${res.status})`);
+      return data;
+    }
+
+    let coursesCache = [];
+
+    // Theme toggle
+    (function () {
+      const saved = localStorage.getItem('theme') === 'dark';
+      document.body.classList.toggle('dark', saved);
+      $('#themeToggle').addEventListener('click', () => {
+        const isDark = document.body.classList.toggle('dark');
+        localStorage.setItem('theme', isDark ? 'dark' : 'light');
+      });
+    })();
+
+    // Load profile
+    (async () => {
+      try {
+        const me = await api('/api/lecturer/me');
+        $('#lecturerName').textContent = me.name;
+        $('#lecturerStaffNo').textContent = me.staff_no;
+        $('#statStatus').textContent = me.status.toUpperCase();
+      } catch { return; }
+    })();
+
+    // Logout
+    $('#logoutBtn').addEventListener('click', async () => {
+      try { await api('/api/lecturer/logout', { method: 'POST' }); } catch (_) {}
+      location.href = 'lecturer-login.html';
+    });
+
+    // Tabs
+    $$('.admin-tab').forEach(tab => {
+      tab.addEventListener('click', () => {
+        $$('.admin-tab').forEach(t => t.classList.remove('active'));
+        $$('.admin-panel').forEach(p => p.classList.remove('active'));
+        tab.classList.add('active');
+        $(`#panel-${tab.dataset.panel}`).classList.add('active');
+        loadPanel(tab.dataset.panel).catch(e => toast(e.message, 'error'));
+      });
+    });
+
+    async function loadPanel(name) {
+      if (name === 'overview') return loadOverview();
+      if (name === 'profile') return loadProfile();
+      if (name === 'courses') return loadCourses();
+      if (name === 'results') return loadResults();
+      if (name === 'attendance') return loadAttendance();
+      if (name === 'announcements') return loadAnnouncements();
+    }
+
+    async function loadOverview() {
+      const courses = await api('/api/lecturer/my-courses');
+      coursesCache = courses;
+      $('#statCourses').textContent = courses.length;
+      let totalStudents = 0;
+      for (const c of courses) totalStudents += c.enrolled_count || 0;
+      $('#statStudents').textContent = totalStudents;
+      const results = await api('/api/lecturer/results');
+      $('#statResults').textContent = results.length;
+    }
+
+    async function loadProfile() {
+      const me = await api('/api/lecturer/me');
+      $('#profileView').innerHTML = `
+        <div style="display:grid; gap:14px; background:var(--bg-alt); padding:24px; border-radius:12px;">
+          <div><div style="font-size:11px; text-transform:uppercase; letter-spacing:0.06em; color:var(--muted); font-weight:700;">Staff No</div><div style="font-family:monospace; font-weight:700; color:var(--navy-700);">${esc(me.staff_no)}</div></div>
+          <div><div style="font-size:11px; text-transform:uppercase; letter-spacing:0.06em; color:var(--muted); font-weight:700;">Name</div><div style="font-weight:600;">${esc(me.name)}</div></div>
+          <div><div style="font-size:11px; text-transform:uppercase; letter-spacing:0.06em; color:var(--muted); font-weight:700;">Email</div><div>${esc(me.email)}</div></div>
+          <div><div style="font-size:11px; text-transform:uppercase; letter-spacing:0.06em; color:var(--muted); font-weight:700;">Phone</div><div>${esc(me.phone || '—')}</div></div>
+          <div><div style="font-size:11px; text-transform:uppercase; letter-spacing:0.06em; color:var(--muted); font-weight:700;">Qualification</div><div>${esc(me.qualification || '—')}</div></div>
+          <div><div style="font-size:11px; text-transform:uppercase; letter-spacing:0.06em; color:var(--muted); font-weight:700;">Specialization</div><div>${esc(me.specialization || '—')}</div></div>
+          <div><div style="font-size:11px; text-transform:uppercase; letter-spacing:0.06em; color:var(--muted); font-weight:700;">Bio</div><div style="line-height:1.6;">${esc(me.bio || '—')}</div></div>
+          <button class="btn-xs" id="editProfileBtn" type="button">Edit Profile</button>
+        </div>
+      `;
+      $('#editProfileBtn').addEventListener('click', async () => {
+        openModal('Edit Profile', [
+          { name: 'name', label: 'Full Name', value: me.name, required: true },
+          { name: 'phone', label: 'Phone', value: me.phone || '' },
+          { name: 'qualification', label: 'Qualification', value: me.qualification || '' },
+          { name: 'specialization', label: 'Specialization', value: me.specialization || '' },
+          { name: 'bio', label: 'Bio', type: 'textarea', value: me.bio || '' },
+        ], async (d) => {
+          await api('/api/lecturer/me', { method: 'PUT', body: d });
+          await loadProfile();
+        });
+      });
+    }
+
+    $('#pwdForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const data = Object.fromEntries(new FormData(e.target));
+      try {
+        await api('/api/lecturer/change-password', { method: 'POST', body: data });
+        toast('Password changed');
+        e.target.reset();
+      } catch (err) { toast(err.message, 'error'); }
+    });
+
+    async function loadCourses() {
+      const courses = await api('/api/lecturer/my-courses');
+      coursesCache = courses;
+      if (!courses.length) {
+        $('#coursesList').innerHTML = '<p class="empty">No courses assigned to you yet. Contact the administrator.</p>';
+        return;
+      }
+      $('#coursesList').innerHTML = courses.map(c => `
+        <div style="background:var(--bg-alt); padding:20px; border-radius:12px; margin-bottom:12px; border-left:4px solid var(--gold-500);">
+          <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:16px; flex-wrap:wrap;">
+            <div>
+              <div style="font-family:monospace; color:var(--gold-500); font-weight:700; font-size:12px; letter-spacing:0.05em;">${esc(c.code)}</div>
+              <h3 style="font-size:17px; font-weight:700; margin:4px 0 8px;">${esc(c.title)}</h3>
+              <p style="color:var(--muted); font-size:13px; margin:0;">${esc(c.description || '')}</p>
+            </div>
+            <div style="text-align:right;">
+              <div style="font-size:24px; font-weight:800; color:var(--navy-700);">${c.enrolled_count}</div>
+              <div style="font-size:11px; text-transform:uppercase; letter-spacing:0.06em; color:var(--muted); font-weight:700;">Students</div>
+            </div>
+          </div>
+        </div>
+      `).join('');
+    }
+
+    async function loadResults() {
+      const rows = await api('/api/lecturer/results');
+      $('#resultsTable tbody').innerHTML = rows.map(r => `
+        <tr>
+          <td>${esc(r.reg_no)} — ${esc(r.student_name)}</td>
+          <td>${esc(r.code)} — ${esc(r.course_title)}</td>
+          <td>${r.marks}</td>
+          <td><strong>${esc(r.grade)}</strong></td>
+          <td>${esc(r.term)}</td>
+        </tr>
+      `).join('') || '<tr><td colspan="5" class="empty">No results yet.</td></tr>';
+    }
+
+    $('#addResultBtn').addEventListener('click', async () => {
+      // Fetch all students + courses for dropdowns
+      const students = await fetch('/api/lecturer/my-courses').then(r => r.json());
+      openModal('Add Result', [
+        { name: 'student_id', label: 'Student ID', type: 'number', required: true },
+        { name: 'course_id', label: 'Course ID', type: 'number', required: true },
+        { name: 'marks', label: 'Marks (0-100)', type: 'number', required: true },
+        { name: 'term', label: 'Term', value: 'Term 1 2025', required: true },
+      ], async (d) => {
+        await api('/api/lecturer/results', { method: 'POST', body: d });
+        await loadResults();
+      });
+    });
+
+    async function loadAttendance() {
+      if (!coursesCache.length) coursesCache = await api('/api/lecturer/my-courses');
+      if (!coursesCache.length) {
+        $('#attTable tbody').innerHTML = '<tr><td colspan="4" class="empty">No courses assigned.</td></tr>';
+        return;
+      }
+      const rows = await api(`/api/lecturer/attendance/${coursesCache[0].id}`);
+      $('#attTable tbody').innerHTML = rows.map(r => `
+        <tr>
+          <td>${esc(r.date)}</td>
+          <td>${esc(r.reg_no)} — ${esc(r.student_name)}</td>
+          <td><span class="pill ${r.status === 'present' ? 'pill-green' : r.status === 'absent' ? 'pill-red' : 'pill-amber'}">${esc(r.status)}</span></td>
+          <td>${esc(r.notes || '')}</td>
+        </tr>
+      `).join('') || '<tr><td colspan="4" class="empty">No records.</td></tr>';
+    }
+
+    $('#takeAttBtn').addEventListener('click', async () => {
+      if (!coursesCache.length) coursesCache = await api('/api/lecturer/my-courses');
+      if (!coursesCache.length) return toast('No courses assigned', 'error');
+
+      openModal('Take Attendance', [
+        { name: 'course_id', label: 'Course', type: 'select', required: true,
+          options: coursesCache.map(c => ({ value: c.id, label: `${c.code} — ${c.title}` })) },
+        { name: 'date', label: 'Date', type: 'date', value: new Date().toISOString().slice(0,10), required: true },
+      ], async () => {
+        toast('Attendance modal — full form coming soon');
+      });
+    });
+
+    async function loadAnnouncements() {
+      const list = await api('/api/lecturer/announcements');
+      $('#annList').innerHTML = list.map(a => `
+        <div class="ann-card">
+          <div class="ann-head">
+            <strong>${esc(a.title)}</strong>
+            <span class="ann-date">${new Date(a.created_at).toLocaleDateString()}</span>
+          </div>
+          <p>${esc(a.body)}</p>
+        </div>
+      `).join('') || '<p class="empty">No announcements.</p>';
+    }
+
+    $('#addAnnBtn').addEventListener('click', () => {
+      openModal('Post Announcement', [
+        { name: 'title', label: 'Title', required: true },
+        { name: 'body', label: 'Body', type: 'textarea', required: true },
+      ], async (d) => {
+        await api('/api/lecturer/announcements', { method: 'POST', body: d });
+        await loadAnnouncements();
+      });
+    });
+
+    // Modal
+    let currentSubmit = null;
+    function openModal(title, fields, onSubmit) {
+      $('#modalTitle').textContent = title;
+      const form = $('#modalForm');
+      form.innerHTML = fields.map(f => {
+        const req = f.required ? 'required' : '';
+        const val = f.value ?? '';
+        if (f.type === 'select') {
+          return `<label>${esc(f.label)}</label><select name="${esc(f.name)}" ${req}>
+            <option value="">— Select —</option>
+            ${f.options.map(o => `<option value="${esc(o.value)}"${String(o.value) === String(val) ? ' selected' : ''}>${esc(o.label)}</option>`).join('')}
+          </select>`;
+        }
+        if (f.type === 'textarea') {
+          return `<label>${esc(f.label)}</label><textarea name="${esc(f.name)}" rows="4" ${req}>${esc(val)}</textarea>`;
+        }
+        return `<label>${esc(f.label)}</label><input name="${esc(f.name)}" type="${esc(f.type || 'text')}" value="${esc(val)}" ${req} />`;
+      }).join('');
+      form.onsubmit = async e => {
+        e.preventDefault();
+        if (!currentSubmit) return;
+        const data = Object.fromEntries(new FormData(form));
+        try {
+          await currentSubmit(data);
+          closeModal();
+          toast('Saved ✅');
+        } catch (err) { toast(err.message, 'error'); }
+      };
+      currentSubmit = onSubmit;
+      $('#modal').classList.remove('hidden');
+    }
+    function closeModal() {
+      $('#modal').classList.add('hidden');
+      currentSubmit = null;
+    }
+    $('#modalCancel').addEventListener('click', closeModal);
+    $('#modal').addEventListener('click', e => { if (e.target.id === 'modal') closeModal(); });
+
+    loadOverview();
+  </script>
+</body>
+</html>

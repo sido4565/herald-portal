@@ -35,6 +35,7 @@
     <nav class="admin-tabs">
       <button class="admin-tab active" data-panel="overview" type="button">Overview</button>
       <button class="admin-tab" data-panel="students" type="button">Students</button>
+      <button class="admin-tab" data-panel="lecturers" type="button">Lecturers</button>
       <button class="admin-tab" data-panel="courses" type="button">Courses</button>
       <button class="admin-tab" data-panel="announcements" type="button">Announcements</button>
       <button class="admin-tab" data-panel="results" type="button">Results</button>
@@ -71,6 +72,29 @@
         <div class="stat-card"><div class="stat-num" id="statAnnouncements">0</div><div class="stat-lbl">Announcements</div></div>
       </div>
     </section>
+     
+    <section class="admin-panel" id="panel-lecturers">
+  <div class="panel-head">
+    <h2>Lecturers</h2>
+    <button class="btn-primary" id="addLecturerBtn" type="button">Add Lecturer</button>
+  </div>
+
+  <h3 style="margin: 20px 0 12px; font-size:13px; text-transform:uppercase; letter-spacing:0.08em; color:var(--text-soft);">Pending Approval</h3>
+  <div class="table-wrap">
+    <table id="pendingLecturersTable">
+      <thead><tr><th>Staff No</th><th>Name</th><th>Email</th><th>Specialization</th><th>Applied</th><th>Actions</th></tr></thead>
+      <tbody></tbody>
+    </table>
+  </div>
+
+  <h3 style="margin: 24px 0 12px; font-size:13px; text-transform:uppercase; letter-spacing:0.08em; color:var(--text-soft);">All Lecturers</h3>
+  <div class="table-wrap">
+    <table id="lecturersTable">
+      <thead><tr><th>Staff No</th><th>Name</th><th>Email</th><th>Qualification</th><th>Status</th><th>Actions</th></tr></thead>
+      <tbody></tbody>
+    </table>
+  </div>
+</section>
 
     <!-- Students -->
     <section class="admin-panel" id="panel-students">

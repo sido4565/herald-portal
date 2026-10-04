@@ -63,6 +63,23 @@ CREATE TABLE IF NOT EXISTS admins (
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 
+CREATE TABLE IF NOT EXISTS lecturers (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  staff_no TEXT UNIQUE NOT NULL,
+  name TEXT NOT NULL,
+  email TEXT UNIQUE NOT NULL,
+  phone TEXT,
+  password TEXT NOT NULL,
+  qualification TEXT,
+  specialization TEXT,
+  bio TEXT,
+  photo_url TEXT,
+  status TEXT DEFAULT 'pending',
+  approved INTEGER DEFAULT 0,
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  approved_at DATETIME
+);
+
 CREATE TABLE IF NOT EXISTS courses (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   code TEXT UNIQUE NOT NULL,

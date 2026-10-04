@@ -155,6 +155,7 @@ if ($('#adminName')) {
   async function loadPanel(name) {
     switch (name) {
       case 'overview':      return loadOverview();
+      case 'lecturers':     return loadLecturers();
       case 'students':      return loadStudents();
       case 'courses':       return loadCourses();
       case 'announcements': return loadAnnouncements();
@@ -166,6 +167,63 @@ if ($('#adminName')) {
       case 'liveclasses':   return loadLiveClasses();
     }
   }
+
+  async function loadLecturers() {
+  const lecturers = await api('/api/admin/lecturers');
+  const pending = lecturers.filter(l => !l.approved && l.status !== 'rejected');
+  const all = lecturers.filter(l => l.approved);
+
+  $('#pendingLecturersTable tbody').innerHTML = pending.map(l => `
+    <tr>
+      <td>${esc(l.staff_no)}</td>
+      <td>${esc(l.name)}</td>
+      <td>${esc(l.email)}</td>
+      <td>${esc(l.specialization || '—')}</td>
+      <td>${new Date(l.created_at).toLocaleDateString()}</td>
+      <td>
+        <button class="btn-xs" data-act="approve-lect" data-id="${l.id}" type="button">Approve</button>
+        <button class="btn-xs danger" data-act="reject-lect" data-id="${l.id}" type="button">Reject</button>
+      </td>
+    </tr>
+  `).join('') || '<tr><td colspan="6" class="empty">No pending applications.</td></tr>';
+
+  $('#lecturersTable tbody').innerHTML = all.map(l => `
+    <tr>
+      <td>${esc(l.staff_no)}</td>
+      <td>${esc(l.name)}</td>
+      <td>${esc(l.email)}</td>
+      <td>${esc(l.qualification || '—')}</td>
+      <td><span class="pill ${l.status === 'active' ? 'pill-green' : l.status === 'suspended' ? 'pill-red' : 'pill-amber'}">${esc(l.status)}</span></td>
+      <td>
+        ${l.status === 'active'
+          ? `<button class="btn-xs danger" data-act="suspend-lect" data-id="${l.id}" type="button">Suspend</button>`
+          : `<button class="btn-xs" data-act="reactivate-lect" data-id="${l.id}" type="button">Reactivate</button>`}
+        <button class="btn-xs danger" data-act="delete-lect" data-id="${l.id}" type="button">Delete</button>
+      </td>
+    </tr>
+  `).join('') || '<tr><td colspan="6" class="empty">No approved lecturers.</td></tr>';
+
+  wireLecturerActions();
+}
+
+function wireLecturerActions() {
+  const handle = async (e) => {
+    const btn = e.target.closest('button[data-act]');
+    if (!btn) return;
+    const id = btn.dataset.id;
+    const act = btn.dataset.act;
+    try {
+      if (act === 'approve-lect')    { await api(`/api/admin/lecturers/${id}/approve`, { method: 'POST' }); toast('Lecturer approved'); }
+      if (act === 'reject-lect')     { if (!confirm('Reject?')) return; await api(`/api/admin/lecturers/${id}/reject`, { method: 'POST' }); toast('Lecturer rejected'); }
+      if (act === 'suspend-lect')    { if (!confirm('Suspend this lecturer?')) return; await api(`/api/admin/lecturers/${id}/suspend`, { method: 'POST' }); toast('Lecturer suspended'); }
+      if (act === 'reactivate-lect') { await api(`/api/admin/lecturers/${id}/reactivate`, { method: 'POST' }); toast('Lecturer reactivated'); }
+      if (act === 'delete-lect')     { if (!confirm('Delete permanently?')) return; await api(`/api/admin/lecturers/${id}`, { method: 'DELETE' }); toast('Lecturer deleted'); }
+      await loadLecturers();
+    } catch (err) { toast(err.message, 'error'); }
+  };
+  document.querySelector('#pendingLecturersTable').addEventListener('click', handle);
+  document.querySelector('#lecturersTable').addEventListener('click', handle);
+}
 
   async function refreshCaches() {
     coursesCache = await api('/api/admin/courses');
@@ -310,6 +368,23 @@ if ($('#adminName')) {
         await loadFees();
       });
     });
+
+    const addLectBtn = $('#addLecturerBtn');
+if (addLectBtn) {
+  addLectBtn.addEventListener('click', () => openModal('Add Lecturer', [
+    { name: 'name', label: 'Full Name', required: true },
+    { name: 'email', label: 'Email', type: 'email', required: true },
+    { name: 'phone', label: 'Phone' },
+    { name: 'password', label: 'Password', type: 'password', required: true },
+    { name: 'qualification', label: 'Qualification' },
+    { name: 'specialization', label: 'Specialization' },
+    { name: 'bio', label: 'Bio', type: 'textarea' },
+  ], async (d) => {
+    const r = await api('/api/admin/lecturers', { method: 'POST', body: d });
+    toast(`Lecturer added: ${r.staff_no}`);
+    await loadLecturers();
+  }));
+}
 
     // ---- Fee reminders ----
     const feeReminderBtn = $('#sendFeeRemindersBtn');

@@ -61,6 +61,14 @@ function authAdmin(req, res, next) {
     req.admin = p; next();
   } catch { res.status(401).json({ error: 'Not authenticated' }); }
 }
+function authLecturer(req, res, next) {
+  try {
+    const p = jwt.verify(req.cookies.lecturer_token, JWT_SECRET);
+    if (p.type !== 'lecturer') return res.status(403).json({ error: 'Lecturer only' });
+    req.lecturer = p;
+    next();
+  } catch { res.status(401).json({ error: 'Not authenticated' }); }
+}
 
 // ---------- Mailer helpers ----------
 let mailer = null;
@@ -348,6 +356,279 @@ app.get('/api/my-live-classes', authStudent, (req, res) => {
   res.json(enriched);
 });
 
+// ==================== LECTURER ROUTES ====================
+// Public: lecturer self-registration
+app.post('/api/lecturer/register', async (req, res) => {
+  const { name, email, phone, password, qualification, specialization, bio } = req.body;
+
+  if (!name || !email || !password) {
+    return res.status(400).json({ error: 'Name, email, and password are required.' });
+  }
+  if (password.length < 6) {
+    return res.status(400).json({ error: 'Password must be at least 6 characters.' });
+  }
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    return res.status(400).json({ error: 'Please enter a valid email address.' });
+  }
+
+  try {
+    // Generate staff number: HRD-LECT-YYYY-NNNN
+    const year = new Date().getFullYear();
+    const prefix = `HRD-LECT-${year}-`;
+    const last = db.prepare(
+      "SELECT staff_no FROM lecturers WHERE staff_no LIKE ? ORDER BY staff_no DESC LIMIT 1"
+    ).get(`${prefix}%`);
+    let nextNum = 1;
+    if (last) {
+      const parts = last.staff_no.split('-');
+      const n = parseInt(parts[parts.length - 1], 10);
+      if (!isNaN(n)) nextNum = n + 1;
+    }
+    const staff_no = `${prefix}${String(nextNum).padStart(4, '0')}`;
+
+    const hash = bcrypt.hashSync(password, 10);
+    const info = db.prepare(`
+      INSERT INTO lecturers (staff_no, name, email, phone, password, qualification, specialization, bio)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(
+      staff_no,
+      name.trim(),
+      email.trim().toLowerCase(),
+      phone || '',
+      hash,
+      qualification || '',
+      specialization || '',
+      bio || ''
+    );
+
+    const lecturer = db.prepare('SELECT id, staff_no, name, email, status, approved FROM lecturers WHERE id = ?')
+      .get(info.lastInsertRowid);
+
+    // Notify superadmin
+    try {
+      const { sendMail, ENABLED: MAIL_ON } = require('./mailer');
+      if (MAIL_ON) {
+        sendMail({
+          to: process.env.GMAIL_USER || process.env.MAIL_FROM_EMAIL,
+          subject: 'New Lecturer Registration — Pending Approval',
+          html: `
+            <h2>New Lecturer Application</h2>
+            <p><strong>${name}</strong> has registered as a lecturer.</p>
+            <div style="background:#f5f6f8; padding:14px; border-left:3px solid #b8860b; border-radius:6px; margin:16px 0;">
+              <div><strong>Staff No:</strong> ${staff_no}</div>
+              <div><strong>Email:</strong> ${email}</div>
+              <div><strong>Phone:</strong> ${phone || '—'}</div>
+              <div><strong>Qualification:</strong> ${qualification || '—'}</div>
+              <div><strong>Specialization:</strong> ${specialization || '—'}</div>
+            </div>
+            <p><a href="${process.env.APP_URL || 'https://herald-portal.onrender.com'}/admin-dashboard.html" style="background:#0b1a33; color:#fff; padding:12px 22px; border-radius:6px; text-decoration:none; font-weight:600;">Open Admin Panel to Approve</a></p>
+          `,
+        }).catch(err => console.error('Lecturer notification failed:', err.message));
+      }
+    } catch (e) { console.error('Notification error:', e.message); }
+
+    res.json({
+      ok: true,
+      staff_no,
+      name: lecturer.name,
+      status: 'pending',
+      message: `Your staff number is ${staff_no}. Await admin approval to log in.`,
+    });
+  } catch (err) {
+    if (String(err.message).includes('UNIQUE')) {
+      return res.status(400).json({ error: 'This email is already registered.' });
+    }
+    console.error('Lecturer registration error:', err);
+    res.status(500).json({ error: 'Registration failed. Please try again.' });
+  }
+});
+
+// Lecturer login
+app.post('/api/lecturer/login', (req, res) => {
+  const { staff_no, email, password } = req.body;
+  if (!password || (!staff_no && !email)) {
+    return res.status(400).json({ error: 'Missing credentials' });
+  }
+
+  const lecturer = staff_no
+    ? db.prepare('SELECT * FROM lecturers WHERE staff_no = ?').get(staff_no)
+    : db.prepare('SELECT * FROM lecturers WHERE email = ?').get(email.toLowerCase());
+
+  if (!lecturer || !bcrypt.compareSync(password, lecturer.password)) {
+    return res.status(401).json({ error: 'Invalid staff number/email or password' });
+  }
+  if (!lecturer.approved) {
+    return res.status(403).json({ error: 'Your account is pending approval. Contact the administrator.' });
+  }
+  if (lecturer.status === 'suspended') {
+    return res.status(403).json({ error: 'Your account has been suspended.' });
+  }
+
+  const token = jwt.sign(
+    { id: lecturer.id, staff_no: lecturer.staff_no, type: 'lecturer' },
+    JWT_SECRET,
+    { expiresIn: '7d' }
+  );
+  res.cookie('lecturer_token', token, { httpOnly: true, sameSite: 'lax' });
+  res.json({ ok: true, name: lecturer.name, staff_no: lecturer.staff_no });
+});
+
+app.post('/api/lecturer/logout', (req, res) => {
+  res.clearCookie('lecturer_token');
+  res.json({ ok: true });
+});
+
+// Get own profile
+app.get('/api/lecturer/me', authLecturer, (req, res) => {
+  const lecturer = db.prepare(`
+    SELECT id, staff_no, name, email, phone, qualification, specialization, bio,
+           photo_url, status, approved, created_at
+    FROM lecturers WHERE id = ?
+  `).get(req.lecturer.id);
+  res.json(lecturer);
+});
+
+// Update own profile
+app.put('/api/lecturer/me', authLecturer, (req, res) => {
+  const { name, phone, qualification, specialization, bio } = req.body;
+  db.prepare(`
+    UPDATE lecturers SET name = ?, phone = ?, qualification = ?, specialization = ?, bio = ?
+    WHERE id = ?
+  `).run(name, phone || '', qualification || '', specialization || '', bio || '', req.lecturer.id);
+  res.json({ ok: true });
+});
+
+// Change password
+app.post('/api/lecturer/change-password', authLecturer, (req, res) => {
+  const { currentPassword, newPassword } = req.body;
+  if (!currentPassword || !newPassword) return res.status(400).json({ error: 'Missing fields' });
+  if (newPassword.length < 6) return res.status(400).json({ error: 'New password must be at least 6 characters' });
+
+  const lecturer = db.prepare('SELECT password FROM lecturers WHERE id = ?').get(req.lecturer.id);
+  if (!bcrypt.compareSync(currentPassword, lecturer.password)) {
+    return res.status(400).json({ error: 'Current password is incorrect' });
+  }
+  db.prepare('UPDATE lecturers SET password = ? WHERE id = ?')
+    .run(bcrypt.hashSync(newPassword, 10), req.lecturer.id);
+  res.json({ ok: true });
+});
+
+// Lecturer: list courses assigned to them (by trainer name match)
+app.get('/api/lecturer/my-courses', authLecturer, (req, res) => {
+  const lecturer = db.prepare('SELECT name FROM lecturers WHERE id = ?').get(req.lecturer.id);
+  const courses = db.prepare(`
+    SELECT c.*, (SELECT COUNT(*) FROM enrollments WHERE course_id = c.id) AS enrolled_count
+    FROM courses c
+    WHERE c.trainer LIKE ?
+    ORDER BY c.code
+  `).all(`%${lecturer.name}%`);
+  res.json(courses);
+});
+
+// Lecturer: students in a course
+app.get('/api/lecturer/courses/:id/students', authLecturer, (req, res) => {
+  const students = db.prepare(`
+    SELECT s.id, s.reg_no, s.name, s.email, s.course, s.active
+    FROM students s
+    JOIN enrollments e ON e.student_id = s.id
+    WHERE e.course_id = ?
+    ORDER BY s.name
+  `).all(req.params.id);
+  res.json(students);
+});
+
+// Lecturer: view results (read-only, no fees)
+app.get('/api/lecturer/results', authLecturer, (req, res) => {
+  const rows = db.prepare(`
+    SELECT r.id, r.marks, r.grade, r.term,
+           s.reg_no, s.name AS student_name,
+           c.code, c.title AS course_title
+    FROM results r
+    JOIN students s ON s.id = r.student_id
+    JOIN courses c ON c.id = r.course_id
+    ORDER BY r.id DESC LIMIT 200
+  `).all();
+  res.json(rows);
+});
+
+// Lecturer: add a result
+app.post('/api/lecturer/results', authLecturer, (req, res) => {
+  const { student_id, course_id, marks, term } = req.body;
+  if (!student_id || !course_id || marks == null || !term) {
+    return res.status(400).json({ error: 'All fields required' });
+  }
+  function calcGrade(m) {
+    if (m >= 80) return 'A'; if (m >= 75) return 'A-'; if (m >= 70) return 'B+';
+    if (m >= 65) return 'B'; if (m >= 60) return 'B-'; if (m >= 55) return 'C+';
+    if (m >= 50) return 'C'; if (m >= 45) return 'D'; return 'E';
+  }
+  const grade = calcGrade(Number(marks));
+  db.prepare('INSERT INTO results (student_id, course_id, marks, grade, term) VALUES (?, ?, ?, ?, ?)')
+    .run(student_id, course_id, marks, grade, term);
+  res.json({ ok: true, grade });
+});
+
+// Lecturer: announcements (read)
+app.get('/api/lecturer/announcements', authLecturer, (req, res) => {
+  res.json(db.prepare('SELECT * FROM announcements ORDER BY created_at DESC').all());
+});
+
+// Lecturer: post an announcement (goes to superadmin for review? No — direct)
+app.post('/api/lecturer/announcements', authLecturer, (req, res) => {
+  const { title, body } = req.body;
+  if (!title || !body) return res.status(400).json({ error: 'Title and body required' });
+  db.prepare('INSERT INTO announcements (title, body) VALUES (?, ?)').run(title, body);
+  res.json({ ok: true });
+});
+
+// Lecturer: view own timetable
+app.get('/api/lecturer/timetable', authLecturer, (req, res) => {
+  const rows = db.prepare(`
+    SELECT t.*, c.code, c.title
+    FROM timetable t
+    JOIN courses c ON c.id = t.course_id
+    ORDER BY CASE t.day
+      WHEN 'Monday' THEN 1 WHEN 'Tuesday' THEN 2 WHEN 'Wednesday' THEN 3
+      WHEN 'Thursday' THEN 4 WHEN 'Friday' THEN 5 WHEN 'Saturday' THEN 6 ELSE 7 END,
+      t.start_time
+  `).all();
+  res.json(rows);
+});
+
+// Lecturer: take attendance (view existing)
+app.get('/api/lecturer/attendance/:courseId', authLecturer, (req, res) => {
+  const rows = db.prepare(`
+    SELECT a.*, s.reg_no, s.name AS student_name
+    FROM attendance a
+    JOIN students s ON s.id = a.student_id
+    WHERE a.course_id = ?
+    ORDER BY a.date DESC, s.name
+    LIMIT 500
+  `).all(req.params.courseId);
+  res.json(rows);
+});
+
+// Lecturer: save attendance
+app.post('/api/lecturer/attendance', authLecturer, (req, res) => {
+  const { course_id, date, records } = req.body;
+  if (!course_id || !date || !Array.isArray(records)) {
+    return res.status(400).json({ error: 'course_id, date, records[] required' });
+  }
+  const insert = db.prepare(`
+    INSERT INTO attendance (course_id, student_id, date, status, marked_by, notes)
+    VALUES (?, ?, ?, ?, ?, ?)
+  `);
+  const del = db.prepare(`DELETE FROM attendance WHERE course_id = ? AND student_id = ? AND date = ?`);
+  const tx = db.transaction(() => {
+    records.forEach(r => {
+      del.run(course_id, r.student_id, date);
+      insert.run(course_id, r.student_id, date, r.status || 'present', req.lecturer.id, r.notes || '');
+    });
+  });
+  tx();
+  res.json({ ok: true, count: records.length });
+});
+
 // ==================== ADMIN ROUTES ====================
 app.post('/api/admin/login', (req, res) => {
   const { username, password } = req.body;
@@ -553,6 +834,99 @@ app.post('/api/admin/students/:id/reset-password', authAdmin, async (req, res) =
     }
     res.json({ ok: true });
   } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ==================== SUPERADMIN: LECTURER MANAGEMENT ====================
+app.get('/api/admin/lecturers', authAdmin, (req, res) => {
+  res.json(db.prepare(`
+    SELECT id, staff_no, name, email, phone, qualification, specialization,
+           status, approved, created_at, approved_at
+    FROM lecturers
+    ORDER BY approved ASC, created_at DESC
+  `).all());
+});
+
+app.post('/api/admin/lecturers/:id/approve', authAdmin, (req, res) => {
+  db.prepare('UPDATE lecturers SET approved = 1, status = ?, approved_at = CURRENT_TIMESTAMP WHERE id = ?')
+    .run('active', req.params.id);
+
+  // Notify lecturer by email
+  try {
+    const lecturer = db.prepare('SELECT name, email, staff_no FROM lecturers WHERE id = ?').get(req.params.id);
+    if (lecturer) {
+      const { sendMail, ENABLED: MAIL_ON } = require('./mailer');
+      if (MAIL_ON) {
+        sendMail({
+          to: lecturer.email,
+          subject: 'Your Herald Lecturer Account is Approved',
+          html: `
+            <h2>Account Approved ✅</h2>
+            <p>Hello ${lecturer.name},</p>
+            <p>Your lecturer account has been approved. You can now log in to the Herald Lecturer Portal.</p>
+            <div style="background:#f5f6f8; padding:14px; border-left:3px solid #b8860b; border-radius:6px; margin:16px 0;">
+              <div><strong>Staff No:</strong> ${lecturer.staff_no}</div>
+              <div><strong>Email:</strong> ${lecturer.email}</div>
+            </div>
+            <p><a href="${process.env.APP_URL || 'https://herald-portal.onrender.com'}/lecturer-login.html" style="background:#0b1a33; color:#fff; padding:12px 22px; border-radius:6px; text-decoration:none; font-weight:600;">Log in to Lecturer Portal</a></p>
+          `,
+        }).catch(err => console.error('Approval email failed:', err.message));
+      }
+    }
+  } catch (e) { console.error(e.message); }
+
+  res.json({ ok: true });
+});
+
+app.post('/api/admin/lecturers/:id/reject', authAdmin, (req, res) => {
+  db.prepare('UPDATE lecturers SET approved = 0, status = ? WHERE id = ?').run('rejected', req.params.id);
+  res.json({ ok: true });
+});
+
+app.post('/api/admin/lecturers/:id/suspend', authAdmin, (req, res) => {
+  db.prepare('UPDATE lecturers SET status = ? WHERE id = ?').run('suspended', req.params.id);
+  res.json({ ok: true });
+});
+
+app.post('/api/admin/lecturers/:id/reactivate', authAdmin, (req, res) => {
+  db.prepare('UPDATE lecturers SET status = ?, approved = 1 WHERE id = ?').run('active', req.params.id);
+  res.json({ ok: true });
+});
+
+app.delete('/api/admin/lecturers/:id', authAdmin, (req, res) => {
+  db.prepare('DELETE FROM lecturers WHERE id = ?').run(req.params.id);
+  res.json({ ok: true });
+});
+
+// Superadmin: create lecturer directly
+app.post('/api/admin/lecturers', authAdmin, (req, res) => {
+  const { name, email, phone, password, qualification, specialization, bio } = req.body;
+  if (!name || !email || !password) return res.status(400).json({ error: 'Name, email, password required' });
+
+  try {
+    const year = new Date().getFullYear();
+    const prefix = `HRD-LECT-${year}-`;
+    const last = db.prepare("SELECT staff_no FROM lecturers WHERE staff_no LIKE ? ORDER BY staff_no DESC LIMIT 1").get(`${prefix}%`);
+    let nextNum = 1;
+    if (last) {
+      const parts = last.staff_no.split('-');
+      const n = parseInt(parts[parts.length - 1], 10);
+      if (!isNaN(n)) nextNum = n + 1;
+    }
+    const staff_no = `${prefix}${String(nextNum).padStart(4, '0')}`;
+
+    const hash = bcrypt.hashSync(password, 10);
+    db.prepare(`
+      INSERT INTO lecturers (staff_no, name, email, phone, password, qualification, specialization, bio, approved, status, approved_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1, 'active', CURRENT_TIMESTAMP)
+    `).run(staff_no, name, email.toLowerCase(), phone || '', hash, qualification || '', specialization || '', bio || '');
+
+    res.json({ ok: true, staff_no });
+  } catch (err) {
+    if (String(err.message).includes('UNIQUE')) {
+      return res.status(400).json({ error: 'Email already exists' });
+    }
     res.status(500).json({ error: err.message });
   }
 });

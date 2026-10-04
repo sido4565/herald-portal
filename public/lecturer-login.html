@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Lecturer Login — Herald</title>
+  <link rel="icon" type="image/svg+xml" href="favicon.svg" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="style.css" />
+  <style>
+    body {
+      margin: 0;
+      font-family: 'Inter', sans-serif;
+      background-image:
+        linear-gradient(135deg, rgba(107,44,44,0.92) 0%, rgba(107,44,44,0.85) 100%),
+        url('images/hero-admin.jpg');
+      background-size: cover; background-position: center;
+      min-height: 100vh; display: flex;
+      align-items: center; justify-content: center;
+      padding: 24px;
+    }
+    .card {
+      background: #fff; border-radius: 20px;
+      padding: 48px 40px; max-width: 440px; width: 100%;
+      box-shadow: 0 40px 80px rgba(0,0,0,0.4);
+    }
+    .card img { max-width: 90px; margin: 0 auto 16px; display: block; }
+    .card h1 { font-size: 24px; text-align: center; color: #0b1a33; margin: 0 0 6px; }
+    .card .subtitle {
+      text-align: center; color: #6b7280; font-size: 13px;
+      text-transform: uppercase; letter-spacing: 0.08em;
+      margin-bottom: 32px;
+    }
+    .form-group { margin-bottom: 18px; }
+    .form-group label {
+      display: block; font-size: 12px; font-weight: 700;
+      color: #4a5260; text-transform: uppercase;
+      letter-spacing: 0.05em; margin-bottom: 8px;
+    }
+    .form-group input {
+      width: 100%; padding: 12px 14px;
+      border: 1px solid #d8dce2; border-radius: 8px;
+      font-size: 14.5px; font-family: inherit;
+      box-sizing: border-box;
+    }
+    .form-group input:focus {
+      border-color: #6b2c2c; outline: none;
+      box-shadow: 0 0 0 3px rgba(107,44,44,0.15);
+    }
+    .btn {
+      width: 100%; padding: 13px;
+      background: #6b2c2c; color: white; border: none;
+      border-radius: 10px; font-size: 15px; font-weight: 700;
+      cursor: pointer; font-family: inherit; transition: all 0.15s;
+    }
+    .btn:hover { background: #8b3a3a; }
+    .btn:disabled { background: #cbd5e1; cursor: not-allowed; }
+    .msg { text-align: center; margin-top: 14px; font-size: 13px; padding: 10px; border-radius: 8px; }
+    .msg.error { color: #b91c1c; background: #fee2e2; }
+    .msg:empty { display: none; }
+    .hint { text-align: center; font-size: 12px; color: #6b7280; margin-top: 20px; line-height: 1.6; }
+    .hint a { color: #b8860b; font-weight: 600; text-decoration: none; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <img src="images/herald-logo.png" alt="Herald" />
+    <h1>Lecturer Login</h1>
+    <p class="subtitle">Herald Trainer and Consultant</p>
+
+    <form id="loginForm">
+      <div class="form-group">
+        <label for="staff_no">Staff Number or Email</label>
+        <input id="staff_no" name="staff_no" placeholder="HRD-LECT-2025-0001" required autofocus />
+      </div>
+      <div class="form-group">
+        <label for="password">Password</label>
+        <input id="password" name="password" type="password" required />
+      </div>
+      <button type="submit" class="btn" id="submitBtn">Sign In</button>
+      <p class="msg" id="formMsg"></p>
+    </form>
+
+    <p class="hint">
+      Not yet a lecturer? <a href="lecturer-register.html">Apply to teach</a><br>
+      <a href="welcome.html">← Back to Herald</a> · <a href="login.html">Student login</a>
+    </p>
+  </div>
+
+  <script>
+    $('#loginForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const form = e.target;
+      const btn = $('#submitBtn');
+      const msg = $('#formMsg');
+
+      msg.className = 'msg';
+      msg.textContent = '';
+      btn.disabled = true;
+      btn.textContent = 'Signing in...';
+
+      const idInput = form.staff_no.value.trim();
+      const data = { password: form.password.value };
+      if (idInput.includes('@')) data.email = idInput.toLowerCase();
+      else data.staff_no = idInput.toUpperCase();
+
+      try {
+        const res = await fetch('/api/lecturer/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(data),
+        });
+        const json = await res.json();
+
+        if (res.ok) {
+          location.href = 'lecturer-dashboard.html';
+        } else {
+          msg.className = 'msg error';
+          msg.textContent = json.error || 'Login failed';
+          btn.disabled = false;
+          btn.textContent = 'Sign In';
+        }
+      } catch (err) {
+        msg.className = 'msg error';
+        msg.textContent = 'Network error. Please try again.';
+        btn.disabled = false;
+        btn.textContent = 'Sign In';
+      }
+    });
+  </script>
+</body>
+</html>
