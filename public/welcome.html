@@ -972,366 +972,260 @@
 // DATA
 // ───────────────────────────────────────────────────────────
 
-const GUIDES = [
-  {
-    title: 'Our Mission',
-    desc: 'To equip individuals and organizations with practical skills that create real economic value.',
-    icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg>',
-    detail: [
-      'Bridge the gap between theory and real-world practice',
-      'Focus on skills employers actually hire for',
-      'Make quality training accessible and affordable',
-      'Serve individuals, SMEs, and corporates alike'
-    ]
-  },
-  {
-    title: 'Our Vision',
-    desc: 'To be East Africa\'s most trusted partner for career-shaping and business-transforming training.',
-    icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>',
-    detail: [
-      'Recognized nationally for training excellence',
-      'A pipeline of skilled professionals across sectors',
-      'Strong partnerships with industry and government',
-      'Alumni leading enterprises across the region'
-    ]
-  },
-  {
-    title: 'Our Values',
-    desc: 'Integrity, excellence, and a relentless commitment to the success of every learner.',
-    icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>',
-    detail: [
-      'Integrity — honest advice, honest pricing',
-      'Excellence — every session prepared and delivered to a high standard',
-      'Respect — treat every learner as a future leader',
-      'Accountability — we measure outcomes, not just attendance'
-    ]
-  },
-  {
-    title: 'Our Approach',
-    desc: 'Hands-on, practical, and tailored — because one size does not fit all.',
-    icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>',
-    detail: [
-      'Learn-by-doing — real projects, real scenarios',
-      'Small class sizes for individual attention',
-      'Blended learning: in-person + online + self-paced',
-      'Post-training support and mentorship'
-    ]
-  }
-];
-
-const SERVICES = [
-  {
-    key: 'corporate',
-    title: 'Corporate Training',
-    desc: 'Customized in-house programs for teams, departments, and management.',
-    icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/></svg>',
-    lead: 'We design and deliver tailored training programs for organizations that want to upskill their teams, improve performance, and build internal capability.',
-    points: [
-      'Needs assessment and skills-gap analysis',
-      'Custom curriculum aligned to your KPIs',
-      'Delivered on-site or at our Mombasa facility',
-      'Post-training evaluation and reporting',
-      'Ideal for banks, SACCOs, SMEs, NGOs, and government'
-    ]
-  },
-  {
-    key: 'individual',
-    title: 'Individual Courses',
-    desc: 'Join scheduled classes or learn at your own pace online.',
-    icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>',
-    lead: 'From short courses to full certificate programs — pick the pace and format that fits your life.',
-    points: [
-      'Morning, evening, and weekend classes',
-      'Fully online options with live sessions',
-      'Certificate issued on completion',
-      'Access to student portal with assignments and progress tracking',
-      'Flexible payment plans'
-    ]
-  },
-  {
-    key: 'consulting',
-    title: 'Business Consulting',
-    desc: 'Strategy, operations, and growth advisory for startups and established firms.',
-    icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>',
-    lead: 'Hands-on consulting that goes beyond recommendations. We work with you to implement and measure results.',
-    points: [
-      'Business plan and pitch deck development',
-      'Financial modeling and feasibility studies',
-      'Operations and process improvement',
-      'Market research and go-to-market strategy',
-      'Growth roadmaps and KPI frameworks'
-    ]
-  },
-  {
-    key: 'career',
-    title: 'Career Coaching',
-    desc: 'One-on-one guidance to land the job, grow the role, or pivot industries.',
-    icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="7"/><polyline points="8.21 13.89 7 23 12 20 17 23 15.79 13.88"/></svg>',
-    lead: 'Personalized coaching to help you define goals, sharpen your profile, and get hired or promoted.',
-    points: [
-      'CV, LinkedIn, and portfolio review',
-      'Interview preparation and mock sessions',
-      'Career path mapping and skill planning',
-      'Salary negotiation strategies',
-      'Ongoing mentorship'
-    ]
-  }
-];
-
 const COURSES = [
   // ═══════════════════════════════════════════════════════
-  // PRIORITY SHORT COURSES (25) — Business + Technical
+  // PRIORITY SHORT COURSES (25)
   // ═══════════════════════════════════════════════════════
   { code: 'SC001', title: 'Digital Marketing & Social Media Marketing', category: 'Short', priority: true,
-    image: 'images/courses/marketing.jpg',
+    image: 'images/courses/marketing.jpg', fee: 6500,
     short: 'Reach customers, build brands, and drive sales using modern digital tools.',
-    full: 'Learn how to plan, execute, and measure digital marketing campaigns across social media, search, and email. Ideal for business owners, marketers, and anyone responsible for revenue.',
+    full: 'Learn how to plan, execute, and measure digital marketing campaigns across social media, search, and email.',
     duration: '2 to 4 weeks', level: 'Beginner', trainer: 'Ms. Amina T.',
     features: ['Social media strategy (Facebook, Instagram, TikTok, LinkedIn)','Google Ads and SEO fundamentals','Email marketing and automation','Content planning and copywriting','Analytics — measuring what matters'] },
 
   { code: 'SC002', title: 'AI for Business & Productivity', category: 'Short', priority: true,
-    image: 'images/courses/ai.jpg',
+    image: 'images/courses/ai.jpg', fee: 4500,
     short: 'Harness AI tools to work faster and smarter in every role.',
-    full: 'A practical, no-jargon introduction to using AI in business. You will learn to use ChatGPT, Copilot, and other tools to automate tasks, write content, analyze data, and boost productivity.',
+    full: 'A practical, no-jargon introduction to using AI in business. Learn ChatGPT, Copilot, and other tools.',
     duration: '1 to 2 weeks', level: 'Beginner', trainer: 'Mr. Herald K.',
-    features: ['AI tools overview (ChatGPT, Copilot, Gemini)','Writing emails, proposals, and reports with AI','Automating routine business tasks','AI for research and data analysis','Responsible and ethical AI use'] },
+    features: ['AI tools overview (ChatGPT, Copilot, Gemini)','Writing emails and reports with AI','Automating routine tasks','AI for research and data analysis','Responsible and ethical AI use'] },
 
   { code: 'SC003', title: 'E-Commerce & Online Business', category: 'Short', priority: true,
-    image: 'images/courses/ecommerce.jpg',
+    image: 'images/courses/ecommerce.jpg', fee: 7500,
     short: 'Launch and grow a profitable online store from scratch.',
-    full: 'Everything you need to start selling online — from choosing a platform to handling payments and shipping. Perfect for entrepreneurs and existing retailers moving online.',
+    full: 'Everything you need to start selling online — from platform choice to payments and shipping.',
     duration: '2 to 4 weeks', level: 'Beginner', trainer: 'Ms. Amina T.',
     features: ['Choosing a platform (Shopify, WooCommerce, Jumia)','Product photography and listings','Payments and mobile money integration','Shipping and fulfillment basics','Marketing your online store'] },
 
   { code: 'SC004', title: 'Business Management & Entrepreneurship', category: 'Short', priority: true,
-    image: 'images/courses/business.jpg',
+    image: 'images/courses/business.jpg', fee: 8500,
     short: 'Master the essentials of running and growing a business.',
-    full: 'A comprehensive introduction to business management for entrepreneurs, supervisors, and aspiring managers. Learn how businesses are structured, how decisions get made, and how to build effective teams.',
+    full: 'A comprehensive introduction to business management for entrepreneurs, supervisors, and aspiring managers.',
     duration: '4 weeks', level: 'Beginner', trainer: 'Mr. Herald K.',
     features: ['Business structures in Kenya','Strategic planning and goal setting','Operations and supply chain basics','Financial literacy for managers','Team leadership'] },
 
   { code: 'SC005', title: 'Advanced Excel for Business', category: 'Short', priority: true,
-    image: 'images/courses/excel.jpg',
+    image: 'images/courses/excel.jpg', fee: 6500,
     short: 'Turn Excel into your most powerful business tool.',
-    full: 'From pivot tables to Power Query, this course teaches the Excel skills that employers actually look for. Practical, hands-on, and immediately applicable.',
+    full: 'From pivot tables to Power Query — the Excel skills employers actually look for.',
     duration: '2 to 4 weeks', level: 'Intermediate', trainer: 'Mr. Brian W.',
     features: ['Advanced formulas and functions','Pivot tables and dashboards','Power Query and data cleaning','Charts and visualization','Automating with macros'] },
 
   { code: 'SC006', title: 'Data Analytics for Business', category: 'Short', priority: true,
-    image: 'images/courses/data.jpg',
+    image: 'images/courses/data.jpg', fee: 14500,
     short: 'Turn raw data into decisions that drive growth.',
-    full: 'Learn to collect, clean, analyze, and visualize data to make better business decisions. Uses Excel, Power BI, and basic Python.',
+    full: 'Learn to collect, clean, analyze, and visualize data using Excel, Power BI, and basic Python.',
     duration: '4 to 8 weeks', level: 'Intermediate', trainer: 'Dr. Otieno M.',
     features: ['Data collection and cleaning','Descriptive and diagnostic analytics','Dashboards with Power BI','Intro to Python for data','Storytelling with data'] },
 
   { code: 'SC007', title: 'Graphic Design for Business', category: 'Short', priority: true,
-    image: 'images/courses/design.jpg',
+    image: 'images/courses/design.jpg', fee: 8500,
     short: 'Design professional visuals for your brand.',
-    full: 'Learn the fundamentals of graphic design using free and paid tools. Create logos, flyers, social media posts, and brand kits.',
+    full: 'Learn the fundamentals of graphic design using free and paid tools.',
     duration: '4 weeks', level: 'Beginner', trainer: 'Ms. Amina T.',
     features: ['Design principles and color theory','Logos and brand identity','Print and digital design','Using Canva and Figma','Exporting for web and print'] },
 
   { code: 'SC008', title: 'Canva Design & Content Creation', category: 'Short', priority: true,
-    image: 'images/courses/canva.jpg',
+    image: 'images/courses/canva.jpg', fee: 3500,
     short: 'Create stunning content in minutes — no design experience needed.',
-    full: 'A fast, practical course on using Canva to create professional social media content, presentations, flyers, and more.',
+    full: 'Fast, practical course on using Canva to create professional social media content.',
     duration: '1 to 2 weeks', level: 'Beginner', trainer: 'Ms. Amina T.',
     features: ['Canva essentials and templates','Brand kits and consistent design','Creating social media posts','Designing presentations and flyers','Exporting and scheduling content'] },
 
   { code: 'SC009', title: 'Website Design for Small Businesses', category: 'Short', priority: true,
-    image: 'images/courses/web.jpg',
+    image: 'images/courses/web.jpg', fee: 15500,
     short: 'Build a professional website without writing code.',
-    full: 'Learn to create and launch business websites using WordPress and other no-code tools. Includes hosting, domains, and basic SEO.',
+    full: 'Create and launch business websites using WordPress and other no-code tools.',
     duration: '4 to 8 weeks', level: 'Beginner', trainer: 'Mr. Herald K.',
     features: ['Choosing the right platform','Domains and hosting setup','WordPress essentials','Basic SEO and speed','Launching and maintaining'] },
 
   { code: 'SC010', title: 'Content Creation & Video Editing', category: 'Short', priority: true,
-    image: 'images/courses/content.jpg',
+    image: 'images/courses/content.jpg', fee: 7500,
     short: 'Create scroll-stopping content for social media and YouTube.',
-    full: 'Learn to script, shoot, edit, and publish video content that grows audiences and drives business.',
+    full: 'Learn to script, shoot, edit, and publish video content that grows audiences.',
     duration: '2 to 4 weeks', level: 'Beginner', trainer: 'Mr. Herald K.',
     features: ['Scripting and storyboarding','Mobile and DSLR shooting','Video editing (CapCut, Premiere)','Sound, music, and captions','Publishing and growth'] },
 
   { code: 'SC011', title: 'Bookkeeping & QuickBooks', category: 'Short', priority: true,
-    image: 'images/courses/bookkeeping.jpg',
+    image: 'images/courses/bookkeeping.jpg', fee: 9500,
     short: 'Keep clean books and stay compliant — effortlessly.',
     full: 'Learn bookkeeping fundamentals and master QuickBooks for small business accounting.',
     duration: '4 weeks', level: 'Beginner', trainer: 'Mr. Brian W.',
     features: ['Double-entry bookkeeping basics','Recording transactions','Bank reconciliation','QuickBooks setup and use','Reports and compliance'] },
 
   { code: 'SC012', title: 'Accounting for Small Businesses', category: 'Short', priority: true,
-    image: 'images/courses/accounting.jpg',
+    image: 'images/courses/accounting.jpg', fee: 8500,
     short: 'Understand your numbers and stay tax-compliant.',
-    full: 'A practical accounting course for business owners and managers. Learn to read financial statements, manage cash flow, and stay compliant with KRA.',
+    full: 'A practical accounting course for business owners. Learn financial statements, cash flow, and KRA compliance.',
     duration: '4 weeks', level: 'Beginner', trainer: 'Mr. Brian W.',
     features: ['Financial statements explained','Cash flow management','Tax basics (KRA, VAT, PAYE)','Budgets and forecasts','Working with an accountant'] },
 
   { code: 'SC013', title: 'Sales & Customer Relationship Management', category: 'Short', priority: true,
-    image: 'images/courses/sales.jpg',
+    image: 'images/courses/sales.jpg', fee: 6500,
     short: 'Build a sales engine and keep customers coming back.',
-    full: 'Learn the fundamentals of sales and CRM. Perfect for sales teams and business owners who want consistent revenue.',
+    full: 'Learn the fundamentals of sales and CRM. Perfect for sales teams and business owners.',
     duration: '2 to 4 weeks', level: 'Beginner', trainer: 'Ms. Amina T.',
     features: ['Sales process and pipeline','CRM tools and best practices','Lead generation strategies','Follow-up and retention','Measuring sales performance'] },
 
   { code: 'SC014', title: 'Professional Selling & Sales Management', category: 'Short', priority: true,
-    image: 'images/courses/selling.jpg',
+    image: 'images/courses/selling.jpg', fee: 7500,
     short: 'Master high-impact selling and manage teams that close.',
-    full: 'Advanced sales training for experienced salespeople and managers. Covers negotiation, key accounts, and sales leadership.',
+    full: 'Advanced sales training for experienced salespeople and managers.',
     duration: '2 to 4 weeks', level: 'Advanced', trainer: 'Mr. Herald K.',
     features: ['Consultative selling techniques','Negotiation and objection handling','Key account management','Managing a sales team','Sales forecasting and reporting'] },
 
   { code: 'SC015', title: 'Procurement & Supply Chain Basics', category: 'Short', priority: true,
-    image: 'images/courses/procurement.jpg',
+    image: 'images/courses/procurement.jpg', fee: 8500,
     short: 'Source smarter, save money, and reduce risk.',
-    full: 'An introduction to procurement and supply chain management for SMEs and corporate buyers.',
+    full: 'Introduction to procurement and supply chain management for SMEs and corporate buyers.',
     duration: '4 weeks', level: 'Beginner', trainer: 'Mr. Brian W.',
     features: ['Procurement process and ethics','Supplier identification and evaluation','Contract and tender basics','Inventory and logistics','Managing supply chain risks'] },
 
   { code: 'SC016', title: 'Project Management', category: 'Short', priority: true,
-    image: 'images/courses/project.jpg',
+    image: 'images/courses/project.jpg', fee: 15500,
     short: 'Deliver projects on time, on budget, on scope.',
-    full: 'Learn to plan, execute, and close projects using practical tools and Agile/Waterfall methods.',
+    full: 'Learn to plan, execute, and close projects using Agile and Waterfall methods.',
     duration: '4 to 8 weeks', level: 'Intermediate', trainer: 'Mr. Herald K.',
     features: ['Project lifecycle and planning','Scope, time, and cost management','Risk and stakeholder management','Agile and Scrum basics','Tools (Trello, Asana, MS Project)'] },
 
   { code: 'SC017', title: 'Business Proposal Writing', category: 'Short', priority: true,
-    image: 'images/courses/proposal.jpg',
+    image: 'images/courses/proposal.jpg', fee: 4500,
     short: 'Write proposals that get funded.',
     full: 'A focused course on crafting compelling business proposals for clients, donors, and investors.',
     duration: '1 to 2 weeks', level: 'Beginner', trainer: 'Ms. Amina T.',
     features: ['Proposal structure and format','Executive summaries that persuade','Pricing and value justification','Common proposal mistakes','Templates and examples'] },
 
   { code: 'SC018', title: 'Business Plan Development', category: 'Short', priority: true,
-    image: 'images/courses/businessplan.jpg',
+    image: 'images/courses/businessplan.jpg', fee: 5500,
     short: 'Turn your idea into a fundable business plan.',
     full: 'Build a complete, professional business plan that banks and investors take seriously.',
     duration: '1 to 2 weeks', level: 'Beginner', trainer: 'Mr. Herald K.',
     features: ['Market analysis and positioning','Financial projections','Marketing and operations plans','Executive summary writing','Common pitfalls to avoid'] },
 
   { code: 'SC019', title: 'Grant & Tender Proposal Writing', category: 'Short', priority: true,
-    image: 'images/courses/grants.jpg',
+    image: 'images/courses/grants.jpg', fee: 7500,
     short: 'Win grants and government tenders with winning proposals.',
     full: 'Specialized training on writing successful grant applications and government tender responses.',
     duration: '2 to 4 weeks', level: 'Intermediate', trainer: 'Dr. Otieno M.',
     features: ['Understanding tender requirements','Compliance and documentation','Technical and financial proposals','Common disqualification reasons','Follow-up and post-award'] },
 
   { code: 'SC020', title: 'Personal Branding & LinkedIn Marketing', category: 'Short', priority: true,
-    image: 'images/courses/personalbrand.jpg',
+    image: 'images/courses/personalbrand.jpg', fee: 4500,
     short: 'Become visible, credible, and in-demand in your field.',
     full: 'Build a personal brand that opens doors — online and offline. Heavy focus on LinkedIn.',
     duration: '1 to 2 weeks', level: 'Beginner', trainer: 'Ms. Amina T.',
     features: ['Defining your brand position','LinkedIn profile optimization','Content strategy and posting','Networking and outreach','Measuring your impact'] },
 
   { code: 'SC021', title: 'Cybersecurity Awareness for Businesses', category: 'Short', priority: true,
-    image: 'images/courses/cybersecurity.jpg',
+    image: 'images/courses/cybersecurity.jpg', fee: 5500,
     short: 'Protect your business from common cyber threats.',
-    full: 'Practical cybersecurity training for staff and managers. Learn to spot phishing, protect data, and respond to incidents.',
+    full: 'Practical cybersecurity training for staff and managers.',
     duration: '1 to 2 weeks', level: 'Beginner', trainer: 'Mr. Brian W.',
     features: ['Phishing and social engineering','Password and access management','Device and network hygiene','Data protection and compliance','Incident response basics'] },
 
   { code: 'SC022', title: 'Freelancing & Online Work Skills', category: 'Short', priority: true,
-    image: 'images/courses/freelancing.jpg',
+    image: 'images/courses/freelancing.jpg', fee: 9500,
     short: 'Earn income online — from Upwork to Fiverr to direct clients.',
-    full: 'Everything you need to start freelancing successfully. Covers finding clients, pricing, contracts, and delivering quality work.',
+    full: 'Everything you need to start freelancing successfully.',
     duration: '2 to 6 weeks', level: 'Beginner', trainer: 'Mr. Herald K.',
     features: ['Choosing your niche','Setting up on Upwork, Fiverr, Freelancer','Writing winning proposals','Pricing and contracts','Getting paid (PayPal, Wise, M-Pesa)'] },
 
   { code: 'SC023', title: 'Digital Office & Computer Applications', category: 'Short', priority: true,
-    image: 'images/courses/digitaloffice.jpg',
+    image: 'images/courses/digitaloffice.jpg', fee: 8500,
     short: 'Work confidently with Word, Excel, PowerPoint, and Google Workspace.',
-    full: 'A beginner-friendly course covering the essential computer skills for any modern office role.',
+    full: 'Beginner-friendly course covering the essential computer skills for any modern office role.',
     duration: '2 to 6 weeks', level: 'Beginner', trainer: 'Ms. Amina T.',
     features: ['MS Word for documents','MS Excel for data and reports','MS PowerPoint for presentations','Google Workspace (Docs, Sheets, Drive)','Email and calendar management'] },
 
   { code: 'SC024', title: 'Leadership & Team Management', category: 'Short', priority: true,
-    image: 'images/courses/leadership.jpg',
+    image: 'images/courses/leadership.jpg', fee: 10500,
     short: 'Lead with clarity, empathy, and confidence.',
     full: 'Designed for supervisors and managers who want to lead effectively and build high-performing teams.',
     duration: '2 to 6 weeks', level: 'Intermediate', trainer: 'Dr. Otieno M.',
     features: ['Leadership styles and self-awareness','Setting goals and giving feedback','Managing difficult conversations','Motivation and engagement','Conflict resolution'] },
 
   { code: 'SC025', title: 'Business Communication & Professional Writing', category: 'Short', priority: true,
-    image: 'images/courses/communication.jpg',
+    image: 'images/courses/communication.jpg', fee: 8500,
     short: 'Communicate with clarity and professionalism in every channel.',
-    full: 'Sharpen your business writing and verbal communication — emails, reports, meetings, and presentations.',
+    full: 'Sharpen your business writing and verbal communication — emails, reports, meetings, presentations.',
     duration: '2 to 6 weeks', level: 'Beginner', trainer: 'Ms. Amina T.',
     features: ['Professional email writing','Reports and memos','Presentations that land','Meeting and negotiation skills','Cross-cultural communication'] },
 
   // ═══════════════════════════════════════════════════════
-  // EXISTING TECHNICAL / CERTIFICATE COURSES
+  // EXISTING CERTIFICATE COURSES
   // ═══════════════════════════════════════════════════════
   { code: 'BIZ101', title: 'Business Management Fundamentals', category: 'Business', priority: true,
-    image: 'images/courses/business.jpg',
-    short: 'Master the essentials of running and growing a business — from planning to people.',
-    full: 'A comprehensive introduction to business management for entrepreneurs, supervisors, and aspiring managers.',
+    image: 'images/courses/business.jpg', fee: 18000,
+    short: 'Master the essentials of running and growing a business.',
+    full: 'A comprehensive introduction to business management for entrepreneurs and aspiring managers.',
     duration: '8 weeks', level: 'Beginner', trainer: 'Mr. Herald K.',
     features: ['Business structures and legal forms','Strategic planning and goal setting','Operations and supply chain basics','Financial literacy','Team leadership'] },
 
   { code: 'MKT201', title: 'Digital Marketing & Sales (Certificate)', category: 'Business',
-    image: 'images/courses/marketing.jpg',
+    image: 'images/courses/marketing.jpg', fee: 16000,
     short: 'Deep-dive digital marketing program with certificate.',
-    full: 'An extended version of our short course, with a certificate on completion and hands-on campaign work.',
+    full: 'Extended version of our short course, with a certificate on completion.',
     duration: '6 weeks', level: 'Beginner', trainer: 'Ms. Amina T.',
     features: ['Full digital marketing toolkit','Paid ads (Google, Meta)','Analytics and attribution','Real campaign project','Certificate issued'] },
 
   { code: 'FIN301', title: 'Finance for Decision Makers', category: 'Business',
-    image: 'images/courses/finance.jpg',
+    image: 'images/courses/finance.jpg', fee: 22000,
     short: 'Read the numbers, understand cash flow, and make confident financial calls.',
-    full: 'A practical finance course for managers and business owners. Real-world financial decision-making you can apply immediately.',
+    full: 'Practical finance course for managers and business owners.',
     duration: '8 weeks', level: 'Intermediate', trainer: 'Mr. Brian W.',
     features: ['Understanding P&L and balance sheet','Budgets and forecasting','Cost control and pricing','Investment appraisal','Financial risk'] },
 
   { code: 'ENT401', title: 'Entrepreneurship & Startup Building', category: 'Business',
-    image: 'images/courses/entrepreneur.jpg',
+    image: 'images/courses/entrepreneur.jpg', fee: 24000,
     short: 'From idea to first customer — build a real, sustainable business.',
-    full: 'Hands-on program for aspiring founders. Work on your actual business idea throughout.',
+    full: 'Hands-on program for aspiring founders. Work on your actual business idea.',
     duration: '10 weeks', level: 'Beginner', trainer: 'Mr. Herald K.',
     features: ['Validating your idea','Business Model Canvas','MVP development','Unit economics','Pitching'] },
 
   { code: 'LDR501', title: 'Leadership & Strategy (Certificate)', category: 'Business',
-    image: 'images/courses/leadership.jpg',
+    image: 'images/courses/leadership.jpg', fee: 20000,
     short: 'Lead with clarity, empathy, and strategic thinking.',
     full: 'Advanced leadership program for supervisors, managers, and executives.',
     duration: '6 weeks', level: 'Advanced', trainer: 'Dr. Otieno M.',
     features: ['Leadership styles and EQ','Strategic thinking frameworks','Performance management','Change management','High-trust teams'] },
 
   { code: 'ELE101', title: 'Electrical Engineering Basics', category: 'Technical', priority: true,
-    image: 'images/courses/electrical.jpg',
+    image: 'images/courses/electrical.jpg', fee: 38000,
     short: 'Start a career in electrical work — theory plus hands-on practice.',
-    full: 'Entry-level program for aspiring electricians. Covers theory, safety, wiring, and installation.',
+    full: 'Entry-level program for aspiring electricians.',
     duration: '12 weeks', level: 'Beginner', trainer: 'Mr. Brian W.',
     features: ['Electrical safety and code','Circuits, voltage, current','Residential wiring','Motor controls','Reading diagrams'] },
 
   { code: 'WEB101', title: 'Web Development Fundamentals', category: 'Technical',
-    image: 'images/courses/web.jpg',
+    image: 'images/courses/web.jpg', fee: 28000,
     short: 'Build responsive websites from scratch.',
     full: 'Beginner-friendly journey into web development — HTML, CSS, JavaScript.',
     duration: '10 weeks', level: 'Beginner', trainer: 'Mr. Herald K.',
     features: ['HTML and semantic markup','CSS layout and grid','JavaScript and DOM','Responsive design','Deploying'] },
 
   { code: 'DB201', title: 'Database Design & SQL', category: 'Technical',
-    image: 'images/courses/db.jpg',
+    image: 'images/courses/db.jpg', fee: 25000,
     short: 'Design and query databases like a pro.',
     full: 'Learn how data is structured, stored, and queried — using real-world tools.',
     duration: '8 weeks', level: 'Intermediate', trainer: 'Ms. Amina T.',
     features: ['Relational concepts','ER diagrams','SQL queries','Indexes and keys','Intro to NoSQL'] },
 
   { code: 'JS301', title: 'Advanced JavaScript', category: 'Technical',
-    image: 'images/courses/js.jpg',
+    image: 'images/courses/js.jpg', fee: 30000,
     short: 'Level up your JS skills — async, APIs, and modern patterns.',
     full: 'For developers ready to build serious applications.',
     duration: '8 weeks', level: 'Advanced', trainer: 'Mr. Herald K.',
     features: ['ES6+ and modules','Async/await','APIs and fetch','Design patterns','Intro to React'] },
 
   { code: 'PY101', title: 'Python Programming', category: 'Technical',
-    image: 'images/courses/python.jpg',
+    image: 'images/courses/python.jpg', fee: 28000,
     short: 'The world\'s most versatile language — from scripts to AI.',
     full: 'Learn Python from zero — automation, data, AI, or web apps.',
     duration: '10 weeks', level: 'Beginner', trainer: 'Dr. Otieno M.',
     features: ['Python syntax','OOP','Files and APIs','Intro to pandas','Automating tasks'] },
 
   { code: 'NET210', title: 'Networking Essentials', category: 'Technical',
-    image: 'images/courses/networking.jpg',
+    image: 'images/courses/networking.jpg', fee: 26000,
     short: 'Understand how networks really work.',
     full: 'Practical networking — IP addresses, routers, switches, security.',
     duration: '8 weeks', level: 'Beginner', trainer: 'Mr. Brian W.',
@@ -1422,6 +1316,7 @@ const sorted = [...list].sort((a, b) => (b.priority ? 1 : 0) - (a.priority ? 1 :
         <div class="course-img-wrap">
           <img src="${c.image}" alt="${c.title}" onerror="this.style.display='none'" />
           ${c.priority ? '<span class="course-badge priority">Priority</span>' : ''}
+          <span class="course-badge" style="background:var(--gold); right:12px; left:auto;">KES ${c.fee.toLocaleString()}</span>
           ${!c.priority && c.category === 'Technical' ? '<span class="course-badge">Technical</span>' : ''}
         </div>
         <div class="course-body">
@@ -1429,9 +1324,9 @@ const sorted = [...list].sort((a, b) => (b.priority ? 1 : 0) - (a.priority ? 1 :
           <h3>${c.title}</h3>
           <p>${c.short}</p>
           <div class="meta">
-            <span><strong>${c.duration}</strong> · ${c.level}</span>
-            <span class="course-learn-more">View</span>
-          </div>
+          <span><strong style="color:#b8860b; font-size:15px;">KES ${c.fee.toLocaleString()}</strong></span>
+          <span class="course-learn-more">View</span>
+         </div>
         </div>
       </div>
     `;
@@ -1481,11 +1376,13 @@ function openCourseModal(course) {
         ${course.features.map(f => `<li>${f}</li>`).join('')}
       </ul>
 
-      <div class="meta" style="display:flex; gap:32px; padding:16px 0; border-top:1px solid #e5e8ed; border-bottom:1px solid #e5e8ed; margin-bottom:24px;">
-        <div><div style="font-size:11px; color:#94a3b8; text-transform:uppercase; font-weight:700; letter-spacing:0.06em; margin-bottom:4px;">Duration</div><div style="font-weight:700; color:#0b1a33;">${course.duration}</div></div>
-        <div><div style="font-size:11px; color:#94a3b8; text-transform:uppercase; font-weight:700; letter-spacing:0.06em; margin-bottom:4px;">Level</div><div style="font-weight:700; color:#0b1a33;">${course.level}</div></div>
-        <div><div style="font-size:11px; color:#94a3b8; text-transform:uppercase; font-weight:700; letter-spacing:0.06em; margin-bottom:4px;">Trainer</div><div style="font-weight:700; color:#0b1a33;">${course.trainer}</div></div>
-      </div>
+      
+      <div class="meta" style="display:grid; grid-template-columns:repeat(4, 1fr); gap:20px; padding:16px 0; border-top:1px solid #e5e8ed; border-bottom:1px solid #e5e8ed; margin-bottom:24px;">
+  <div><div style="font-size:11px; color:#94a3b8; text-transform:uppercase; font-weight:700; letter-spacing:0.06em; margin-bottom:4px;">Duration</div><div style="font-weight:700; color:#0b1a33;">${course.duration}</div></div>
+  <div><div style="font-size:11px; color:#94a3b8; text-transform:uppercase; font-weight:700; letter-spacing:0.06em; margin-bottom:4px;">Level</div><div style="font-weight:700; color:#0b1a33;">${course.level}</div></div>
+  <div><div style="font-size:11px; color:#94a3b8; text-transform:uppercase; font-weight:700; letter-spacing:0.06em; margin-bottom:4px;">Trainer</div><div style="font-weight:700; color:#0b1a33;">${course.trainer}</div></div>
+  <div><div style="font-size:11px; color:#b8860b; text-transform:uppercase; font-weight:700; letter-spacing:0.06em; margin-bottom:4px;">Course Fee</div><div style="font-weight:800; color:#b8860b; font-size:17px;">KES ${course.fee.toLocaleString()}</div></div>
+</div>
 
       <div class="modal-footer">
         <a href="register.html?course=${encodeURIComponent(course.title)}" class="btn-gold">Enroll Now</a>
