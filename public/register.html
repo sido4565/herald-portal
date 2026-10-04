@@ -1,0 +1,552 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Register — Herald Trainer and Consultant</title>
+  <link rel="icon" type="image/svg+xml" href="favicon.svg" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="style.css" />
+  <script>
+    (function () {
+      try {
+        if (localStorage.getItem('theme') === 'dark') {
+          document.documentElement.classList.add('dark-preload');
+        }
+      } catch (e) {}
+    })();
+  </script>
+  <style>
+    .dark-preload body { background: #0b1220; }
+
+    body {
+      margin: 0;
+      font-family: 'Inter', -apple-system, sans-serif;
+      background-image:
+        linear-gradient(135deg, rgba(11,26,51,0.92) 0%, rgba(11,26,51,0.80) 100%),
+        url('images/hero-landing.jpg');
+      background-size: cover;
+      background-position: center;
+      background-attachment: fixed;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 40px 20px;
+      color: #ffffff;
+    }
+
+    .register-wrap {
+      width: 100%;
+      max-width: 560px;
+      background: #ffffff;
+      color: #1a1f2e;
+      border-radius: 20px;
+      box-shadow: 0 40px 80px rgba(0,0,0,0.4);
+      overflow: hidden;
+    }
+
+    .register-head {
+      background: #0b1a33;
+      color: white;
+      padding: 32px 40px 28px;
+      text-align: center;
+      border-bottom: 4px solid #b8860b;
+    }
+    .register-head img { max-width: 90px; margin: 0 auto 14px; display: block; }
+    .register-head h1 {
+      font-size: 24px;
+      font-weight: 800;
+      margin: 0 0 6px;
+      letter-spacing: -0.02em;
+    }
+    .register-head p {
+      font-size: 13px;
+      color: rgba(255,255,255,0.75);
+      margin: 0;
+      letter-spacing: 0.02em;
+    }
+
+    .register-body { padding: 32px 40px 36px; }
+
+    .form-group { margin-bottom: 18px; }
+    .form-group label {
+      display: block;
+      font-size: 12px;
+      font-weight: 700;
+      color: #4a5260;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin-bottom: 8px;
+    }
+    .form-group input,
+    .form-group select {
+      width: 100%;
+      padding: 12px 14px;
+      border: 1px solid #d8dce2;
+      border-radius: 8px;
+      font-size: 14.5px;
+      font-family: inherit;
+      background: #ffffff;
+      color: #1a1f2e;
+      outline: none;
+      transition: border-color 0.15s, box-shadow 0.15s;
+      box-sizing: border-box;
+    }
+    .form-group input:focus,
+    .form-group select:focus {
+      border-color: #3b82f6;
+      box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15);
+    }
+
+    /* Course picker */
+    .course-picker { position: relative; }
+    .course-picker-dropdown {
+      position: absolute;
+      top: calc(100% + 6px);
+      left: 0; right: 0;
+      max-height: 260px;
+      overflow-y: auto;
+      background: white;
+      border: 1px solid #d8dce2;
+      border-radius: 8px;
+      box-shadow: 0 12px 32px rgba(11,26,51,0.15);
+      z-index: 10;
+      padding: 6px;
+    }
+    .course-picker-dropdown.hidden { display: none; }
+    .course-picker-group {
+      padding: 6px 10px 4px;
+      font-size: 10px;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: #94a3b8;
+      border-bottom: 1px solid #f0f0f0;
+      margin-bottom: 4px;
+    }
+    .course-picker-group:not(:first-child) { margin-top: 8px; }
+    .course-picker-option {
+      padding: 9px 12px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 13px;
+      color: #1a1f2e;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 8px;
+    }
+    .course-picker-option:hover,
+    .course-picker-option.highlighted {
+      background: #eff6ff;
+    }
+    .course-picker-option.selected {
+      background: #0b1a33;
+      color: white;
+    }
+    .course-picker-code {
+      font-family: 'Courier New', monospace;
+      font-size: 10px;
+      color: #b8860b;
+      font-weight: 700;
+    }
+    .course-picker-empty {
+      padding: 16px 12px;
+      text-align: center;
+      font-size: 12px;
+      color: #94a3b8;
+      font-style: italic;
+    }
+
+    .btn-submit {
+      width: 100%;
+      padding: 14px;
+      background: #b8860b;
+      color: white;
+      border: none;
+      border-radius: 10px;
+      font-size: 15px;
+      font-weight: 700;
+      cursor: pointer;
+      font-family: inherit;
+      letter-spacing: 0.02em;
+      transition: all 0.15s;
+      margin-top: 8px;
+    }
+    .btn-submit:hover { background: #d4a017; transform: translateY(-1px); }
+    .btn-submit:disabled { background: #cbd5e1; cursor: not-allowed; transform: none; }
+
+    .hint {
+      text-align: center;
+      font-size: 12px;
+      color: #6b7280;
+      margin-top: 18px;
+      line-height: 1.5;
+    }
+    .hint a { color: #b8860b; font-weight: 600; text-decoration: none; }
+    .hint a:hover { text-decoration: underline; }
+
+    .msg {
+      text-align: center;
+      margin-top: 16px;
+      font-size: 13px;
+      font-weight: 500;
+      padding: 10px;
+      border-radius: 8px;
+      min-height: 20px;
+    }
+    .msg.error { color: #b91c1c; background: #fee2e2; }
+    .msg.success { color: #15803d; background: #dcfce7; }
+    .msg:empty { display: none; }
+
+    /* Success panel */
+    .success-panel {
+      text-align: center;
+      padding: 32px 20px;
+    }
+    .success-panel h3 {
+      font-size: 22px;
+      font-weight: 800;
+      color: #0b1a33;
+      margin: 0 0 8px;
+    }
+    .success-panel .welcome-msg {
+      color: #4a5260;
+      font-size: 14px;
+      margin-bottom: 20px;
+    }
+    .reg-no-box {
+      background: linear-gradient(135deg, #fef9e7 0%, #fdf3d0 100%);
+      border: 2px dashed #b8860b;
+      border-radius: 12px;
+      padding: 20px;
+      margin: 24px 0;
+    }
+    .reg-no-label {
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      font-weight: 700;
+      color: #92400e;
+      margin-bottom: 8px;
+    }
+    .reg-no {
+      font-family: 'Courier New', monospace;
+      font-size: 26px;
+      font-weight: 800;
+      color: #0b1a33;
+      letter-spacing: 0.05em;
+    }
+    .success-note {
+      font-size: 13px;
+      color: #6b7280;
+      line-height: 1.6;
+      margin-bottom: 24px;
+    }
+    .success-note strong { color: #0b1a33; }
+
+    @media (max-width: 600px) {
+      .register-head { padding: 24px 24px 20px; }
+      .register-head h1 { font-size: 20px; }
+      .register-body { padding: 24px 24px 28px; }
+      .reg-no { font-size: 20px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="register-wrap" id="registerWrap">
+
+    <!-- Registration Form -->
+    <div id="formView">
+      <div class="register-head">
+        <img src="images/herald-logo.png" alt="Herald" />
+        <h1>Create Your Account</h1>
+        <p>Herald Trainer and Consultant — Student Portal</p>
+      </div>
+      <div class="register-body">
+        <form id="registerPageForm" autocomplete="off">
+          <div class="form-group">
+            <label for="name">Full Name</label>
+            <input id="name" name="name" required />
+          </div>
+
+          <div class="form-group">
+            <label for="email">Email Address</label>
+            <input id="email" name="email" type="email" required />
+          </div>
+
+          <div class="form-group">
+            <label for="password">Password</label>
+            <input id="password" name="password" type="password" minlength="6" required />
+          </div>
+
+          <div class="form-group">
+            <label for="course">Program of Study</label>
+            <div class="course-picker">
+              <input
+                type="text"
+                id="course"
+                name="course"
+                placeholder="Type to search courses..."
+                autocomplete="off"
+                required
+              />
+              <div class="course-picker-dropdown hidden" id="courseDropdown"></div>
+            </div>
+          </div>
+
+          <button type="submit" class="btn-submit" id="submitBtn">Create My Account</button>
+
+          <p class="msg" id="formMsg"></p>
+
+          <p class="hint">
+            Already have an account? <a href="login.html">Sign in here</a>
+          </p>
+        </form>
+      </div>
+    </div>
+
+    <!-- Success View -->
+    <div id="successView" style="display:none;">
+      <div class="register-head">
+        <img src="images/herald-logo.png" alt="Herald" />
+        <h1>Welcome to Herald! 🎉</h1>
+        <p>Your registration is complete</p>
+      </div>
+      <div class="register-body">
+        <div class="success-panel">
+          <h3>Registration Successful</h3>
+          <p class="welcome-msg" id="welcomeName"></p>
+
+          <div class="reg-no-box">
+            <div class="reg-no-label">Your Registration Number</div>
+            <div class="reg-no" id="regNoDisplay">HRL-XXXX-XXXX</div>
+          </div>
+
+          <p class="success-note">
+            We've emailed this to you.<br>
+            <strong>Save this number — you'll need it every time you log in.</strong>
+          </p>
+
+          <a href="login.html" class="btn-submit" style="display:block; text-decoration:none; text-align:center;">
+            Continue to Login →
+          </a>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <script>
+    const $ = (s) => document.querySelector(s);
+
+    // ─── Course Picker ───
+    (function initCoursePicker() {
+      const input = $('#course');
+      const dropdown = $('#courseDropdown');
+      if (!input || !dropdown) return;
+
+      let courses = [];
+      let filtered = [];
+      let highlightedIndex = -1;
+
+      fetch('/api/public/courses')
+        .then(r => r.json())
+        .then(data => {
+          courses = Array.isArray(data) ? data.map(c =>
+            typeof c === 'string' ? { code: '', title: c, category: 'Courses' } : c
+          ) : [];
+        })
+        .catch(err => {
+          console.error('Course load failed:', err);
+          courses = [];
+        });
+
+      function escapeHtml(s) {
+        return String(s ?? '').replace(/[&<>"']/g, c => ({
+          '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+        }[c]));
+      }
+
+      function renderOptions() {
+        if (!filtered.length) {
+          dropdown.innerHTML = '<div class="course-picker-empty">No courses match your search</div>';
+          return;
+        }
+        const grouped = {};
+        filtered.forEach(c => {
+          const cat = c.category || 'Courses';
+          if (!grouped[cat]) grouped[cat] = [];
+          grouped[cat].push(c);
+        });
+
+        let html = '';
+        let idx = 0;
+        Object.entries(grouped).forEach(([category, items]) => {
+          html += `<div class="course-picker-group">${escapeHtml(category)}</div>`;
+          items.forEach(c => {
+            const isSelected = input.value === c.title;
+            html += `
+              <div class="course-picker-option${idx === highlightedIndex ? ' highlighted' : ''}${isSelected ? ' selected' : ''}"
+                   data-index="${idx}"
+                   data-value="${escapeHtml(c.title)}">
+                <span>${escapeHtml(c.title)}</span>
+                ${c.code ? `<span class="course-picker-code">${escapeHtml(c.code)}</span>` : ''}
+              </div>`;
+            idx++;
+          });
+        });
+        dropdown.innerHTML = html;
+      }
+
+      function filterCourses(query) {
+        const q = (query || '').trim().toLowerCase();
+        if (!q) {
+          filtered = courses.slice(0, 50);
+        } else {
+          filtered = courses
+            .map(c => {
+              const title = c.title.toLowerCase();
+              const code = (c.code || '').toLowerCase();
+              let score = 0;
+              if (title.startsWith(q) || code.startsWith(q)) score = 100;
+              else if (title.includes(q) || code.includes(q)) score = 50;
+              return { course: c, score };
+            })
+            .filter(x => x.score > 0)
+            .sort((a, b) => b.score - a.score)
+            .slice(0, 30)
+            .map(x => x.course);
+        }
+        highlightedIndex = -1;
+        renderOptions();
+      }
+
+      input.addEventListener('focus', () => {
+        filterCourses(input.value);
+        dropdown.classList.remove('hidden');
+      });
+      input.addEventListener('input', () => {
+        filterCourses(input.value);
+        dropdown.classList.remove('hidden');
+      });
+
+      input.addEventListener('keydown', (e) => {
+        const options = dropdown.querySelectorAll('.course-picker-option');
+        if (e.key === 'ArrowDown') {
+          e.preventDefault();
+          if (!options.length) return;
+          highlightedIndex = Math.min(highlightedIndex + 1, options.length - 1);
+          renderOptions();
+          dropdown.querySelector('.highlighted')?.scrollIntoView({ block: 'nearest' });
+        } else if (e.key === 'ArrowUp') {
+          e.preventDefault();
+          if (!options.length) return;
+          highlightedIndex = Math.max(highlightedIndex - 1, 0);
+          renderOptions();
+          dropdown.querySelector('.highlighted')?.scrollIntoView({ block: 'nearest' });
+        } else if (e.key === 'Enter') {
+          if (highlightedIndex >= 0 && options[highlightedIndex]) {
+            e.preventDefault();
+            input.value = options[highlightedIndex].dataset.value;
+            dropdown.classList.add('hidden');
+          }
+        } else if (e.key === 'Escape') {
+          dropdown.classList.add('hidden');
+        }
+      });
+
+      dropdown.addEventListener('mousedown', e => e.preventDefault());
+      dropdown.addEventListener('click', e => {
+        const opt = e.target.closest('.course-picker-option');
+        if (!opt) return;
+        input.value = opt.dataset.value;
+        dropdown.classList.add('hidden');
+      });
+
+      document.addEventListener('click', e => {
+        if (!input.contains(e.target) && !dropdown.contains(e.target)) {
+          dropdown.classList.add('hidden');
+        }
+      });
+    })();
+
+    // ─── Form Submit ───
+    $('#registerPageForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const form = e.target;
+      const msg = $('#formMsg');
+      const btn = $('#submitBtn');
+
+      msg.className = 'msg';
+      msg.textContent = '';
+      btn.disabled = true;
+      btn.textContent = 'Creating account...';
+
+      const data = {
+        name: form.name.value.trim(),
+        email: form.email.value.trim().toLowerCase(),
+        password: form.password.value,
+        course: form.course.value.trim(),
+      };
+
+      // Basic client-side validation
+      if (!data.name || !data.email || !data.password || !data.course) {
+        msg.className = 'msg error';
+        msg.textContent = 'Please fill in all fields.';
+        btn.disabled = false;
+        btn.textContent = 'Create My Account';
+        return;
+      }
+      if (data.password.length < 6) {
+        msg.className = 'msg error';
+        msg.textContent = 'Password must be at least 6 characters.';
+        btn.disabled = false;
+        btn.textContent = 'Create My Account';
+        return;
+      }
+
+      try {
+        const res = await fetch('/api/register', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(data),
+        });
+        const json = await res.json();
+
+        if (res.ok) {
+          // Show success view
+          $('#regNoDisplay').textContent = json.reg_no || 'HRL-XXXX-XXXX';
+          $('#welcomeName').textContent = `Welcome, ${json.name || data.name}!`;
+          $('#formView').style.display = 'none';
+          $('#successView').style.display = 'block';
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+        } else {
+          msg.className = 'msg error';
+          msg.textContent = json.error || 'Registration failed. Please try again.';
+          btn.disabled = false;
+          btn.textContent = 'Create My Account';
+        }
+      } catch (err) {
+        msg.className = 'msg error';
+        msg.textContent = 'Network error. Please check your connection and try again.';
+        btn.disabled = false;
+        btn.textContent = 'Create My Account';
+      }
+    });
+
+    // ─── Prefill course from ?course=... query string ───
+    (function prefillCourse() {
+      const params = new URLSearchParams(window.location.search);
+      const preset = params.get('course');
+      if (preset) {
+        const input = $('#course');
+        if (input) input.value = preset;
+      }
+    })();
+  </script>
+</body>
+</html>
