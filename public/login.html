@@ -109,26 +109,34 @@
     </form>
 
     <form id="registerForm" class="auth-form hidden">
-      <label for="reg-name">Full Name</label>
-      <input id="reg-name" name="name" required />
+  <label for="reg-name">Full Name</label>
+  <input id="reg-name" name="name" required />
 
-      <label for="reg-email">Email Address</label>
-      <input id="reg-email" name="email" type="email" required />
+  <label for="reg-email">Email Address</label>
+  <input id="reg-email" name="email" type="email" required />
 
-      <label for="reg-password">Password (min 6 characters)</label>
-      <input id="reg-password" name="password" type="password" minlength="6" required />
+  <label for="reg-password">Password (min 6 characters)</label>
+  <input id="reg-password" name="password" type="password" minlength="6" required />
 
-      <label for="reg-course">Program of Study</label>
-      <select id="reg-course" name="course" required>
-        <option value="">— Select a course —</option>
-      </select>
+  <label for="reg-course">Program of Study</label>
+  <div class="course-picker" id="coursePicker">
+    <input
+      type="text"
+      id="reg-course"
+      name="course"
+      placeholder="Type to search courses..."
+      autocomplete="off"
+      required
+    />
+    <div class="course-picker-dropdown hidden" id="courseDropdown"></div>
+  </div>
 
-      <p class="hint" style="text-align:left; margin:4px 0 0;">
-        Your registration number will be generated automatically and sent to your email.
-      </p>
+  <p class="hint" style="text-align:left; margin:4px 0 0;">
+    Start typing to search. Your registration number will be generated automatically and sent to your email.
+  </p>
 
-      <button type="submit" class="btn-primary">Create Account</button>
-    </form>
+  <button type="submit" class="btn-primary">Create Account</button>
+</form>
 
     <div id="regSuccess" class="hidden" style="margin-top:20px; padding:20px; background:var(--bg-alt); border-radius:8px; border-left:4px solid var(--success);">
       <img src="images/success.jpg" alt="Success" style="display: block; max-width: 140px; margin: 0 auto 16px; border-radius: 8px;" />

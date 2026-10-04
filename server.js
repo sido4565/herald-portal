@@ -152,9 +152,62 @@ app.get('/api/me', authStudent, (req, res) => {
   res.json(db.prepare('SELECT id, reg_no, name, email, course FROM students WHERE id = ?').get(req.user.id));
 });
 
+// Public: full course list for the registration picker
 app.get('/api/public/courses', (req, res) => {
-  const rows = db.prepare('SELECT DISTINCT title FROM courses ORDER BY title').all();
-  res.json(rows.map(r => r.title));
+  // Combine DB courses + the master course catalog
+  const dbCourses = db.prepare('SELECT DISTINCT title, code FROM courses ORDER BY title').all();
+
+  // Full catalog (mirrors the welcome.html COURSES array)
+  const catalog = [
+    // Short Courses
+    { code: 'SC001', title: 'Digital Marketing & Social Media Marketing', category: 'Short Courses' },
+    { code: 'SC002', title: 'AI for Business & Productivity', category: 'Short Courses' },
+    { code: 'SC003', title: 'E-Commerce & Online Business', category: 'Short Courses' },
+    { code: 'SC004', title: 'Business Management & Entrepreneurship', category: 'Short Courses' },
+    { code: 'SC005', title: 'Advanced Excel for Business', category: 'Short Courses' },
+    { code: 'SC006', title: 'Data Analytics for Business', category: 'Short Courses' },
+    { code: 'SC007', title: 'Graphic Design for Business', category: 'Short Courses' },
+    { code: 'SC008', title: 'Canva Design & Content Creation', category: 'Short Courses' },
+    { code: 'SC009', title: 'Website Design for Small Businesses', category: 'Short Courses' },
+    { code: 'SC010', title: 'Content Creation & Video Editing', category: 'Short Courses' },
+    { code: 'SC011', title: 'Bookkeeping & QuickBooks', category: 'Short Courses' },
+    { code: 'SC012', title: 'Accounting for Small Businesses', category: 'Short Courses' },
+    { code: 'SC013', title: 'Sales & Customer Relationship Management', category: 'Short Courses' },
+    { code: 'SC014', title: 'Professional Selling & Sales Management', category: 'Short Courses' },
+    { code: 'SC015', title: 'Procurement & Supply Chain Basics', category: 'Short Courses' },
+    { code: 'SC016', title: 'Project Management', category: 'Short Courses' },
+    { code: 'SC017', title: 'Business Proposal Writing', category: 'Short Courses' },
+    { code: 'SC018', title: 'Business Plan Development', category: 'Short Courses' },
+    { code: 'SC019', title: 'Grant & Tender Proposal Writing', category: 'Short Courses' },
+    { code: 'SC020', title: 'Personal Branding & LinkedIn Marketing', category: 'Short Courses' },
+    { code: 'SC021', title: 'Cybersecurity Awareness for Businesses', category: 'Short Courses' },
+    { code: 'SC022', title: 'Freelancing & Online Work Skills', category: 'Short Courses' },
+    { code: 'SC023', title: 'Digital Office & Computer Applications', category: 'Short Courses' },
+    { code: 'SC024', title: 'Leadership & Team Management', category: 'Short Courses' },
+    { code: 'SC025', title: 'Business Communication & Professional Writing', category: 'Short Courses' },
+    // Certificate courses
+    { code: 'BIZ101', title: 'Business Management Fundamentals', category: 'Certificate Courses' },
+    { code: 'MKT201', title: 'Digital Marketing & Sales (Certificate)', category: 'Certificate Courses' },
+    { code: 'FIN301', title: 'Finance for Decision Makers', category: 'Certificate Courses' },
+    { code: 'ENT401', title: 'Entrepreneurship & Startup Building', category: 'Certificate Courses' },
+    { code: 'LDR501', title: 'Leadership & Strategy (Certificate)', category: 'Certificate Courses' },
+    // Technical
+    { code: 'ELE101', title: 'Electrical Engineering Basics', category: 'Technical Courses' },
+    { code: 'WEB101', title: 'Web Development Fundamentals', category: 'Technical Courses' },
+    { code: 'DB201', title: 'Database Design & SQL', category: 'Technical Courses' },
+    { code: 'JS301', title: 'Advanced JavaScript', category: 'Technical Courses' },
+    { code: 'PY101', title: 'Python Programming', category: 'Technical Courses' },
+    { code: 'NET210', title: 'Networking Essentials', category: 'Technical Courses' }
+  ];
+
+  // Merge DB courses that aren't in the catalog
+  const catalogTitles = new Set(catalog.map(c => c.title));
+  const extraDb = dbCourses
+    .filter(d => !catalogTitles.has(d.title))
+    .map(d => ({ code: d.code || '', title: d.title, category: 'Other' }));
+
+  const all = [...catalog, ...extraDb];
+  res.json(all);
 });
 
 app.get('/api/courses', authStudent, (req, res) => {

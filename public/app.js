@@ -78,21 +78,173 @@ if (document.getElementById('loginForm')) {
     }
   });
 
-    // Load courses into register dropdown
-  (async () => {
-    try {
-      const courseSelect = document.getElementById('reg-course');
-      if (!courseSelect) return;
-      const res = await fetch('/api/public/courses');
-      const courses = await res.json();
-      courses.forEach(c => {
-        const opt = document.createElement('option');
-        opt.value = c;
-        opt.textContent = c;
-        courseSelect.appendChild(opt);
+     // ─────────────────────────────────────────────
+  // Searchable Course Picker
+  // ─────────────────────────────────────────────
+  (function initCoursePicker() {
+    const input = document.getElementById('reg-course');
+    const dropdown = document.getElementById('courseDropdown');
+    const picker = document.getElementById('coursePicker');
+    if (!input || !dropdown || !picker) return;
+
+    let courses = [];
+    let filtered = [];
+    let highlightedIndex = -1;
+
+    // Fetch courses
+    fetch('/api/public/courses')
+      .then(r => r.json())
+      .then(data => {
+        courses = Array.isArray(data) ? data : [];
+        // Normalize: allow strings or objects
+        courses = courses.map(c =>
+          typeof c === 'string'
+            ? { code: '', title: c, category: 'Courses' }
+            : c
+        );
+      })
+      .catch(err => {
+        console.error('Course load failed:', err);
+        courses = [];
       });
-    } catch (e) {
-      console.error('Course load error:', e);
+
+    function escapeHtml(s) {
+      return String(s ?? '').replace(/[&<>"']/g, c => ({
+        '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+      }[c]));
+    }
+
+    function renderOptions() {
+      if (!filtered.length) {
+        dropdown.innerHTML = '<div class="course-picker-empty">No courses match your search</div>';
+        return;
+      }
+
+      // Group by category
+      const grouped = {};
+      filtered.forEach(c => {
+        const cat = c.category || 'Courses';
+        if (!grouped[cat]) grouped[cat] = [];
+        grouped[cat].push(c);
+      });
+
+      let html = '';
+      let idx = 0;
+      Object.entries(grouped).forEach(([category, items]) => {
+        html += `<div class="course-picker-group">${escapeHtml(category)}</div>`;
+        items.forEach(c => {
+          const isSelected = input.value === c.title;
+          html += `
+            <div class="course-picker-option${idx === highlightedIndex ? ' highlighted' : ''}${isSelected ? ' selected' : ''}"
+                 data-index="${idx}"
+                 data-value="${escapeHtml(c.title)}">
+              <span>${escapeHtml(c.title)}</span>
+              ${c.code ? `<span class="course-picker-code">${escapeHtml(c.code)}</span>` : ''}
+            </div>`;
+          idx++;
+        });
+      });
+      dropdown.innerHTML = html;
+    }
+
+    function openDropdown() {
+      dropdown.classList.remove('hidden');
+    }
+
+    function closeDropdown() {
+      dropdown.classList.add('hidden');
+      highlightedIndex = -1;
+    }
+
+    function filterCourses(query) {
+      const q = (query || '').trim().toLowerCase();
+      if (!q) {
+        filtered = courses.slice(0, 50); // Show first 50 when empty
+      } else {
+        // Score-based: starts-with > contains
+        filtered = courses
+          .map(c => {
+            const title = c.title.toLowerCase();
+            const code = (c.code || '').toLowerCase();
+            let score = 0;
+            if (title.startsWith(q) || code.startsWith(q)) score = 100;
+            else if (title.includes(q) || code.includes(q)) score = 50;
+            return { course: c, score };
+          })
+          .filter(x => x.score > 0)
+          .sort((a, b) => b.score - a.score)
+          .slice(0, 30)
+          .map(x => x.course);
+      }
+      highlightedIndex = -1;
+      renderOptions();
+    }
+
+    input.addEventListener('focus', () => {
+      filterCourses(input.value);
+      openDropdown();
+    });
+
+    input.addEventListener('input', () => {
+      filterCourses(input.value);
+      openDropdown();
+    });
+
+    input.addEventListener('keydown', (e) => {
+      const options = dropdown.querySelectorAll('.course-picker-option');
+
+      if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        if (!options.length) return;
+        highlightedIndex = Math.min(highlightedIndex + 1, options.length - 1);
+        renderOptions();
+        dropdown.querySelector('.highlighted')?.scrollIntoView({ block: 'nearest' });
+      } else if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        if (!options.length) return;
+        highlightedIndex = Math.max(highlightedIndex - 1, 0);
+        renderOptions();
+        dropdown.querySelector('.highlighted')?.scrollIntoView({ block: 'nearest' });
+      } else if (e.key === 'Enter') {
+        if (highlightedIndex >= 0 && options[highlightedIndex]) {
+          e.preventDefault();
+          selectOption(options[highlightedIndex].dataset.value);
+        }
+      } else if (e.key === 'Escape') {
+        closeDropdown();
+        input.blur();
+      } else if (e.key === 'Tab') {
+        closeDropdown();
+      }
+    });
+
+    dropdown.addEventListener('mousedown', (e) => {
+      // Prevent input blur before click
+      e.preventDefault();
+    });
+
+    dropdown.addEventListener('click', (e) => {
+      const opt = e.target.closest('.course-picker-option');
+      if (!opt) return;
+      selectOption(opt.dataset.value);
+    });
+
+    function selectOption(value) {
+      input.value = value;
+      input.dispatchEvent(new Event('change'));
+      closeDropdown();
+      input.blur();
+    }
+
+    // Close on outside click
+    document.addEventListener('click', (e) => {
+      if (!picker.contains(e.target)) closeDropdown();
+    });
+
+    // Close on form submit
+    const form = document.getElementById('registerForm');
+    if (form) {
+      form.addEventListener('submit', closeDropdown);
     }
   })();
 
