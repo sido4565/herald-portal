@@ -81,9 +81,143 @@
       transition: background 0.15s;
     }
     .nav-cta:hover { background: var(--gold-light); }
-    @media (max-width: 768px) {
-      .nav-links { display: none; }
-    }
+
+/* ─── Mobile Hamburger ─── */
+.nav-burger {
+  display: none;
+  background: transparent;
+  border: none;
+  padding: 8px;
+  cursor: pointer;
+  flex-direction: column;
+  gap: 5px;
+  z-index: 210;
+}
+.nav-burger span {
+  display: block;
+  width: 24px;
+  height: 2px;
+  background: white;
+  border-radius: 2px;
+  transition: all 0.3s;
+}
+.nav-burger:hover span { background: var(--gold-light); }
+.nav-burger.open span:nth-child(1) { transform: translateY(7px) rotate(45deg); }
+.nav-burger.open span:nth-child(2) { opacity: 0; }
+.nav-burger.open span:nth-child(3) { transform: translateY(-7px) rotate(-45deg); }
+
+/* ─── Mobile Slide-in Menu ─── */
+.mobile-menu {
+  position: fixed;
+  top: 0; right: -100%;
+  width: 100%;
+  max-width: 340px;
+  height: 100vh;
+  background: #0b1a33;
+  color: white;
+  z-index: 200;
+  transition: right 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+  display: flex;
+  flex-direction: column;
+  padding: 0;
+  overflow-y: auto;
+  box-shadow: -10px 0 40px rgba(0,0,0,0.5);
+}
+.mobile-menu.open { right: 0; }
+
+.mobile-menu-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 20px 24px;
+  border-bottom: 1px solid rgba(255,255,255,0.08);
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.15em;
+  color: rgba(255,255,255,0.6);
+}
+.mobile-menu-close {
+  background: transparent;
+  border: none;
+  color: white;
+  font-size: 32px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0 4px;
+  font-weight: 300;
+  transition: color 0.15s;
+}
+.mobile-menu-close:hover { color: var(--gold-light); }
+
+.mobile-menu-links {
+  list-style: none;
+  padding: 20px 0;
+  margin: 0;
+  flex: 1;
+}
+.mobile-menu-links li { border-bottom: 1px solid rgba(255,255,255,0.05); }
+.mobile-menu-links a {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 20px 24px;
+  color: white;
+  font-size: 17px;
+  font-weight: 600;
+  transition: all 0.15s;
+  text-decoration: none;
+}
+.mobile-menu-links a:hover,
+.mobile-menu-links a:active {
+  background: rgba(230, 184, 76, 0.1);
+  color: var(--gold-light);
+  padding-left: 32px;
+}
+.mobile-menu-links a span {
+  font-family: 'SF Mono', 'Monaco', monospace;
+  font-size: 11px;
+  color: var(--gold-light);
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  opacity: 0.7;
+}
+
+.mobile-menu-cta {
+  padding: 24px;
+  border-top: 1px solid rgba(255,255,255,0.08);
+  margin-top: auto;
+}
+.mobile-menu-cta .btn-gold,
+.mobile-menu-cta .btn-outline-white {
+  padding: 14px 24px;
+  font-size: 15px;
+  font-weight: 700;
+  border-radius: 10px;
+}
+
+/* ─── Backdrop ─── */
+.mobile-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.6);
+  backdrop-filter: blur(4px);
+  z-index: 150;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.3s;
+}
+.mobile-backdrop.open {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+/* ─── Responsive ─── */
+@media (max-width: 900px) {
+  .nav-links { display: none; }
+  .nav-cta { display: none; }
+  .nav-burger { display: flex; }
+}
 
     /* ─── Hero ─── */
     .hero {
@@ -835,14 +969,44 @@
     <img src="images/herald-logo.png" alt="Herald" />
     <span>HERALD</span>
   </a>
+
+  <!-- Desktop links -->
   <ul class="nav-links">
     <li><a href="#guides">What Guides Us</a></li>
     <li><a href="#services">Services</a></li>
     <li><a href="#courses">Courses</a></li>
     <li><a href="#contact">Contact</a></li>
   </ul>
-  <a href="login.html" class="nav-cta">Student Portal →</a>
+
+  <!-- Desktop CTA -->
+  <a href="register.html" class="nav-cta">Enroll Now</a>
+
+  <!-- Mobile hamburger button -->
+  <button class="nav-burger" id="navBurger" aria-label="Open menu" aria-expanded="false">
+    <span></span><span></span><span></span>
+  </button>
 </nav>
+
+<!-- Mobile slide-in menu -->
+<div class="mobile-menu" id="mobileMenu">
+  <div class="mobile-menu-head">
+    <span>Menu</span>
+    <button class="mobile-menu-close" id="mobileMenuClose" aria-label="Close menu">×</button>
+  </div>
+  <ul class="mobile-menu-links">
+    <li><a href="#guides"><span>01</span>What Guides Us</a></li>
+    <li><a href="#services"><span>02</span>Services</a></li>
+    <li><a href="#courses"><span>03</span>Courses</a></li>
+    <li><a href="#contact"><span>04</span>Contact</a></li>
+  </ul>
+  <div class="mobile-menu-cta">
+    <a href="register.html" class="btn-gold" style="display:block; text-align:center;">Enroll Now</a>
+    <a href="login.html" class="btn-outline-white" style="display:block; text-align:center; margin-top:10px;">Student Portal →</a>
+  </div>
+</div>
+
+<!-- Backdrop -->
+<div class="mobile-backdrop" id="mobileBackdrop"></div>
 
 <!-- Hero -->
 <section class="hero" id="top">
@@ -1341,6 +1505,63 @@ document.querySelectorAll('.nav-links a, .hero-cta a[href^="#"]').forEach(link =
     }
   });
 });
+
+// ═══════════════════════════════════════════════════════════
+// Mobile menu
+// ═══════════════════════════════════════════════════════════
+(function initMobileMenu() {
+  const burger = document.getElementById('navBurger');
+  const menu = document.getElementById('mobileMenu');
+  const backdrop = document.getElementById('mobileBackdrop');
+  const closeBtn = document.getElementById('mobileMenuClose');
+  if (!burger || !menu || !backdrop) return;
+
+  function open() {
+    burger.classList.add('open');
+    burger.setAttribute('aria-expanded', 'true');
+    menu.classList.add('open');
+    backdrop.classList.add('open');
+    document.body.style.overflow = 'hidden';
+  }
+
+  function close() {
+    burger.classList.remove('open');
+    burger.setAttribute('aria-expanded', 'false');
+    menu.classList.remove('open');
+    backdrop.classList.remove('open');
+    document.body.style.overflow = '';
+  }
+
+  burger.addEventListener('click', () => {
+    if (menu.classList.contains('open')) close();
+    else open();
+  });
+
+  closeBtn?.addEventListener('click', close);
+  backdrop.addEventListener('click', close);
+
+  // Close on link click (then scroll naturally)
+  menu.querySelectorAll('a').forEach(a => {
+    a.addEventListener('click', () => {
+      close();
+    });
+  });
+
+  // Close on Escape
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape' && menu.classList.contains('open')) close();
+  });
+
+  // Close on resize to desktop
+  let resizeTimer;
+  window.addEventListener('resize', () => {
+    clearTimeout(resizeTimer);
+    resizeTimer = setTimeout(() => {
+      if (window.innerWidth > 900) close();
+    }, 150);
+  });
+})();
+
 </script>
 
 </body>
