@@ -15,9 +15,12 @@
       background-image:
         linear-gradient(135deg, rgba(107,44,44,0.92) 0%, rgba(107,44,44,0.85) 100%),
         url('images/hero-admin.jpg');
-      background-size: cover; background-position: center;
-      min-height: 100vh; display: flex;
-      align-items: center; justify-content: center;
+      background-size: cover;
+      background-position: center;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
       padding: 24px;
     }
     .card {
@@ -58,6 +61,7 @@
     .btn:disabled { background: #cbd5e1; cursor: not-allowed; }
     .msg { text-align: center; margin-top: 14px; font-size: 13px; padding: 10px; border-radius: 8px; }
     .msg.error { color: #b91c1c; background: #fee2e2; }
+    .msg.success { color: #15803d; background: #dcfce7; }
     .msg:empty { display: none; }
     .hint { text-align: center; font-size: 12px; color: #6b7280; margin-top: 20px; line-height: 1.6; }
     .hint a { color: #b8860b; font-weight: 600; text-decoration: none; }
@@ -69,14 +73,27 @@
     <h1>Lecturer Login</h1>
     <p class="subtitle">Herald Trainer and Consultant</p>
 
-    <form id="loginForm">
+    <form id="loginForm" method="post" onsubmit="return false;">
       <div class="form-group">
         <label for="staff_no">Staff Number or Email</label>
-        <input id="staff_no" name="staff_no" placeholder="HRD-LECT-2025-0001" required autofocus />
+        <input
+          id="staff_no"
+          name="staff_no"
+          placeholder="HRD-LECT-2026-0001"
+          autocomplete="username"
+          required
+          autofocus
+        />
       </div>
       <div class="form-group">
         <label for="password">Password</label>
-        <input id="password" name="password" type="password" required />
+        <input
+          id="password"
+          name="password"
+          type="password"
+          autocomplete="current-password"
+          required
+        />
       </div>
       <button type="submit" class="btn" id="submitBtn">Sign In</button>
       <p class="msg" id="formMsg"></p>
@@ -89,45 +106,65 @@
   </div>
 
   <script>
-    $('#loginForm').addEventListener('submit', async (e) => {
-      e.preventDefault();
-      const form = e.target;
-      const btn = $('#submitBtn');
-      const msg = $('#formMsg');
+    (function () {
+      const form = document.getElementById('loginForm');
+      const btn = document.getElementById('submitBtn');
+      const msg = document.getElementById('formMsg');
 
-      msg.className = 'msg';
-      msg.textContent = '';
-      btn.disabled = true;
-      btn.textContent = 'Signing in...';
+      form.addEventListener('submit', async function (e) {
+        // CRITICAL: Prevent default form submission (stops password leaking in URL)
+        e.preventDefault();
+        e.stopPropagation();
 
-      const idInput = form.staff_no.value.trim();
-      const data = { password: form.password.value };
-      if (idInput.includes('@')) data.email = idInput.toLowerCase();
-      else data.staff_no = idInput.toUpperCase();
+        msg.className = 'msg';
+        msg.textContent = '';
+        btn.disabled = true;
+        btn.textContent = 'Signing in...';
 
-      try {
-        const res = await fetch('/api/lecturer/login', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(data),
-        });
-        const json = await res.json();
+        const idInput = document.getElementById('staff_no').value.trim();
+        const password = document.getElementById('password').value;
 
-        if (res.ok) {
-          location.href = 'lecturer-dashboard.html';
+        // Build payload — send ID as either staff_no or email
+        const payload = { password };
+        if (idInput.includes('@')) {
+          payload.email = idInput.toLowerCase();
         } else {
+          payload.staff_no = idInput.toUpperCase();
+        }
+
+        try {
+          const res = await fetch('/api/lecturer/login', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'same-origin',
+            body: JSON.stringify(payload),
+          });
+
+          let json = {};
+          try { json = await res.json(); } catch (_) {}
+
+          if (res.ok && json.ok) {
+            msg.className = 'msg success';
+            msg.textContent = 'Login successful. Redirecting...';
+            // Use replace to avoid back-button re-submit
+            window.location.replace('lecturer-dashboard.html');
+            return;
+          }
+
           msg.className = 'msg error';
-          msg.textContent = json.error || 'Login failed';
+          msg.textContent = json.error || 'Login failed. Please check your credentials.';
+          btn.disabled = false;
+          btn.textContent = 'Sign In';
+        } catch (err) {
+          msg.className = 'msg error';
+          msg.textContent = 'Network error. Please check your connection and try again.';
           btn.disabled = false;
           btn.textContent = 'Sign In';
         }
-      } catch (err) {
-        msg.className = 'msg error';
-        msg.textContent = 'Network error. Please try again.';
-        btn.disabled = false;
-        btn.textContent = 'Sign In';
-      }
-    });
+
+        return false;
+      });
+    })();
   </script>
 </body>
 </html>
