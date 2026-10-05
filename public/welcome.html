@@ -600,6 +600,77 @@
       transition: transform 0.2s;
     }
     .course-card:hover .course-learn-more::after { transform: translateX(4px); }
+    
+    /* ─── Show More / Less Toggle ─── */
+.courses-toggle-wrap {
+  text-align: center;
+  margin-top: 40px;
+}
+
+.courses-toggle-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  background: #ffffff;
+  color: var(--navy);
+  border: 2px solid var(--navy);
+  padding: 14px 32px;
+  border-radius: 999px;
+  font-size: 14px;
+  font-weight: 700;
+  font-family: inherit;
+  cursor: pointer;
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  letter-spacing: 0.02em;
+}
+
+.courses-toggle-btn:hover {
+  background: var(--navy);
+  color: #ffffff;
+  transform: translateY(-2px);
+  box-shadow: 0 12px 28px rgba(11, 26, 51, 0.2);
+}
+
+.courses-toggle-btn .toggle-arrow {
+  display: inline-block;
+  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  font-size: 12px;
+}
+
+.courses-toggle-btn.expanded .toggle-arrow {
+  transform: rotate(180deg);
+}
+
+.courses-toggle-count {
+  background: rgba(184, 134, 11, 0.15);
+  color: var(--gold);
+  padding: 2px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 800;
+  margin-left: 4px;
+}
+
+.courses-toggle-btn:hover .courses-toggle-count {
+  background: rgba(255, 255, 255, 0.2);
+  color: var(--gold-light);
+}
+
+/* Fade-in animation for newly revealed cards */
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.course-card.newly-revealed {
+  animation: fadeInUp 0.4s cubic-bezier(0.4, 0, 0.2, 1) both;
+}
 
     /* ─── Course Modal ─── */
     .modal-overlay {
@@ -1062,6 +1133,14 @@
   </div>
   <div class="courses-tabs" id="coursesTabs"></div>
   <div class="courses-grid" id="coursesGrid"></div>
+
+  <div class="courses-toggle-wrap">
+    <button class="courses-toggle-btn" id="coursesToggleBtn" type="button">
+      <span class="toggle-label">Show all courses</span>
+      <span class="courses-toggle-count" id="coursesToggleCount">36</span>
+      <span class="toggle-arrow">▼</span>
+    </button>
+  </div>
 </section>
 
 <!-- Contact -->
@@ -1362,13 +1441,18 @@ function renderTabs() {
   `).join('');
 
   coursesTabs.querySelectorAll('.course-tab').forEach(tab => {
-    tab.addEventListener('click', () => {
-      activeCategory = tab.dataset.cat;
-      renderTabs();
-      renderCourses();
-    });
+  tab.addEventListener('click', () => {
+    activeCategory = tab.dataset.cat;
+    coursesExpanded = false;  // ← Reset collapse state when switching tabs
+    renderTabs();
+    renderCourses();
   });
+});
 }
+
+// State for expand/collapse
+let coursesExpanded = false;
+const INITIAL_COUNT = 3;
 
 function renderCourses() {
   const list = activeCategory === 'All'
@@ -1378,10 +1462,16 @@ function renderCourses() {
   // Priority first
   const sorted = [...list].sort((a, b) => (b.priority ? 1 : 0) - (a.priority ? 1 : 0));
 
-  document.getElementById('coursesGrid').innerHTML = sorted.map((c) => {
+  // Limit or show all
+  const visible = coursesExpanded ? sorted : sorted.slice(0, INITIAL_COUNT);
+  const hasMore = sorted.length > INITIAL_COUNT;
+
+  const grid = document.getElementById('coursesGrid');
+  grid.innerHTML = visible.map((c, i) => {
     const realIdx = COURSES.indexOf(c);
+    const isNew = coursesExpanded && i >= INITIAL_COUNT;
     return `
-      <div class="course-card" data-course="${realIdx}">
+      <div class="course-card${isNew ? ' newly-revealed' : ''}" data-course="${realIdx}">
         <div class="course-img-wrap">
           <img src="${c.image}" alt="${c.title}" onerror="this.style.display='none'" />
           ${c.priority ? '<span class="course-badge priority">Priority</span>' : ''}
@@ -1400,16 +1490,52 @@ function renderCourses() {
     `;
   }).join('');
 
+  // Click handlers
   document.querySelectorAll('.course-card').forEach(card => {
     card.addEventListener('click', () => {
       const course = COURSES[Number(card.dataset.course)];
       openCourseModal(course);
     });
   });
+
+  // Update the toggle button
+  updateToggleButton(sorted.length, hasMore);
 }
 
-renderTabs();
-renderCourses();
+function updateToggleButton(totalCount, hasMore) {
+  const btn = document.getElementById('coursesToggleBtn');
+  const label = btn.querySelector('.toggle-label');
+  const countEl = document.getElementById('coursesToggleCount');
+  if (!btn) return;
+
+  // Hide button entirely if there aren't more than 3 courses in this category
+  if (!hasMore) {
+    btn.parentElement.style.display = 'none';
+    return;
+  }
+  btn.parentElement.style.display = 'block';
+
+  countEl.textContent = totalCount;
+
+  if (coursesExpanded) {
+    label.textContent = 'Show fewer courses';
+    btn.classList.add('expanded');
+  } else {
+    label.textContent = 'Show all courses';
+    btn.classList.remove('expanded');
+  }
+}
+
+// Toggle button click handler
+document.getElementById('coursesToggleBtn')?.addEventListener('click', () => {
+  coursesExpanded = !coursesExpanded;
+  renderCourses();
+
+  // Scroll to keep the button in view when collapsing
+  if (!coursesExpanded) {
+    document.getElementById('courses').scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+});
 
 // ═══════════════════════════════════════════════════════════
 // MODAL
