@@ -105,6 +105,20 @@
       </div>
       <div id="annList" class="ann-admin-list"></div>
     </section>
+  
+<!-- Materials -->
+<section class="admin-panel" id="panel-materials">
+  <div class="panel-head">
+    <h2>Study Materials</h2>
+    <button class="btn-primary" id="addMaterialBtn" type="button">Post Material</button>
+  </div>
+
+  <p style="color: var(--muted); font-size: 13px; margin-bottom: 20px; line-height: 1.6;">
+    Materials unlock automatically on their release date. Post today's lesson for immediate access, or schedule future lessons in advance.
+  </p>
+
+  <div id="materialsList"></div>
+</section>
   </main>
 
   <div class="modal-overlay hidden" id="modal">
@@ -152,22 +166,7 @@
     }
 
     let coursesCache = [];
-
-    <!-- Materials -->
-<section class="admin-panel" id="panel-materials">
-  <div class="panel-head">
-    <h2>Study Materials</h2>
-    <button class="btn-primary" id="addMaterialBtn" type="button">Post Material</button>
-  </div>
-
-  <p style="color: var(--muted); font-size: 13px; margin-bottom: 20px; line-height: 1.6;">
-    Materials unlock automatically on their release date. Post today's lesson for immediate access, or schedule future lessons in advance.
-  </p>
-
-  <div id="materialsList"></div>
-</section>
-
-    // Theme toggle
+// Theme toggle
     (function () {
       const saved = localStorage.getItem('theme') === 'dark';
       document.body.classList.toggle('dark', saved);
