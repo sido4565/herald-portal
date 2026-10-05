@@ -1476,3 +1476,16 @@ body.dark .stat-num {
   }
   .card, .stat-card { padding: 20px; }
 }
+
+/* Material cards */
+.material-locked {
+  opacity: 0.7;
+  position: relative;
+}
+.material-locked strong::before {
+  content: '🔒 ';
+}
+
+.material-unlocked {
+  border-left: 3px solid var(--success);
+}

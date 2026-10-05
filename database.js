@@ -186,6 +186,30 @@ CREATE TABLE IF NOT EXISTS live_classes (
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY(course_id) REFERENCES courses(id)
 );
+
+CREATE TABLE IF NOT EXISTS materials (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  course_id INTEGER NOT NULL,
+  title TEXT NOT NULL,
+  description TEXT,
+  material_type TEXT DEFAULT 'file',
+  file_path TEXT,
+  file_name TEXT,
+  external_url TEXT,
+  release_date TEXT NOT NULL,
+  created_by INTEGER,
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY(course_id) REFERENCES courses(id)
+);
+
+CREATE TABLE IF NOT EXISTS material_views (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  material_id INTEGER NOT NULL,
+  student_id INTEGER NOT NULL,
+  viewed_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY(material_id) REFERENCES materials(id),
+  FOREIGN KEY(student_id) REFERENCES students(id)
+);
 `);
 
 // ---------- Safe migrations ----------

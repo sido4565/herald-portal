@@ -32,6 +32,7 @@
       <button class="admin-tab" data-panel="results" type="button">Results</button>
       <button class="admin-tab" data-panel="attendance" type="button">Attendance</button>
       <button class="admin-tab" data-panel="announcements" type="button">Announcements</button>
+      <button class="admin-tab" data-panel="materials" type="button">Study Materials</button>
     </nav>
 
     <!-- Overview -->
@@ -152,6 +153,20 @@
 
     let coursesCache = [];
 
+    <!-- Materials -->
+<section class="admin-panel" id="panel-materials">
+  <div class="panel-head">
+    <h2>Study Materials</h2>
+    <button class="btn-primary" id="addMaterialBtn" type="button">Post Material</button>
+  </div>
+
+  <p style="color: var(--muted); font-size: 13px; margin-bottom: 20px; line-height: 1.6;">
+    Materials unlock automatically on their release date. Post today's lesson for immediate access, or schedule future lessons in advance.
+  </p>
+
+  <div id="materialsList"></div>
+</section>
+
     // Theme toggle
     (function () {
       const saved = localStorage.getItem('theme') === 'dark';
@@ -189,6 +204,148 @@
       });
     });
 
+    async function loadMaterials() {
+  const list = await api('/api/lecturer/materials');
+  const courses = await api('/api/lecturer/my-courses');
+
+  const wrap = $('#materialsList');
+  if (!list.length) {
+    wrap.innerHTML = '<p class="empty">No materials posted yet. Click "Post Material" to add one.</p>';
+    return;
+  }
+
+  const now = new Date();
+  wrap.innerHTML = list.map(m => {
+    const releaseDate = new Date(m.release_date);
+    const isUnlocked = now >= releaseDate;
+    const statusPill = isUnlocked
+      ? '<span class="pill pill-green">Live</span>'
+      : `<span class="pill pill-amber">Unlocks ${releaseDate.toLocaleDateString()}</span>`;
+
+    return `
+      <div style="background: var(--bg-alt); padding: 18px 20px; border-radius: 12px; margin-bottom: 12px; border-left: 4px solid var(--gold-500);">
+        <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; flex-wrap: wrap;">
+          <div style="flex: 1; min-width: 200px;">
+            <div style="font-family: monospace; color: var(--gold-500); font-weight: 700; font-size: 12px; letter-spacing: 0.05em; margin-bottom: 4px;">${esc(m.code)}</div>
+            <h3 style="margin: 0 0 6px; font-size: 16px; font-weight: 700;">${esc(m.title)}</h3>
+            ${m.description ? `<p style="color: var(--text-soft); font-size: 13px; margin: 0 0 10px;">${esc(m.description)}</p>` : ''}
+            <div style="display: flex; gap: 14px; flex-wrap: wrap; font-size: 12px; color: var(--muted);">
+              <span>📅 Releases: <strong>${releaseDate.toLocaleDateString()}</strong></span>
+              <span>👁️ ${m.view_count} views</span>
+              ${m.file_path ? `<a href="${esc(m.file_path)}" target="_blank" style="color: var(--gold-500); font-weight: 600;">📎 ${esc(m.file_name || 'file')}</a>` : ''}
+              ${m.external_url ? `<a href="${esc(m.external_url)}" target="_blank" style="color: var(--gold-500); font-weight: 600;">🔗 Link</a>` : ''}
+            </div>
+          </div>
+          <div style="display: flex; flex-direction: column; gap: 8px; align-items: flex-end;">
+            ${statusPill}
+            <button class="btn-xs danger" data-material-id="${m.id}" type="button">Delete</button>
+          </div>
+        </div>
+      </div>
+    `;
+  }).join('');
+
+  // Delete handlers
+  wrap.querySelectorAll('[data-material-id]').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      if (!confirm('Delete this material?')) return;
+      try {
+        await api(`/api/lecturer/materials/${btn.dataset.materialId}`, { method: 'DELETE' });
+        toast('Deleted');
+        await loadMaterials();
+      } catch (e) { toast(e.message, 'error'); }
+    });
+  });
+}
+
+$('#addMaterialBtn')?.addEventListener('click', async () => {
+  const courses = await api('/api/lecturer/my-courses');
+  if (!courses.length) return toast('You have no courses assigned yet.', 'error');
+
+  // Build custom modal
+  const overlay = document.createElement('div');
+  overlay.className = 'modal-overlay';
+  overlay.innerHTML = `
+    <div class="modal" style="max-width: 560px;">
+      <h3>Post Study Material</h3>
+      <form id="matForm" class="modal-form">
+        <label>Course</label>
+        <select name="course_id" required>
+          <option value="">— Select course —</option>
+          ${courses.map(c => `<option value="${c.id}">${esc(c.code)} — ${esc(c.title)}</option>`).join('')}
+        </select>
+
+        <label>Title</label>
+        <input name="title" required placeholder="e.g. Week 3 — Marketing Funnels" />
+
+        <label>Description</label>
+        <textarea name="description" rows="3" placeholder="Brief description of the material"></textarea>
+
+        <label>Release Date (unlocks for students)</label>
+        <input type="date" name="release_date" value="${new Date().toISOString().slice(0,10)}" required />
+
+        <label>File (optional — PDF, DOCX, PPTX, image, video)</label>
+        <input type="file" name="file" id="matFile" accept=".pdf,.doc,.docx,.ppt,.pptx,.jpg,.jpeg,.png,.webp,.mp4,.webm" />
+
+        <label>External URL (optional — YouTube, Drive, etc.)</label>
+        <input type="url" name="external_url" placeholder="https://..." />
+      </form>
+      <div class="modal-actions">
+        <button class="btn-ghost dark" type="button" data-close>Cancel</button>
+        <button class="btn-primary" id="matSaveBtn" type="button">Post</button>
+      </div>
+    </div>`;
+  document.body.appendChild(overlay);
+
+  overlay.addEventListener('click', e => {
+    if (e.target === overlay || e.target.closest('[data-close]')) overlay.remove();
+  });
+
+  overlay.querySelector('#matSaveBtn').addEventListener('click', async () => {
+    const form = overlay.querySelector('#matForm');
+    const fd = new FormData(form);
+    const fileInput = overlay.querySelector('#matFile');
+    const hasFile = fileInput.files && fileInput.files.length > 0;
+
+    const payload = {
+      course_id: Number(fd.get('course_id')),
+      title: fd.get('title'),
+      description: fd.get('description'),
+      release_date: fd.get('release_date'),
+      external_url: fd.get('external_url'),
+      material_type: hasFile ? 'file' : (fd.get('external_url') ? 'link' : 'text'),
+    };
+
+    if (!payload.course_id || !payload.title || !payload.release_date) {
+      return toast('Course, title, and release date are required', 'error');
+    }
+
+    try {
+      // Upload file first if present
+      if (hasFile) {
+        const upFd = new FormData();
+        upFd.append('file', fileInput.files[0]);
+        const upRes = await fetch('/api/lecturer/materials/upload', {
+          method: 'POST',
+          credentials: 'same-origin',
+          body: upFd,
+        });
+        const upJson = await upRes.json();
+        if (!upRes.ok) throw new Error(upJson.error || 'File upload failed');
+        payload.file_path = upJson.file_path;
+        payload.file_name = upJson.file_name;
+      }
+
+      await api('/api/lecturer/materials', { method: 'POST', body: payload });
+      overlay.remove();
+      toast('Material posted ✅');
+      await loadMaterials();
+    } catch (e) {
+      toast(e.message, 'error');
+    }
+  });
+});
+
     async function loadPanel(name) {
       if (name === 'overview') return loadOverview();
       if (name === 'profile') return loadProfile();
@@ -196,6 +353,7 @@
       if (name === 'results') return loadResults();
       if (name === 'attendance') return loadAttendance();
       if (name === 'announcements') return loadAnnouncements();
+      if (name === 'materials') return loadMaterials();
     }
 
     async function loadOverview() {

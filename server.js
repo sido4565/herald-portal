@@ -43,6 +43,43 @@ app.use('/uploads', express.static(UPLOAD_DIR, {
   }
 }));
 
+// Materials upload — accepts PDFs, DOCX, PPTX, images, videos
+const materialUpload = multer({
+  storage: multer.diskStorage({
+    destination: (req, file, cb) => cb(null, UPLOAD_DIR),
+    filename: (req, file, cb) => {
+      const safe = file.originalname.replace(/[^a-zA-Z0-9._-]/g, '_');
+      cb(null, `mat-${Date.now()}-${req.lecturer?.id || 'anon'}-${safe}`);
+    },
+  }),
+  limits: { fileSize: 25 * 1024 * 1024 }, // 25 MB
+  fileFilter: (req, file, cb) => {
+    const allowed = [
+      'application/pdf',
+      'application/msword',
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      'application/vnd.ms-powerpoint',
+      'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+      'image/jpeg', 'image/png', 'image/webp',
+      'video/mp4', 'video/webm',
+    ];
+    if (!allowed.includes(file.mimetype)) {
+      return cb(new Error('Unsupported file type'));
+    }
+    cb(null, true);
+  },
+});
+
+// Upload endpoint for materials
+app.post('/api/lecturer/materials/upload', authLecturer, materialUpload.single('file'), (req, res) => {
+  if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
+  res.json({
+    ok: true,
+    file_path: `/uploads/${req.file.filename}`,
+    file_name: req.file.originalname,
+  });
+});
+
 // ---------- Auth helpers ----------
 const signStudent = s => jwt.sign({ id: s.id, reg: s.reg_no, type: 'student' }, JWT_SECRET, { expiresIn: '7d' });
 const signAdmin = a => jwt.sign({ id: a.id, username: a.username, type: 'admin', role: a.role }, JWT_SECRET, { expiresIn: '7d' });
@@ -1270,6 +1307,177 @@ app.post('/api/admin/live-classes', authAdmin, async (req, res) => {
 app.delete('/api/admin/live-classes/:id', authAdmin, (req, res) => {
   db.prepare('DELETE FROM live_classes WHERE id = ?').run(req.params.id);
   res.json({ ok: true });
+});
+
+// ==================== MATERIALS — LECTURER ====================
+// Lecturer: list materials for their courses
+app.get('/api/lecturer/materials', authLecturer, (req, res) => {
+  const rows = db.prepare(`
+    SELECT m.*, c.code, c.title AS course_title,
+      (SELECT COUNT(*) FROM material_views WHERE material_id = m.id) AS view_count
+    FROM materials m
+    JOIN courses c ON c.id = m.course_id
+    ORDER BY m.release_date DESC, m.id DESC
+    LIMIT 200
+  `).all();
+  res.json(rows);
+});
+
+// Lecturer: create material
+app.post('/api/lecturer/materials', authLecturer, (req, res) => {
+  const {
+    course_id, title, description, material_type,
+    file_path, file_name, external_url, release_date
+  } = req.body;
+
+  if (!course_id || !title || !release_date) {
+    return res.status(400).json({ error: 'course_id, title, and release_date are required' });
+  }
+
+  const info = db.prepare(`
+    INSERT INTO materials (course_id, title, description, material_type, file_path, file_name, external_url, release_date, created_by)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `).run(
+    course_id, title, description || '', material_type || 'file',
+    file_path || null, file_name || null, external_url || null,
+    release_date, req.lecturer.id
+  );
+
+  res.json({ ok: true, id: info.lastInsertRowid });
+});
+
+// Lecturer: delete material
+app.delete('/api/lecturer/materials/:id', authLecturer, (req, res) => {
+  db.prepare('DELETE FROM material_views WHERE material_id = ?').run(req.params.id);
+  db.prepare('DELETE FROM materials WHERE id = ?').run(req.params.id);
+  res.json({ ok: true });
+});
+
+// Lecturer: view student views of a material
+app.get('/api/lecturer/materials/:id/views', authLecturer, (req, res) => {
+  const rows = db.prepare(`
+    SELECT mv.viewed_at, s.reg_no, s.name
+    FROM material_views mv
+    JOIN students s ON s.id = mv.student_id
+    WHERE mv.material_id = ?
+    ORDER BY mv.viewed_at DESC
+  `).all(req.params.id);
+  res.json(rows);
+});
+
+// ==================== MATERIALS — STUDENT ====================
+// Student: list materials for enrolled courses with lock status
+app.get('/api/my-materials', authStudent, (req, res) => {
+  const now = new Date();
+
+  const rows = db.prepare(`
+    SELECT m.id, m.title, m.description, m.material_type, m.file_path, m.file_name,
+           m.external_url, m.release_date, m.created_at,
+           c.code, c.title AS course_title
+    FROM materials m
+    JOIN courses c ON c.id = m.course_id
+    JOIN enrollments e ON e.course_id = m.course_id
+    WHERE e.student_id = ?
+    ORDER BY m.release_date ASC, m.id ASC
+  `).all(req.user.id);
+
+  const enriched = rows.map(m => {
+    const releaseDate = new Date(m.release_date);
+    const isUnlocked = now >= releaseDate;
+    const isToday = releaseDate.toDateString() === now.toDateString();
+
+    // Compute unlock countdown
+    let unlockInMs = 0;
+    if (!isUnlocked) unlockInMs = releaseDate.getTime() - now.getTime();
+
+    return {
+      ...m,
+      unlocked: isUnlocked,
+      isToday,
+      unlockInMs,
+      release_date_formatted: releaseDate.toLocaleDateString('en-KE', {
+        weekday: 'short', year: 'numeric', month: 'short', day: 'numeric',
+      }),
+    };
+  });
+
+  res.json(enriched);
+});
+
+// Student: fetch a specific material (only if unlocked)
+app.get('/api/my-materials/:id', authStudent, (req, res) => {
+  const m = db.prepare(`
+    SELECT m.*, c.code, c.title AS course_title
+    FROM materials m
+    JOIN courses c ON c.id = m.course_id
+    JOIN enrollments e ON e.course_id = m.course_id
+    WHERE m.id = ? AND e.student_id = ?
+  `).get(req.params.id, req.user.id);
+
+  if (!m) return res.status(404).json({ error: 'Material not found' });
+
+  const now = new Date();
+  if (now < new Date(m.release_date)) {
+    return res.status(423).json({
+      error: 'This material is not yet available',
+      release_date: m.release_date,
+    });
+  }
+
+  // Log the view
+  db.prepare('INSERT INTO material_views (material_id, student_id) VALUES (?, ?)')
+    .run(m.id, req.user.id);
+
+  res.json(m);
+});
+
+// ==================== TRANSCRIPTS ====================
+// Student: get transcript data
+app.get('/api/my-transcript', authStudent, (req, res) => {
+  const student = db.prepare(
+    'SELECT reg_no, name, email, course FROM students WHERE id = ?'
+  ).get(req.user.id);
+
+  const results = db.prepare(`
+    SELECT r.marks, r.grade, r.term, c.code AS course_code, c.title AS course_title
+    FROM results r
+    JOIN courses c ON c.id = r.course_id
+    WHERE r.student_id = ?
+    ORDER BY r.term ASC, c.code ASC
+  `).all(req.user.id);
+
+  // Group by term
+  const byTerm = {};
+  results.forEach(r => {
+    if (!byTerm[r.term]) byTerm[r.term] = [];
+    byTerm[r.term].push(r);
+  });
+
+  // Compute GPA (simple: A=4.0, A-=3.7, etc.)
+  const gradePoints = {
+    'A': 4.0, 'A-': 3.7, 'B+': 3.3, 'B': 3.0,
+    'B-': 2.7, 'C+': 2.3, 'C': 2.0, 'D': 1.0, 'E': 0.0,
+  };
+
+  let totalPoints = 0;
+  let totalUnits = 0;
+  results.forEach(r => {
+    const pts = gradePoints[r.grade] || 0;
+    totalPoints += pts;
+    totalUnits += 1;
+  });
+  const gpa = totalUnits > 0 ? (totalPoints / totalUnits).toFixed(2) : '—';
+
+  res.json({
+    student,
+    results,
+    byTerm,
+    summary: {
+      totalUnits,
+      gpa,
+      generated_at: new Date().toISOString(),
+    },
+  });
 });
 
 app.listen(PORT, () => console.log(`Herald Portal running on http://localhost:${PORT}`));
