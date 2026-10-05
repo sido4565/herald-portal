@@ -42,7 +42,9 @@ function toast(msg, type = 'success') {
   }, 3000);
 }
 
-// ---------- LOGIN / REGISTER ----------
+// ============================================================
+// LOGIN / REGISTER PAGE
+// ============================================================
 if (document.getElementById('loginForm')) {
   const loginForm = document.getElementById('loginForm');
   const registerForm = document.getElementById('registerForm');
@@ -78,8 +80,24 @@ if (document.getElementById('loginForm')) {
     }
   });
 
-     // ─────────────────────────────────────────────
-  // Searchable Course Picker
+  registerForm.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const data = Object.fromEntries(new FormData(registerForm));
+    const res = await fetch('/api/register', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data)
+    });
+    const json = await res.json();
+    if (res.ok) location.href = 'dashboard.html';
+    else {
+      msg.className = 'msg error';
+      msg.textContent = json.error || 'Registration failed';
+    }
+  });
+
+  // ─────────────────────────────────────────────
+  // Searchable Course Picker (register form)
   // ─────────────────────────────────────────────
   (function initCoursePicker() {
     const input = document.getElementById('reg-course');
@@ -91,17 +109,12 @@ if (document.getElementById('loginForm')) {
     let filtered = [];
     let highlightedIndex = -1;
 
-    // Fetch courses
     fetch('/api/public/courses')
       .then(r => r.json())
       .then(data => {
-        courses = Array.isArray(data) ? data : [];
-        // Normalize: allow strings or objects
-        courses = courses.map(c =>
-          typeof c === 'string'
-            ? { code: '', title: c, category: 'Courses' }
-            : c
-        );
+        courses = Array.isArray(data) ? data.map(c =>
+          typeof c === 'string' ? { code: '', title: c, category: 'Courses' } : c
+        ) : [];
       })
       .catch(err => {
         console.error('Course load failed:', err);
@@ -120,7 +133,6 @@ if (document.getElementById('loginForm')) {
         return;
       }
 
-      // Group by category
       const grouped = {};
       filtered.forEach(c => {
         const cat = c.category || 'Courses';
@@ -147,21 +159,11 @@ if (document.getElementById('loginForm')) {
       dropdown.innerHTML = html;
     }
 
-    function openDropdown() {
-      dropdown.classList.remove('hidden');
-    }
-
-    function closeDropdown() {
-      dropdown.classList.add('hidden');
-      highlightedIndex = -1;
-    }
-
     function filterCourses(query) {
       const q = (query || '').trim().toLowerCase();
       if (!q) {
-        filtered = courses.slice(0, 50); // Show first 50 when empty
+        filtered = courses.slice(0, 50);
       } else {
-        // Score-based: starts-with > contains
         filtered = courses
           .map(c => {
             const title = c.title.toLowerCase();
@@ -182,17 +184,15 @@ if (document.getElementById('loginForm')) {
 
     input.addEventListener('focus', () => {
       filterCourses(input.value);
-      openDropdown();
+      dropdown.classList.remove('hidden');
     });
-
     input.addEventListener('input', () => {
       filterCourses(input.value);
-      openDropdown();
+      dropdown.classList.remove('hidden');
     });
 
     input.addEventListener('keydown', (e) => {
       const options = dropdown.querySelectorAll('.course-picker-option');
-
       if (e.key === 'ArrowDown') {
         e.preventDefault();
         if (!options.length) return;
@@ -208,87 +208,31 @@ if (document.getElementById('loginForm')) {
       } else if (e.key === 'Enter') {
         if (highlightedIndex >= 0 && options[highlightedIndex]) {
           e.preventDefault();
-          selectOption(options[highlightedIndex].dataset.value);
+          input.value = options[highlightedIndex].dataset.value;
+          dropdown.classList.add('hidden');
         }
       } else if (e.key === 'Escape') {
-        closeDropdown();
-        input.blur();
-      } else if (e.key === 'Tab') {
-        closeDropdown();
+        dropdown.classList.add('hidden');
       }
     });
 
-    dropdown.addEventListener('mousedown', (e) => {
-      // Prevent input blur before click
-      e.preventDefault();
-    });
-
-    dropdown.addEventListener('click', (e) => {
+    dropdown.addEventListener('mousedown', e => e.preventDefault());
+    dropdown.addEventListener('click', e => {
       const opt = e.target.closest('.course-picker-option');
       if (!opt) return;
-      selectOption(opt.dataset.value);
+      input.value = opt.dataset.value;
+      dropdown.classList.add('hidden');
     });
 
-    function selectOption(value) {
-      input.value = value;
-      input.dispatchEvent(new Event('change'));
-      closeDropdown();
-      input.blur();
-    }
-
-    // Close on outside click
-    document.addEventListener('click', (e) => {
-      if (!picker.contains(e.target)) closeDropdown();
+    document.addEventListener('click', e => {
+      if (!picker.contains(e.target)) dropdown.classList.add('hidden');
     });
-
-    // Close on form submit
-    const form = document.getElementById('registerForm');
-    if (form) {
-      form.addEventListener('submit', closeDropdown);
-    }
   })();
-
-  registerForm.addEventListener('submit', async (e) => {
-    e.preventDefault();
-    const data = Object.fromEntries(new FormData(registerForm));
-    const submitBtn = registerForm.querySelector('button[type="submit"]');
-    submitBtn.classList.add('btn-loading');
-    submitBtn.disabled = true;
-
-    try {
-      const res = await fetch('/api/register', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(data)
-      });
-      const json = await res.json();
-
-      if (res.ok) {
-        // Hide form, show success panel with reg_no
-        loginForm.classList.add('hidden');
-        registerForm.classList.add('hidden');
-        document.querySelector('.tabs').classList.add('hidden');
-        document.getElementById('regNoDisplay').textContent = json.reg_no;
-        document.getElementById('regSuccess').classList.remove('hidden');
-
-        document.getElementById('goToLogin').addEventListener('click', () => {
-          location.href = 'login.html';
-        });
-      } else {
-        msg.className = 'msg error';
-        msg.textContent = json.error || 'Registration failed';
-      }
-    } catch (err) {
-      msg.className = 'msg error';
-      msg.textContent = 'Network error. Please try again.';
-    } finally {
-      submitBtn.classList.remove('btn-loading');
-      submitBtn.disabled = false;
-    }
-  });
 }
 
-// ---------- DASHBOARD ----------
+// ============================================================
+// DASHBOARD
+// ============================================================
 if (document.getElementById('announcements')) {
   const themeBtn = document.getElementById('themeToggle');
   if (themeBtn) themeBtn.addEventListener('click', toggleTheme);
@@ -311,49 +255,47 @@ async function loadDashboard() {
     location.href = 'login.html';
   });
 
-  // Announcements
+  // ─── Announcements ───
   try {
     const annRes = await fetch('/api/announcements');
     const anns = await annRes.json();
     document.getElementById('announcements').innerHTML = anns.length
       ? anns.map(a => `<li><strong>${esc(a.title)}</strong><p>${esc(a.body)}</p></li>`).join('')
-      : `<li style="text-align:center; padding: 24px; color: var(--muted);">
-     <img src="images/empty-state.jpg" alt="" style="max-width: 180px; margin: 0 auto 12px; border-radius: 8px; opacity: 0.85;" />
-     <p style="margin: 0;">No announcements at this time.</p>
-   </li>`;
+      : '<li style="color:var(--muted);">No announcements at this time.</li>';
   } catch (e) { console.error(e); }
 
-  // Courses
+  // ─── Courses ───
   try {
     const courseRes = await fetch('/api/courses');
     const courses = await courseRes.json();
-    const courseImageMap = {
-  'WD101':  'web.jpg',
-  'DB201':  'db.jpg',
-  'JS301':  'js.jpg',
-  'PY101':  'python.jpg',
-  'NET210': 'networking.jpg',
-};
 
-document.getElementById('courses').innerHTML = courses.map(c => {
-  const img = courseImageMap[c.code] || 'web.jpg';
-  return `
-    <li style="display: flex; gap: 16px; align-items: center; padding: 14px 0;">
-      <img
-        src="images/courses/${img}"
-        alt="${esc(c.title)}"
-        style="width: 84px; height: 84px; object-fit: cover; border-radius: 10px; flex-shrink: 0; border: 1px solid var(--border-soft);"
-        onerror="this.style.display='none'"
-      />
-      <div style="flex: 1; min-width: 0;">
-        <strong style="display: block; margin-bottom: 4px;">${esc(c.code)} — ${esc(c.title)}</strong>
-        <p style="margin: 0 0 6px; font-size: 12px; color: var(--muted);">Trainer: ${esc(c.trainer)}</p>
-        ${c.enrolled
-          ? '<button class="btn-enroll" disabled>Enrolled ✓</button>'
-          : `<button class="btn-enroll" data-id="${c.id}">Enroll</button>`}
-      </div>
-    </li>`;
-}).join('');
+    const courseImageMap = {
+      'WD101':  'web.jpg',
+      'DB201':  'db.jpg',
+      'JS301':  'js.jpg',
+      'PY101':  'python.jpg',
+      'NET210': 'networking.jpg',
+    };
+
+    document.getElementById('courses').innerHTML = courses.map(c => {
+      const img = courseImageMap[c.code] || 'web.jpg';
+      return `
+        <li style="display: flex; gap: 16px; align-items: center; padding: 14px 0;">
+          <img
+            src="images/courses/${img}"
+            alt="${esc(c.title)}"
+            style="width: 84px; height: 84px; object-fit: cover; border-radius: 10px; flex-shrink: 0; border: 1px solid var(--border-soft);"
+            onerror="this.style.display='none'"
+          />
+          <div style="flex: 1; min-width: 0;">
+            <strong style="display: block; margin-bottom: 4px;">${esc(c.code)} — ${esc(c.title)}</strong>
+            <p style="margin: 0 0 6px; font-size: 12px; color: var(--muted);">Trainer: ${esc(c.trainer)}</p>
+            ${c.enrolled
+              ? '<button class="btn-enroll" disabled>Enrolled ✓</button>'
+              : `<button class="btn-enroll" data-id="${c.id}">Enroll</button>`}
+          </div>
+        </li>`;
+    }).join('');
 
     document.querySelectorAll('.btn-enroll[data-id]').forEach(btn => {
       btn.addEventListener('click', async () => {
@@ -363,7 +305,7 @@ document.getElementById('courses').innerHTML = courses.map(c => {
     });
   } catch (e) { console.error(e); }
 
-  // Results
+  // ─── Results ───
   try {
     const resRes = await fetch('/api/results');
     const results = await resRes.json();
@@ -380,7 +322,7 @@ document.getElementById('courses').innerHTML = courses.map(c => {
       : '<tr><td colspan="5" class="empty">No results published yet.</td></tr>';
   } catch (e) { console.error(e); }
 
-  // Fees
+  // ─── Fees ───
   try {
     const feeRes = await fetch('/api/my-fees');
     const fees = await feeRes.json();
@@ -429,7 +371,7 @@ document.getElementById('courses').innerHTML = courses.map(c => {
       : '<li style="color:var(--muted);">No fee records on file.</li>';
   } catch (e) { console.error('fees load', e); }
 
-  // Attendance
+  // ─── Attendance ───
   try {
     const attRes = await fetch('/api/my-attendance');
     const att = await attRes.json();
@@ -450,51 +392,58 @@ document.getElementById('courses').innerHTML = courses.map(c => {
         }).join('')}
       </div>` : '<p style="color:var(--muted); font-size:13px; margin-bottom:8px;">No attendance records yet.</p>';
 
-    document.getElementById('attendanceSummary').innerHTML = summaryHtml;
+    const attSummaryEl = document.getElementById('attendanceSummary');
+    if (attSummaryEl) attSummaryEl.innerHTML = summaryHtml;
 
-    document.getElementById('attendanceList').innerHTML = att.records && att.records.length
-      ? att.records.slice(0, 10).map(r => `
-          <li>
-            <div style="display:flex; justify-content:space-between; align-items:center; gap:12px;">
-              <div>
-                <strong>${esc(r.date)}</strong>
-                <p>${esc(r.code)} — ${esc(r.title)}</p>
+    const attListEl = document.getElementById('attendanceList');
+    if (attListEl) {
+      attListEl.innerHTML = att.records && att.records.length
+        ? att.records.slice(0, 10).map(r => `
+            <li>
+              <div style="display:flex; justify-content:space-between; align-items:center; gap:12px;">
+                <div>
+                  <strong>${esc(r.date)}</strong>
+                  <p>${esc(r.code)} — ${esc(r.title)}</p>
+                </div>
+                <span class="pill ${r.status === 'present' ? 'pill-green' : r.status === 'absent' ? 'pill-red' : 'pill-amber'}">${esc(r.status)}</span>
               </div>
-              <span class="pill ${r.status === 'present' ? 'pill-green' : r.status === 'absent' ? 'pill-red' : 'pill-amber'}">${esc(r.status)}</span>
-            </div>
-          </li>`).join('')
-      : '';
+            </li>`).join('')
+        : '';
+    }
   } catch (e) { console.error('attendance load', e); }
 
-  // Live Classes
+  // ─── Live Classes ───
   try {
     const lcRes = await fetch('/api/my-live-classes');
     const lcs = await lcRes.json();
 
-    document.getElementById('liveClasses').innerHTML = lcs.length
-      ? lcs.map(c => {
-          const pillCls = c.status === 'live' ? 'pill-green' : c.status === 'upcoming' ? 'pill-amber' : 'pill-red';
-          const label = c.status === 'live' ? 'LIVE NOW' : c.status.toUpperCase();
-          const start = new Date(c.scheduled_at);
-          return `
-            <li>
-              <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:12px; flex-wrap:wrap;">
-                <div>
-                  <strong>${esc(c.title)}</strong>
-                  <p>${esc(c.code)} — ${esc(c.course_title)}</p>
-                  <p style="font-size:12px; color:var(--muted);">${start.toLocaleString()} &middot; ${c.duration_minutes} min</p>
+    const lcEl = document.getElementById('liveClasses');
+    if (lcEl) {
+      lcEl.innerHTML = lcs.length
+        ? lcs.map(c => {
+            const pillCls = c.status === 'live' ? 'pill-green' : c.status === 'upcoming' ? 'pill-amber' : 'pill-red';
+            const label = c.status === 'live' ? 'LIVE NOW' : c.status.toUpperCase();
+            const start = new Date(c.scheduled_at);
+            return `
+              <li>
+                <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:12px; flex-wrap:wrap;">
+                  <div>
+                    <strong>${esc(c.title)}</strong>
+                    <p>${esc(c.code)} — ${esc(c.course_title)}</p>
+                    <p style="font-size:12px; color:var(--muted);">${start.toLocaleString()} &middot; ${c.duration_minutes} min</p>
+                  </div>
+                  <div style="text-align:right;">
+                    <span class="pill ${pillCls}">${label}</span>
+                    ${c.status !== 'ended' ? `<div style="margin-top:6px;"><a class="btn-enroll" href="${esc(c.meeting_url)}" target="_blank" rel="noopener" style="text-decoration:none; display:inline-block;">Join</a></div>` : ''}
+                  </div>
                 </div>
-                <div style="text-align:right;">
-                  <span class="pill ${pillCls}">${label}</span>
-                  ${c.status !== 'ended' ? `<div style="margin-top:6px;"><a class="btn-enroll" href="${esc(c.meeting_url)}" target="_blank" rel="noopener" style="text-decoration:none; display:inline-block;">Join</a></div>` : ''}
-                </div>
-              </div>
-            </li>`;
-        }).join('')
-      : '<li style="color:var(--muted);">No live classes scheduled.</li>';
+              </li>`;
+          }).join('')
+        : '<li style="color:var(--muted);">No live classes scheduled.</li>';
+    }
   } catch (e) { console.error('live classes load', e); }
 
-  // Timetable
+  // ─── Timetable ───
   try {
     const ttRes = await fetch('/api/my-timetable');
     const tt = await ttRes.json();
@@ -508,7 +457,7 @@ document.getElementById('courses').innerHTML = courses.map(c => {
       : '<li style="color:var(--muted);">No classes scheduled.</li>';
   } catch (e) { console.error('timetable load', e); }
 
-  // Assignments
+  // ─── Assignments ───
   try {
     const asgRes = await fetch('/api/my-assignments');
     const asg = await asgRes.json();
@@ -539,9 +488,77 @@ document.getElementById('courses').innerHTML = courses.map(c => {
           </li>`).join('')
       : '<li style="color:var(--muted);">No assignments posted.</li>';
   } catch (e) { console.error('assignments load', e); }
+
+  // ─── Study Materials (time-locked) ───
+  try {
+    const matRes = await fetch('/api/my-materials');
+    const materials = await matRes.json();
+
+    const matEl = document.getElementById('materialsList');
+    if (matEl) {
+      matEl.innerHTML = materials.length
+        ? materials.map(m => {
+            if (!m.unlocked) {
+              return `
+                <li style="opacity: 0.7;">
+                  <div style="display: flex; justify-content: space-between; gap: 12px; align-items: flex-start;">
+                    <div style="flex: 1;">
+                      <strong>🔒 ${esc(m.title)}</strong>
+                      <p style="color: var(--muted); font-size: 12px; margin-top: 3px;">
+                        ${esc(m.code)} — ${esc(m.course_title)}
+                      </p>
+                      <p style="color: var(--warning); font-size: 12px; margin-top: 6px; font-weight: 600;">
+                        Unlocks ${esc(m.release_date_formatted)}
+                      </p>
+                    </div>
+                    <span class="pill pill-amber">Locked</span>
+                  </div>
+                </li>`;
+            }
+            const links = [];
+            if (m.file_path) links.push(`<a href="${esc(m.file_path)}" target="_blank" class="btn-xs" style="text-decoration:none; display:inline-block;">📎 Open File</a>`);
+            if (m.external_url) links.push(`<a href="${esc(m.external_url)}" target="_blank" class="btn-xs" style="text-decoration:none; display:inline-block;">🔗 Open Link</a>`);
+
+            return `
+              <li>
+                <div style="display: flex; justify-content: space-between; gap: 12px; align-items: flex-start; flex-wrap: wrap;">
+                  <div style="flex: 1; min-width: 200px;">
+                    <strong>${esc(m.title)}</strong>
+                    <p style="color: var(--muted); font-size: 12px; margin-top: 3px;">
+                      ${esc(m.code)} — ${esc(m.course_title)}
+                    </p>
+                    ${m.description ? `<p style="color: var(--text-soft); font-size: 13px; margin-top: 6px;">${esc(m.description)}</p>` : ''}
+                    <div style="margin-top: 10px; display: flex; gap: 8px; flex-wrap: wrap;">
+                      ${links.join('')}
+                    </div>
+                  </div>
+                  <span class="pill ${m.isToday ? 'pill-green' : 'pill-green'}">${m.isToday ? 'Today' : 'Available'}</span>
+                </div>
+              </li>`;
+          }).join('')
+        : '<li style="color: var(--muted);">No materials posted yet.</li>';
+    }
+  } catch (e) { console.error('materials load', e); }
+
+  // ─── Transcript Download ───
+  const dlBtn = document.getElementById('downloadTranscriptBtn');
+  if (dlBtn) {
+    dlBtn.addEventListener('click', async () => {
+      try {
+        const res = await fetch('/api/my-transcript');
+        if (!res.ok) throw new Error('Failed to load transcript');
+        const data = await res.json();
+        generateTranscriptHTML(data);
+      } catch (e) {
+        toast('Could not generate transcript: ' + e.message, 'error');
+      }
+    });
+  }
 }
 
-// ---------- Payment details (KCB) ----------
+// ============================================================
+// PAYMENT DETAILS (KCB)
+// ============================================================
 const PAYMENT = {
   bank: 'KCB Bank Kenya',
   paybill: '522522',
@@ -577,7 +594,9 @@ function renderPaymentBox() {
     </div>`;
 }
 
-// ---------- Fee receipt ----------
+// ============================================================
+// FEE RECEIPT (printable)
+// ============================================================
 function printReceipt(feeId, term, due, paid) {
   const balance = Number(due) - Number(paid);
   const win = window.open('', '_blank', 'width=460,height=720');
@@ -637,7 +656,9 @@ function printReceipt(feeId, term, due, paid) {
   win.document.close();
 }
 
-// ---------- Assignment submission ----------
+// ============================================================
+// ASSIGNMENT SUBMISSION
+// ============================================================
 function submitAssignment(assignmentId) {
   const overlay = document.createElement('div');
   overlay.className = 'modal-overlay';
@@ -718,7 +739,250 @@ function submitAssignment(assignmentId) {
   });
 }
 
-// ---------- Auto-logout after 30 min inactivity ----------
+// ============================================================
+// TRANSCRIPT GENERATION
+// ============================================================
+function generateTranscriptHTML(data) {
+  const { student, byTerm, summary } = data;
+
+  const termSections = Object.entries(byTerm).map(([term, items]) => `
+    <div style="margin-bottom: 24px;">
+      <h3 style="font-size: 13px; text-transform: uppercase; letter-spacing: 0.08em; color: #0b1a33; padding-bottom: 8px; border-bottom: 2px solid #b8860b; margin-bottom: 12px;">
+        ${esc(term)}
+      </h3>
+      <table style="width: 100%; border-collapse: collapse; font-size: 13px;">
+        <thead>
+          <tr>
+            <th style="text-align: left; padding: 8px 6px; border-bottom: 1px solid #e5e8ed; color: #6b7280; font-size: 11px; text-transform: uppercase;">Code</th>
+            <th style="text-align: left; padding: 8px 6px; border-bottom: 1px solid #e5e8ed; color: #6b7280; font-size: 11px; text-transform: uppercase;">Unit / Course</th>
+            <th style="text-align: center; padding: 8px 6px; border-bottom: 1px solid #e5e8ed; color: #6b7280; font-size: 11px; text-transform: uppercase;">Marks</th>
+            <th style="text-align: center; padding: 8px 6px; border-bottom: 1px solid #e5e8ed; color: #6b7280; font-size: 11px; text-transform: uppercase;">Grade</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${items.map(r => `
+            <tr>
+              <td style="padding: 10px 6px; border-bottom: 1px solid #f0f0f0; font-family: 'Courier New', monospace; font-weight: 600;">${esc(r.course_code)}</td>
+              <td style="padding: 10px 6px; border-bottom: 1px solid #f0f0f0;">${esc(r.course_title)}</td>
+              <td style="padding: 10px 6px; border-bottom: 1px solid #f0f0f0; text-align: center;">${r.marks}</td>
+              <td style="padding: 10px 6px; border-bottom: 1px solid #f0f0f0; text-align: center; font-weight: 700; color: ${r.grade.startsWith('A') ? '#15803d' : r.grade.startsWith('B') ? '#0b1a33' : '#a16207'};">${esc(r.grade)}</td>
+            </tr>
+          `).join('')}
+        </tbody>
+      </table>
+    </div>
+  `).join('');
+
+  const win = window.open('', '_blank');
+  win.document.write(`
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <meta charset="utf-8" />
+      <title>Academic Transcript — ${esc(student.name)}</title>
+      <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+          font-family: 'Inter', -apple-system, sans-serif;
+          padding: 40px 32px;
+          max-width: 820px;
+          margin: auto;
+          color: #1a1f2e;
+          line-height: 1.5;
+        }
+        .letterhead {
+          text-align: center;
+          padding-bottom: 24px;
+          border-bottom: 4px double #0b1a33;
+          margin-bottom: 24px;
+        }
+        .letterhead h1 {
+          font-size: 22px;
+          font-weight: 800;
+          letter-spacing: 0.04em;
+          color: #0b1a33;
+          margin-bottom: 6px;
+        }
+        .letterhead .sub {
+          font-size: 11px;
+          text-transform: uppercase;
+          letter-spacing: 0.15em;
+          color: #6b7280;
+          font-weight: 600;
+        }
+        .doc-title {
+          text-align: center;
+          font-size: 15px;
+          font-weight: 800;
+          text-transform: uppercase;
+          letter-spacing: 0.15em;
+          color: #0b1a33;
+          margin: 24px 0 32px;
+          padding: 12px;
+          background: #f5f6f8;
+          border-radius: 8px;
+        }
+        .student-info {
+          display: grid;
+          grid-template-columns: 1fr 1fr;
+          gap: 14px 32px;
+          margin-bottom: 32px;
+          padding: 20px;
+          background: #f9fafb;
+          border-left: 4px solid #b8860b;
+          border-radius: 6px;
+        }
+        .info-row { display: flex; flex-direction: column; gap: 3px; }
+        .info-lbl {
+          font-size: 10px;
+          text-transform: uppercase;
+          letter-spacing: 0.1em;
+          color: #94a3b8;
+          font-weight: 700;
+        }
+        .info-val { font-size: 14px; font-weight: 600; color: #0b1a33; }
+        .summary {
+          display: grid;
+          grid-template-columns: 1fr 1fr 1fr;
+          gap: 16px;
+          margin: 32px 0;
+        }
+        .summary-item {
+          text-align: center;
+          padding: 20px;
+          background: linear-gradient(135deg, #f9fafb, #f0f3f7);
+          border-radius: 10px;
+          border: 1px solid #e5e8ed;
+        }
+        .summary-lbl {
+          font-size: 10px;
+          text-transform: uppercase;
+          letter-spacing: 0.1em;
+          color: #6b7280;
+          font-weight: 700;
+          margin-bottom: 8px;
+        }
+        .summary-val {
+          font-size: 26px;
+          font-weight: 800;
+          color: #0b1a33;
+          font-family: 'SF Mono', 'Monaco', monospace;
+        }
+        .footer {
+          margin-top: 48px;
+          padding-top: 24px;
+          border-top: 1px solid #e5e8ed;
+          text-align: center;
+          font-size: 11px;
+          color: #6b7280;
+          line-height: 1.7;
+        }
+        .seal {
+          display: inline-block;
+          padding: 12px 24px;
+          border: 2px dashed #b8860b;
+          border-radius: 8px;
+          color: #b8860b;
+          font-weight: 700;
+          font-size: 12px;
+          letter-spacing: 0.1em;
+          text-transform: uppercase;
+          margin-bottom: 16px;
+        }
+        @media print {
+          body { padding: 20px; }
+          .no-print { display: none; }
+        }
+        .no-print-bar {
+          position: fixed;
+          top: 0; left: 0; right: 0;
+          background: #0b1a33;
+          color: white;
+          padding: 12px 20px;
+          text-align: center;
+          font-size: 14px;
+          z-index: 100;
+          box-shadow: 0 2px 12px rgba(0,0,0,0.2);
+        }
+        .no-print-bar button {
+          background: #b8860b;
+          color: white;
+          border: none;
+          padding: 8px 20px;
+          border-radius: 6px;
+          font-weight: 700;
+          cursor: pointer;
+          margin-left: 16px;
+          font-family: inherit;
+        }
+        .no-print-bar button:hover { background: #d4a017; }
+      </style>
+    </head>
+    <body>
+      <div class="no-print-bar">
+        📄 Your transcript is ready.
+        <button onclick="window.print()">Print / Save as PDF</button>
+      </div>
+      <div style="height: 60px;"></div>
+
+      <div class="letterhead">
+        <h1>HERALD TRAINER AND CONSULTANT</h1>
+        <div class="sub">Skills · Knowledge · Better Futures</div>
+      </div>
+
+      <div class="doc-title">Official Academic Transcript</div>
+
+      <div class="student-info">
+        <div class="info-row">
+          <span class="info-lbl">Student Name</span>
+          <span class="info-val">${esc(student.name)}</span>
+        </div>
+        <div class="info-row">
+          <span class="info-lbl">Registration Number</span>
+          <span class="info-val">${esc(student.reg_no)}</span>
+        </div>
+        <div class="info-row">
+          <span class="info-lbl">Program</span>
+          <span class="info-val">${esc(student.course)}</span>
+        </div>
+        <div class="info-row">
+          <span class="info-lbl">Email</span>
+          <span class="info-val">${esc(student.email)}</span>
+        </div>
+      </div>
+
+      ${termSections || '<p style="text-align:center; color:#6b7280; padding:40px;">No results recorded yet.</p>'}
+
+      <div class="summary">
+        <div class="summary-item">
+          <div class="summary-lbl">Total Units</div>
+          <div class="summary-val">${summary.totalUnits}</div>
+        </div>
+        <div class="summary-item">
+          <div class="summary-lbl">Cumulative GPA</div>
+          <div class="summary-val">${summary.gpa}</div>
+        </div>
+        <div class="summary-item">
+          <div class="summary-lbl">Date Generated</div>
+          <div class="summary-val" style="font-size:16px;">${new Date(summary.generated_at).toLocaleDateString()}</div>
+        </div>
+      </div>
+
+      <div class="footer">
+        <div class="seal">Official Transcript</div>
+        <div>This is a computer-generated transcript and does not require a signature.</div>
+        <div>For verification, contact sidzac33@gmail.com or +254 796 071 997</div>
+        <div style="margin-top: 8px; color: #94a3b8;">Herald Trainer and Consultant · Mombasa, Kenya</div>
+      </div>
+    </body>
+    </html>
+  `);
+  win.document.close();
+}
+
+// ============================================================
+// AUTO-LOGOUT AFTER 30 MIN INACTIVITY
+// ============================================================
 (function autoLogout() {
   if (!document.getElementById('userName')) return;
   const TIMEOUT = 30 * 60 * 1000;
