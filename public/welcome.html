@@ -1030,6 +1030,326 @@
       pointer-events: auto;
     }
     .back-to-top:hover { background: var(--gold); transform: translateY(-3px); }
+
+    /* ═══════════════════════════════════════════════════════════
+   NEUMORPHISM — Landing page overrides
+   ═══════════════════════════════════════════════════════════ */
+
+/* Page base */
+body {
+  background: #eef1f5;
+}
+
+/* Stats bar — floating neu panel */
+.stats {
+  background: linear-gradient(135deg, #eef1f5 0%, #e6eaf0 100%);
+  color: #0b1a33;
+  box-shadow:
+    20px 20px 60px #c8ccd4,
+    -20px -20px 60px #ffffff,
+    inset 0 1px 0 rgba(255,255,255,0.6);
+  border: 1px solid rgba(255,255,255,0.5);
+}
+
+.stat-num {
+  background: linear-gradient(135deg, #0b1a33, #244c74);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.stat-lbl { color: #64748b; }
+
+/* Guides cards — raised neu */
+.guide-card {
+  background: #eef1f5;
+  border: none;
+  box-shadow:
+    10px 10px 24px #c8ccd4,
+    -10px -10px 24px #ffffff;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.guide-card:hover {
+  transform: translateY(-4px);
+  box-shadow:
+    14px 14px 32px #c8ccd4,
+    -14px -14px 32px #ffffff;
+}
+
+.guide-card.active {
+  background: linear-gradient(135deg, #eef1f5, #fdf7e3);
+  box-shadow:
+    inset 6px 6px 12px #c8ccd4,
+    inset -6px -6px 12px #ffffff;
+}
+
+.guide-icon {
+  background: linear-gradient(135deg, #eef1f5, #e6eaf0);
+  box-shadow:
+    inset 4px 4px 8px #c8ccd4,
+    inset -4px -4px 8px #ffffff;
+  color: #b8860b;
+}
+
+.guide-card:hover .guide-icon {
+  background: linear-gradient(135deg, #0b1a33, #244c74);
+  color: #e6b84c;
+  box-shadow:
+    6px 6px 14px #c8ccd4,
+    -6px -6px 14px #ffffff,
+    inset 0 1px 0 rgba(255,255,255,0.15);
+}
+
+/* Services cards — raised neu */
+.service-card {
+  background: #eef1f5;
+  border: none;
+  box-shadow:
+    10px 10px 24px #c8ccd4,
+    -10px -10px 24px #ffffff;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.service-card:hover {
+  transform: translateY(-4px);
+  box-shadow:
+    14px 14px 32px #c8ccd4,
+    -14px -14px 32px #ffffff;
+}
+
+.service-icon {
+  background: linear-gradient(135deg, #eef1f5, #e6eaf0);
+  box-shadow:
+    inset 4px 4px 8px #c8ccd4,
+    inset -4px -4px 8px #ffffff;
+  color: #b8860b;
+}
+
+.service-card:hover .service-icon {
+  background: linear-gradient(135deg, #0b1a33, #244c74);
+  color: #e6b84c;
+  box-shadow:
+    6px 6px 14px #c8ccd4,
+    -6px -6px 14px #ffffff,
+    inset 0 1px 0 rgba(255,255,255,0.15);
+}
+
+/* Course cards — raised neu */
+.course-card {
+  background: #eef1f5;
+  border: none;
+  box-shadow:
+    10px 10px 24px #c8ccd4,
+    -10px -10px 24px #ffffff;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.course-card:hover {
+  transform: translateY(-6px);
+  box-shadow:
+    16px 16px 36px #c8ccd4,
+    -16px -16px 36px #ffffff;
+}
+
+.course-img-wrap {
+  border-bottom: 1px solid rgba(255,255,255,0.8);
+}
+
+.course-body {
+  background: #eef1f5;
+}
+
+/* Course tabs — pill neu */
+.course-tab {
+  background: #eef1f5;
+  border: none;
+  box-shadow:
+    5px 5px 12px #c8ccd4,
+    -5px -5px 12px #ffffff;
+  transition: all 0.2s ease;
+}
+
+.course-tab:hover {
+  transform: translateY(-1px);
+  box-shadow:
+    7px 7px 16px #c8ccd4,
+    -7px -7px 16px #ffffff;
+}
+
+.course-tab.active {
+  background: linear-gradient(135deg, #0b1a33, #244c74);
+  color: white;
+  box-shadow:
+    inset 4px 4px 8px rgba(0,0,0,0.3),
+    inset -4px -4px 8px rgba(255,255,255,0.05);
+}
+
+/* Show more button — neu pill */
+.courses-toggle-btn {
+  background: #eef1f5;
+  color: #0b1a33;
+  border: none;
+  box-shadow:
+    8px 8px 18px #c8ccd4,
+    -8px -8px 18px #ffffff;
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.courses-toggle-btn:hover {
+  transform: translateY(-2px);
+  box-shadow:
+    12px 12px 26px #c8ccd4,
+    -12px -12px 26px #ffffff;
+  background: linear-gradient(135deg, #eef1f5, #fdf7e3);
+  color: #b8860b;
+}
+
+.courses-toggle-btn:active {
+  transform: translateY(0);
+  box-shadow:
+    inset 4px 4px 8px #c8ccd4,
+    inset -4px -4px 8px #ffffff;
+}
+
+/* Contact items — inset neu */
+.contact-item {
+  background: linear-gradient(135deg, #eef1f5, #e6eaf0);
+  border: none;
+  box-shadow:
+    inset 4px 4px 10px #c8ccd4,
+    inset -4px -4px 10px #ffffff;
+  color: #0b1a33;
+}
+
+.contact-item:hover {
+  background: linear-gradient(135deg, #0b1a33, #244c74);
+  color: white;
+  box-shadow:
+    8px 8px 20px #c8ccd4,
+    -8px -8px 20px #ffffff;
+}
+
+.contact-item-icon {
+  background: linear-gradient(135deg, #b8860b, #e6b84c);
+  box-shadow:
+    4px 4px 10px #c8ccd4,
+    -4px -4px 10px #ffffff;
+}
+
+.contact-item-label { color: #64748b; }
+.contact-item-value { color: #0b1a33; }
+
+.contact-item:hover .contact-item-icon {
+  background: linear-gradient(135deg, #e6b84c, #fbbf24);
+}
+
+/* Hero CTA buttons — neu pressable */
+.btn-gold {
+  background: linear-gradient(135deg, #b8860b, #d4a017);
+  border: none;
+  box-shadow:
+    10px 10px 24px rgba(0,0,0,0.3),
+    -4px -4px 12px rgba(255,255,255,0.08),
+    inset 0 1px 0 rgba(255,255,255,0.2);
+  color: white;
+}
+
+.btn-gold:hover {
+  background: linear-gradient(135deg, #d4a017, #e6b84c);
+  transform: translateY(-2px);
+  box-shadow:
+    14px 14px 32px rgba(0,0,0,0.35),
+    -6px -6px 16px rgba(255,255,255,0.1),
+    inset 0 1px 0 rgba(255,255,255,0.25);
+}
+
+.btn-outline-white {
+  background: rgba(255,255,255,0.06);
+  backdrop-filter: blur(8px);
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,0.15),
+    0 8px 24px rgba(0,0,0,0.2);
+}
+
+.btn-outline-white:hover {
+  background: rgba(255,255,255,0.12);
+  transform: translateY(-2px);
+}
+
+/* Mobile menu — soft neu */
+.mobile-menu {
+  background: linear-gradient(135deg, #0b1a33, #061323);
+  box-shadow: -20px 0 60px rgba(0,0,0,0.5);
+}
+
+.mobile-menu-links a {
+  border-radius: 0;
+}
+
+/* Navigation — subtle raised */
+.nav {
+  background: rgba(11, 26, 51, 0.92);
+  backdrop-filter: blur(16px);
+  box-shadow: 0 4px 24px rgba(0,0,0,0.15);
+}
+
+.nav-cta {
+  background: linear-gradient(135deg, #b8860b, #d4a017);
+  box-shadow:
+    4px 4px 12px rgba(0,0,0,0.3),
+    inset 0 1px 0 rgba(255,255,255,0.2);
+}
+
+.nav-cta:hover {
+  background: linear-gradient(135deg, #d4a017, #e6b84c);
+  transform: translateY(-1px);
+}
+
+/* Dark mode — swap neu palette */
+body.dark {
+  background: #0f172a;
+}
+body.dark .stats {
+  background: linear-gradient(135deg, #141d31, #0f172a);
+  color: #e5e9f0;
+  box-shadow:
+    20px 20px 60px #060c18,
+    -20px -20px 60px #1e293b;
+}
+body.dark .stat-num {
+  background: linear-gradient(135deg, #93c5fd, #bfdbfe);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+body.dark .guide-card,
+body.dark .service-card,
+body.dark .course-card,
+body.dark .course-tab,
+body.dark .courses-toggle-btn {
+  background: #141d31;
+  box-shadow:
+    10px 10px 24px #060c18,
+    -10px -10px 24px #1e293b;
+}
+body.dark .course-body { background: #141d31; }
+body.dark .guide-icon,
+body.dark .service-icon {
+  background: #0f172a;
+  box-shadow:
+    inset 4px 4px 8px #060c18,
+    inset -4px -4px 8px #1e293b;
+}
+body.dark .contact-item {
+  background: #141d31;
+  color: #e5e9f0;
+  box-shadow:
+    inset 4px 4px 10px #060c18,
+    inset -4px -4px 10px #1e293b;
+}
+body.dark .contact-item-value { color: #e5e9f0; }
+body.dark .contact-item-label { color: #94a3b8; }
   </style>
 </head>
 <body>

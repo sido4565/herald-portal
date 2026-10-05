@@ -41,6 +41,27 @@
   --radius-lg: 8px;
   --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   --font-mono: 'SF Mono', 'Monaco', 'Menlo', 'Consolas', monospace;
+    /* ─── Neumorphism tokens ─── */
+  --neu-bg: #eef1f5;
+  --neu-bg-alt: #e6eaf0;
+  --neu-surface: #eef1f5;
+  --neu-light: #ffffff;
+  --neu-dark: #c8ccd4;
+  --neu-shadow-out:
+    8px 8px 18px var(--neu-dark),
+    -8px -8px 18px var(--neu-light);
+  --neu-shadow-out-sm:
+    4px 4px 10px var(--neu-dark),
+    -4px -4px 10px var(--neu-light);
+  --neu-shadow-in:
+    inset 6px 6px 12px var(--neu-dark),
+    inset -6px -6px 12px var(--neu-light);
+  --neu-shadow-in-sm:
+    inset 3px 3px 7px var(--neu-dark),
+    inset -3px -3px 7px var(--neu-light);
+  --neu-shadow-pressed:
+    inset 4px 4px 8px var(--neu-dark),
+    inset -4px -4px 8px var(--neu-light);
 }
 
 /* ---------- Dark Mode ---------- */
@@ -70,7 +91,34 @@ body.dark {
   --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.4);
   --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.4);
   --shadow-lg: 0 12px 32px rgba(0, 0, 0, 0.5);
+    /* ─── Dark neumorphism ─── */
+  --neu-bg: #141d31;
+  --neu-bg-alt: #0f172a;
+  --neu-surface: #141d31;
+  --neu-light: #1e293b;
+  --neu-dark: #060c18;
+  --neu-shadow-out:
+    8px 8px 18px var(--neu-dark),
+    -8px -8px 18px var(--neu-light);
+  --neu-shadow-out-sm:
+    4px 4px 10px var(--neu-dark),
+    -4px -4px 10px var(--neu-light);
+  --neu-shadow-in:
+    inset 6px 6px 12px var(--neu-dark),
+    inset -6px -6px 12px var(--neu-light);
+  --neu-shadow-in-sm:
+    inset 3px 3px 7px var(--neu-dark),
+    inset -3px -3px 7px var(--neu-light);
+  --neu-shadow-pressed:
+    inset 4px 4px 8px var(--neu-dark),
+    inset -4px -4px 8px var(--neu-light);
+  --bg: var(--neu-bg);
+  --bg-alt: var(--neu-bg-alt);
+  --card: var(--neu-surface);
+  --border: #1e283d;
+  --border-soft: #1a2337;
 }
+
 
 /* ---------- Reset ---------- */
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -1052,4 +1100,379 @@ body.dark .course-picker-option.highlighted {
 body.dark .course-picker-group {
   color: #94a3b8;
   border-color: #1e283d;
+}
+
+/* ===================================================================
+   NEUMORPHISM OVERRIDES
+   Soft UI applied to core components
+   =================================================================== */
+
+/* ─── Page background ─── */
+body {
+  background: var(--neu-bg);
+  transition: background 0.3s ease, color 0.3s ease;
+}
+
+/* ─── Cards — raised surfaces ─── */
+.card,
+.stat-card,
+.ann-card,
+.sub-card,
+.fees-summary-bar .stat-card,
+.admin-panel .stat-card,
+.modal {
+  background: var(--neu-surface);
+  border: none;
+  box-shadow: var(--neu-shadow-out);
+  transition: box-shadow 0.25s ease, transform 0.25s ease;
+}
+
+.card:hover,
+.ann-card:hover {
+  box-shadow: var(--neu-shadow-out), 0 0 0 1px rgba(184, 134, 11, 0.08);
+}
+
+/* Wider gap for cards to breathe */
+.grid { gap: 28px; }
+
+/* ─── Tables & table wrappers ─── */
+.table-wrap {
+  background: var(--neu-surface);
+  border: none;
+  box-shadow: var(--neu-shadow-in);
+  border-radius: var(--radius-lg);
+  padding: 16px;
+}
+
+table thead th {
+  background: transparent;
+  border-bottom: 1px solid var(--border-soft);
+}
+
+/* ─── Inputs — inset, carved into surface ─── */
+.auth-form input,
+.modal-form input,
+.modal-form select,
+.modal-form textarea,
+.term-filter,
+.grade-input,
+.feedback-input,
+.course-picker input {
+  background: var(--neu-surface);
+  border: none;
+  box-shadow: var(--neu-shadow-in-sm);
+  transition: box-shadow 0.2s ease, border-color 0.2s ease;
+  border-radius: var(--radius);
+}
+
+.auth-form input:focus,
+.modal-form input:focus,
+.modal-form select:focus,
+.modal-form textarea:focus,
+.term-filter:focus,
+.grade-input:focus,
+.feedback-input:focus,
+.course-picker input:focus {
+  box-shadow: var(--neu-shadow-in-sm), 0 0 0 2px var(--gold-500);
+  outline: none;
+}
+
+/* ─── Primary buttons — raised, pressable ─── */
+.btn-primary,
+.btn-gold,
+.btn-submit {
+  background: var(--neu-surface);
+  color: var(--navy-700);
+  box-shadow: var(--neu-shadow-out-sm);
+  border: none;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  font-weight: 700;
+}
+
+.btn-primary:hover,
+.btn-gold:hover,
+.btn-submit:hover {
+  color: var(--gold-500);
+  transform: translateY(-1px);
+  box-shadow:
+    6px 6px 14px var(--neu-dark),
+    -6px -6px 14px var(--neu-light);
+}
+
+.btn-primary:active,
+.btn-gold:active,
+.btn-submit:active {
+  box-shadow: var(--neu-shadow-pressed);
+  transform: translateY(0);
+}
+
+/* Accent primary — filled with brand color but still soft */
+.btn-primary.accent,
+.btn-submit {
+  background: linear-gradient(135deg, var(--navy-700), var(--navy-600));
+  color: #ffffff;
+  box-shadow:
+    6px 6px 14px var(--neu-dark),
+    -6px -6px 14px var(--neu-light),
+    inset 0 1px 0 rgba(255,255,255,0.15);
+}
+.btn-primary.accent:hover,
+.btn-submit:hover {
+  background: linear-gradient(135deg, var(--navy-600), var(--navy-500));
+  color: #ffffff;
+}
+
+/* ─── Small buttons (edit/delete) ─── */
+.btn-xs,
+.btn-pay,
+.btn-enroll {
+  background: var(--neu-surface);
+  border: none;
+  box-shadow: var(--neu-shadow-out-sm);
+  transition: all 0.15s ease;
+  color: var(--text-soft);
+}
+
+.btn-xs:hover,
+.btn-pay:hover,
+.btn-enroll:hover {
+  transform: translateY(-1px);
+  box-shadow:
+    5px 5px 12px var(--neu-dark),
+    -5px -5px 12px var(--neu-light);
+}
+
+.btn-xs:active,
+.btn-pay:active,
+.btn-enroll:active {
+  box-shadow: var(--neu-shadow-pressed);
+  transform: translateY(0);
+}
+
+.btn-xs.danger {
+  color: var(--danger);
+  background: var(--neu-surface);
+}
+.btn-xs.danger:hover {
+  background: linear-gradient(135deg, #fee2e2, #fecaca);
+  color: var(--danger);
+}
+
+.btn-pay {
+  color: var(--success);
+}
+
+/* ─── Pills — subtle raised badges ─── */
+.pill {
+  border: none;
+  box-shadow:
+    2px 2px 4px var(--neu-dark),
+    -2px -2px 4px var(--neu-light);
+  font-weight: 700;
+}
+
+.pill-green { background: linear-gradient(135deg, #dcfce7, #bbf7d0); color: #166534; }
+.pill-red   { background: linear-gradient(135deg, #fee2e2, #fecaca); color: #991b1b; }
+.pill-amber { background: linear-gradient(135deg, #fef3c7, #fde68a); color: #92400e; }
+
+body.dark .pill-green { background: linear-gradient(135deg, #052e16, #064e3b); color: #86efac; }
+body.dark .pill-red   { background: linear-gradient(135deg, #450a0a, #7f1d1d); color: #fca5a5; }
+body.dark .pill-amber { background: linear-gradient(135deg, #451a03, #78350f); color: #fcd34d; }
+
+/* ─── Topbar — softly raised ─── */
+.topbar {
+  background: var(--neu-bg);
+  color: var(--text);
+  border-bottom: none;
+  box-shadow: 0 4px 16px rgba(15, 23, 42, 0.06);
+}
+
+.admin-topbar {
+  background: linear-gradient(135deg, #6b2c2c, #8b3a3a);
+  color: white;
+  box-shadow: 0 4px 16px rgba(107, 44, 44, 0.25);
+}
+
+.topbar .brand { color: var(--navy-800); }
+.admin-topbar .brand { color: #ffffff; }
+
+/* Buttons inside topbar stay dark-themed */
+.topbar .btn-ghost,
+.admin-topbar .btn-ghost {
+  color: var(--text-soft);
+  border-color: var(--border);
+}
+.admin-topbar .btn-ghost { color: #ffffff; border-color: rgba(255,255,255,0.3); }
+
+/* ─── Tabs — raised when active ─── */
+.admin-tab {
+  border: none;
+  background: transparent;
+  color: var(--muted);
+  padding: 10px 16px;
+  border-radius: var(--radius);
+  font-weight: 600;
+  transition: all 0.2s ease;
+}
+
+.admin-tab:hover {
+  background: var(--neu-surface);
+  color: var(--text);
+  box-shadow: var(--neu-shadow-out-sm);
+}
+
+.admin-tab.active {
+  background: var(--neu-surface);
+  color: var(--admin-700);
+  box-shadow: var(--neu-shadow-out-sm);
+  border-bottom: none;
+}
+
+body.dark .admin-tab.active { color: #fca5a5; }
+
+/* Course tabs (welcome page) */
+.course-tab {
+  background: var(--neu-surface);
+  border: none;
+  box-shadow: var(--neu-shadow-out-sm);
+}
+
+.course-tab.active {
+  background: linear-gradient(135deg, var(--navy-800), var(--navy-600));
+  color: white;
+  box-shadow:
+    inset 4px 4px 8px rgba(0,0,0,0.3),
+    inset -4px -4px 8px rgba(255,255,255,0.05);
+}
+
+/* ─── Modals — floating panel ─── */
+.modal-overlay {
+  background: rgba(15, 23, 42, 0.5);
+  backdrop-filter: blur(8px);
+}
+
+.modal {
+  box-shadow:
+    20px 20px 60px rgba(15, 23, 42, 0.3),
+    -10px -10px 40px rgba(255, 255, 255, 0.08);
+}
+
+/* ─── Toasts — raised ─── */
+.toast {
+  background: var(--neu-surface);
+  color: var(--text);
+  box-shadow: var(--neu-shadow-out);
+  border-left: 4px solid var(--gold-500);
+  font-weight: 600;
+}
+
+.toast-success {
+  border-left-color: var(--success);
+  background: linear-gradient(135deg, var(--neu-surface), #f0fdf4);
+}
+.toast-error {
+  border-left-color: var(--danger);
+  background: linear-gradient(135deg, var(--neu-surface), #fef2f2);
+}
+body.dark .toast-success { background: linear-gradient(135deg, #141d31, #052e16); }
+body.dark .toast-error { background: linear-gradient(135deg, #141d31, #450a0a); }
+
+/* ─── Stats grid — soft raised cards ─── */
+.stat-card {
+  padding: 28px;
+}
+
+.stat-num {
+  background: linear-gradient(135deg, var(--navy-700), var(--navy-500));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+body.dark .stat-num {
+  background: linear-gradient(135deg, #93c5fd, #bfdbfe);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* ─── Course picker dropdown (lecturer/student register) ─── */
+.course-picker-dropdown {
+  background: var(--neu-surface);
+  box-shadow: var(--neu-shadow-out);
+  border: none;
+}
+
+.course-picker-option:hover,
+.course-picker-option.highlighted {
+  background: var(--neu-bg-alt);
+  box-shadow: var(--neu-shadow-in-sm);
+}
+
+.course-picker-option.selected {
+  background: linear-gradient(135deg, var(--navy-800), var(--navy-600));
+  color: white;
+  box-shadow:
+    inset 3px 3px 6px rgba(0,0,0,0.25),
+    inset -3px -3px 6px rgba(255,255,255,0.05);
+}
+
+/* ─── Timetable grid ─── */
+.tt-grid-wrap {
+  background: var(--neu-surface);
+  border: none;
+  box-shadow: var(--neu-shadow-in);
+}
+
+.tt-head {
+  background: linear-gradient(135deg, var(--navy-800), var(--navy-700));
+  box-shadow: var(--neu-shadow-out-sm);
+  border: none;
+}
+
+.tt-slot {
+  background: linear-gradient(135deg, var(--info-bg), #eef2ff);
+  border-left: none;
+  box-shadow:
+    inset 2px 2px 4px rgba(30, 64, 175, 0.1),
+    2px 2px 4px var(--neu-dark),
+    -2px -2px 4px var(--neu-light);
+}
+
+/* ─── Auth cards — raised ─── */
+.auth-card {
+  background: var(--neu-surface);
+  box-shadow:
+    20px 20px 60px rgba(15, 23, 42, 0.25),
+    -10px -10px 40px rgba(255, 255, 255, 0.05);
+  border: none;
+}
+
+.auth-card::before {
+  background: linear-gradient(90deg, var(--gold-500), var(--gold-300));
+}
+
+/* ─── Theme toggle & ghost buttons on dark topbar ─── */
+.theme-toggle {
+  background: var(--neu-surface);
+  color: var(--text-soft);
+  border: none;
+  box-shadow: var(--neu-shadow-out-sm);
+}
+
+.theme-toggle:active {
+  box-shadow: var(--neu-shadow-pressed);
+}
+
+/* ─── Responsive: reduce shadow spread on mobile ─── */
+@media (max-width: 768px) {
+  :root {
+    --neu-shadow-out:
+      5px 5px 12px var(--neu-dark),
+      -5px -5px 12px var(--neu-light);
+    --neu-shadow-in:
+      inset 4px 4px 8px var(--neu-dark),
+      inset -4px -4px 8px var(--neu-light);
+  }
+  .card, .stat-card { padding: 20px; }
 }
