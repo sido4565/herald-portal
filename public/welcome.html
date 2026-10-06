@@ -367,6 +367,25 @@
       opacity: 0.75;
       font-weight: 600;
     }
+    /* ─── Count-up animation polish ─── */
+.stat-num {
+  transition: color 0.3s, text-shadow 0.4s;
+}
+
+.stat-num.counting {
+  color: #b8860b;
+  text-shadow: 0 0 20px rgba(184, 134, 11, 0.3);
+}
+
+.stat-num.done {
+  animation: numPop 0.45s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+@keyframes numPop {
+  0%   { transform: scale(1); }
+  40%  { transform: scale(1.12); }
+  100% { transform: scale(1); }
+}
 
     /* ─── What Guides Us (Interactive) ─── */
     .guides {
@@ -1417,11 +1436,23 @@ body.dark .contact-item-label { color: #94a3b8; }
 
 
 <!-- Stats -->
-<div class="stats">
-  <div class="stat-item"><div class="stat-num">500+</div><div class="stat-lbl">Students Trained</div></div>
-  <div class="stat-item"><div class="stat-num">15+</div><div class="stat-lbl">Courses Offered</div></div>
-  <div class="stat-item"><div class="stat-num">98%</div><div class="stat-lbl">Satisfaction Rate</div></div>
-  <div class="stat-item"><div class="stat-num">5+</div><div class="stat-lbl">Years of Excellence</div></div>
+<div class="stats" id="statsBar">
+  <div class="stat-item">
+    <div class="stat-num" data-target="1200" data-suffix="+">0+</div>
+    <div class="stat-lbl">Students Trained</div>
+  </div>
+  <div class="stat-item">
+    <div class="stat-num" data-target="50" data-suffix="+">0+</div>
+    <div class="stat-lbl">Courses Offered</div>
+  </div>
+  <div class="stat-item">
+    <div class="stat-num" data-target="98" data-suffix="%">0%</div>
+    <div class="stat-lbl">Satisfaction Rate</div>
+  </div>
+  <div class="stat-item">
+    <div class="stat-num" data-target="5" data-suffix="+">0+</div>
+    <div class="stat-lbl">Years of Excellence</div>
+  </div>
 </div>
 
 <!-- What Guides Us -->
@@ -2014,6 +2045,93 @@ document.querySelectorAll('.nav-links a, .hero-cta a[href^="#"]').forEach(link =
     }, 150);
   });
 })();
+
+// ═══════════════════════════════════════════════════════════
+// Animated Counter — count-up when scrolled into view
+// ═══════════════════════════════════════════════════════════
+(function initCounters() {
+  const statsBar = document.getElementById('statsBar');
+  if (!statsBar) return;
+
+  const numbers = statsBar.querySelectorAll('.stat-num');
+  if (!numbers.length) return;
+
+  // Respect user's motion preference
+  const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  function formatNumber(n) {
+    return Math.floor(n).toLocaleString('en-US'); // 1200 → "1,200"
+  }
+
+    function animateCounter(el) {
+    const target = Number(el.dataset.target) || 0;
+    const suffix = el.dataset.suffix || '';
+    const duration = 1800; // ms
+    const startTime = performance.now();
+
+    // Add counting class for the gold glow effect
+    el.classList.add('counting');
+
+    // Easing: ease-out-cubic (fast start, smooth finish)
+    function easeOutCubic(t) {
+      return 1 - Math.pow(1 - t, 3);
+    }
+
+    function tick(now) {
+      const elapsed = now - startTime;
+      const progress = Math.min(elapsed / duration, 1);
+      const eased = easeOutCubic(progress);
+      const current = eased * target;
+      el.textContent = formatNumber(current) + suffix;
+
+      if (progress < 1) {
+        requestAnimationFrame(tick);
+      } else {
+        // Final value
+        el.textContent = formatNumber(target) + suffix;
+
+        // Swap classes for the pop effect
+        el.classList.remove('counting');
+        el.classList.add('done');
+        setTimeout(() => el.classList.remove('done'), 500);
+      }
+    }
+
+    requestAnimationFrame(tick);
+  }
+
+  // Fire when stats bar enters viewport
+  let fired = false;
+
+  function handleIntersection(entries) {
+    entries.forEach(entry => {
+      if (entry.isIntersecting && !fired) {
+        fired = true;
+        if (prefersReducedMotion) {
+          // Skip animation — set final values directly
+          numbers.forEach(el => {
+            const target = Number(el.dataset.target) || 0;
+            const suffix = el.dataset.suffix || '';
+            el.textContent = formatNumber(target) + suffix;
+          });
+        } else {
+          // Animate each number, staggered slightly
+          numbers.forEach((el, i) => {
+            setTimeout(() => animateCounter(el), i * 120);
+          });
+        }
+        observer.disconnect();
+      }
+    });
+  }
+
+  const observer = new IntersectionObserver(handleIntersection, {
+    threshold: 0.35, // fire when 35% of the stats bar is visible
+  });
+
+  observer.observe(statsBar);
+})();
+
 
 </script>
 
