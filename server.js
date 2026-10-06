@@ -550,15 +550,14 @@ app.post('/api/lecturer/change-password', authLecturer, (req, res) => {
   res.json({ ok: true });
 });
 
-// Lecturer: list courses assigned to them (by trainer name match)
+// Lecturer: list courses assigned to them
 app.get('/api/lecturer/my-courses', authLecturer, (req, res) => {
-  const lecturer = db.prepare('SELECT name FROM lecturers WHERE id = ?').get(req.lecturer.id);
   const courses = db.prepare(`
     SELECT c.*, (SELECT COUNT(*) FROM enrollments WHERE course_id = c.id) AS enrolled_count
     FROM courses c
-    WHERE c.trainer LIKE ?
+    WHERE c.lecturer_id = ?
     ORDER BY c.code
-  `).all(`%${lecturer.name}%`);
+  `).all(req.lecturer.id);
   res.json(courses);
 });
 
@@ -971,8 +970,12 @@ app.post('/api/admin/lecturers', authAdmin, (req, res) => {
 // --- Courses
 app.get('/api/admin/courses', authAdmin, (req, res) => {
   res.json(db.prepare(`
-    SELECT c.*, (SELECT COUNT(*) FROM enrollments WHERE course_id = c.id) AS enrolled_count
-    FROM courses c ORDER BY c.id
+    SELECT c.*,
+      (SELECT COUNT(*) FROM enrollments WHERE course_id = c.id) AS enrolled_count,
+      (SELECT name FROM lecturers WHERE id = c.lecturer_id) AS lecturer_name,
+      (SELECT staff_no FROM lecturers WHERE id = c.lecturer_id) AS lecturer_staff_no
+    FROM courses c
+    ORDER BY c.id
   `).all());
 });
 
@@ -1005,6 +1008,69 @@ app.get('/api/admin/courses/:id/students', authAdmin, (req, res) => {
     SELECT s.id, s.reg_no, s.name, s.email FROM students s
     JOIN enrollments e ON e.student_id = s.id WHERE e.course_id = ?
   `).all(req.params.id));
+});
+
+// Admin: list approved lecturers (for the assignment dropdown)
+app.get('/api/admin/lecturers/approved', authAdmin, (req, res) => {
+  const rows = db.prepare(`
+    SELECT id, staff_no, name, email, specialization
+    FROM lecturers
+    WHERE approved = 1 AND status = 'active'
+    ORDER BY name
+  `).all();
+  res.json(rows);
+});
+
+// Admin: assign a lecturer to a course
+app.post('/api/admin/courses/:id/assign', authAdmin, (req, res) => {
+  const { lecturer_id } = req.body;
+
+  // Verify the course exists
+  const course = db.prepare('SELECT id, code, title FROM courses WHERE id = ?').get(req.params.id);
+  if (!course) return res.status(404).json({ error: 'Course not found' });
+
+  // If clearing the assignment (null/0/empty)
+  if (!lecturer_id) {
+    db.prepare('UPDATE courses SET lecturer_id = NULL WHERE id = ?').run(req.params.id);
+    return res.json({ ok: true, message: 'Lecturer unassigned' });
+  }
+
+  // Verify the lecturer exists and is approved
+  const lecturer = db.prepare(`
+    SELECT id, name, staff_no, approved, status FROM lecturers WHERE id = ?
+  `).get(lecturer_id);
+  if (!lecturer) return res.status(404).json({ error: 'Lecturer not found' });
+  if (!lecturer.approved || lecturer.status !== 'active') {
+    return res.status(400).json({ error: 'Lecturer is not approved or is inactive' });
+  }
+
+  // Assign: update lecturer_id AND trainer text (for display/backwards compat)
+  db.prepare('UPDATE courses SET lecturer_id = ?, trainer = ? WHERE id = ?')
+    .run(lecturer.id, lecturer.name, req.params.id);
+
+  // Notify lecturer by email
+  try {
+    const { sendMail, ENABLED: MAIL_ON } = require('./mailer');
+    if (MAIL_ON) {
+      const lecturerFull = db.prepare('SELECT email, name FROM lecturers WHERE id = ?').get(lecturer.id);
+      sendMail({
+        to: lecturerFull.email,
+        subject: 'You have been assigned a new course — ' + course.code,
+        html: `
+          <h2>New Course Assignment</h2>
+          <p>Hello ${lecturerFull.name},</p>
+          <p>You have been assigned to teach <strong>${course.code} — ${course.title}</strong> at Herald Trainer and Consultant.</p>
+          <p>Log in to your lecturer dashboard to view student lists, post materials, take attendance, and enter results.</p>
+          <p><a href="${process.env.APP_URL || 'https://herald-portal.onrender.com'}/lecturer-login.html" style="background:#0b1a33; color:#fff; padding:12px 22px; border-radius:6px; text-decoration:none; font-weight:600;">Open Lecturer Portal</a></p>
+        `,
+      }).catch(err => console.error('Assignment email failed:', err.message));
+    }
+  } catch (e) { console.error('Email error:', e.message); }
+
+  res.json({
+    ok: true,
+    lecturer: { id: lecturer.id, name: lecturer.name, staff_no: lecturer.staff_no },
+  });
 });
 
 // --- Announcements

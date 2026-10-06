@@ -318,16 +318,47 @@ function wireLecturerActions() {
   toast(r.reg_no ? `Student added. Reg No: ${r.reg_no}` : 'Student added.');
 }));
 
-    $('#addCourseBtn').addEventListener('click', () => openModal('Add Course', [
-      { name: 'code',        label: 'Code', required: true },
-      { name: 'title',       label: 'Title', required: true },
-      { name: 'trainer',     label: 'Trainer', required: true },
-      { name: 'description', label: 'Description', type: 'textarea' }
-    ], async d => {
-      await api('/api/admin/courses', { method: 'POST', body: d });
+    $('#addCourseBtn').addEventListener('click', async () => {
+  let lecturers = [];
+  try {
+    lecturers = await api('/api/admin/lecturers/approved');
+  } catch (_) {}
+
+  openModal('Add Course', [
+    { name: 'code',        label: 'Code', required: true },
+    { name: 'title',       label: 'Title', required: true },
+    { name: 'trainer',     label: 'Trainer (text, used if no lecturer assigned)' },
+    { name: 'lecturer_id', label: 'Assigned Lecturer', type: 'select',
+      options: [{ value: '', label: '— None —' }].concat(
+        lecturers.map(l => ({ value: l.id, label: `${l.name} — ${l.staff_no}` }))
+      ) },
+    { name: 'description', label: 'Description', type: 'textarea' }
+  ], async d => {
+    // Create course first
+    const payload = {
+      code: d.code,
+      title: d.title,
+      trainer: d.trainer || 'Unassigned',
+      description: d.description,
+    };
+    await api('/api/admin/courses', { method: 'POST', body: payload });
+
+    // If a lecturer was chosen, we need the new course's ID → reload and assign
+    if (d.lecturer_id) {
       coursesCache = [];
-      await loadCourses();
-    }));
+      const refreshed = await api('/api/admin/courses');
+      const newCourse = refreshed.find(c => c.code === d.code);
+      if (newCourse) {
+        await api(`/api/admin/courses/${newCourse.id}/assign`, {
+          method: 'POST',
+          body: { lecturer_id: Number(d.lecturer_id) },
+        });
+      }
+    }
+    coursesCache = [];
+    await loadCourses();
+  });
+});
 
     $('#addAnnBtn').addEventListener('click', () => openModal('New Announcement', [
       { name: 'title', label: 'Title', required: true },
@@ -570,6 +601,7 @@ if (addLectBtn) {
         if (act === 'del-asg')       return delAsg(id);
         if (act === 'del-att')       return delAtt(id);
         if (act === 'del-lc')        return delLiveClass(id);
+        if (act === 'assign-lecturer') return assignLecturerToCourse(id);
       } catch (err) { toast(err.message, 'error'); }
     });
   }
@@ -611,23 +643,29 @@ if (addLectBtn) {
 
   // ---------------- Courses ----------------
   async function loadCourses() {
-    const rows = await api('/api/admin/courses');
-    coursesCache = rows;
-    const tb = $('#coursesTable tbody');
-    tb.innerHTML = rows.map(c => `
+  const rows = await api('/api/admin/courses');
+  coursesCache = rows;
+  const tb = $('#coursesTable tbody');
+  tb.innerHTML = rows.map(c => {
+    const lecturerDisplay = c.lecturer_name
+      ? `<span style="display:block; font-weight:600;">${esc(c.lecturer_name)}</span><span style="font-size:11px; color:var(--muted); font-family:monospace;">${esc(c.lecturer_staff_no || '')}</span>`
+      : '<span style="color:var(--danger); font-style:italic;">Unassigned</span>';
+    return `
       <tr>
         <td>${esc(c.code)}</td>
         <td>${esc(c.title)}</td>
-        <td>${esc(c.trainer)}</td>
+        <td>${lecturerDisplay}</td>
         <td>${c.enrolled_count}</td>
         <td>
+          <button class="btn-xs" data-act="assign-lecturer" data-id="${c.id}" type="button">Assign</button>
           <button class="btn-xs" data-act="edit-course" data-id="${c.id}" type="button">Edit</button>
           <button class="btn-xs" data-act="view-course" data-id="${c.id}" type="button">Students</button>
           <button class="btn-xs danger" data-act="del-course" data-id="${c.id}" type="button">Delete</button>
         </td>
-      </tr>`).join('') || '<tr><td colspan="5" class="empty">No courses created.</td></tr>';
-    wireTableActions(tb);
-  }
+      </tr>`;
+  }).join('') || '<tr><td colspan="5" class="empty">No courses created.</td></tr>';
+  wireTableActions(tb);
+}
 
   function editCourse(id) {
     const c = coursesCache.find(x => x.id === id);
@@ -643,6 +681,75 @@ if (addLectBtn) {
       await loadCourses();
     });
   }
+
+  async function assignLecturerToCourse(courseId) {
+  const course = coursesCache.find(c => c.id === courseId);
+  if (!course) return;
+
+  // Fetch approved lecturers
+  let lecturers = [];
+  try {
+    lecturers = await api('/api/admin/lecturers/approved');
+  } catch (e) {
+    return toast('Could not load lecturers: ' + e.message, 'error');
+  }
+
+  if (!lecturers.length) {
+    return toast('No approved lecturers yet. Approve a lecturer first.', 'error');
+  }
+
+  // Build a custom modal
+  const overlay = document.createElement('div');
+  overlay.className = 'modal-overlay';
+  overlay.innerHTML = `
+    <div class="modal" style="max-width: 520px;">
+      <h3>Assign Lecturer</h3>
+      <p style="color: var(--muted); font-size: 13px; margin: 0 0 16px; line-height: 1.5;">
+        <strong style="color: var(--text);">${esc(course.code)}</strong> — ${esc(course.title)}
+      </p>
+
+      <div class="modal-form">
+        <label>Select Lecturer</label>
+        <select id="assignLectSelect">
+          <option value="">— Unassign —</option>
+          ${lecturers.map(l => `
+            <option value="${l.id}"${l.id === course.lecturer_id ? ' selected' : ''}>
+              ${esc(l.name)} — ${esc(l.staff_no)}${l.specialization ? ' (' + esc(l.specialization) + ')' : ''}
+            </option>
+          `).join('')}
+        </select>
+      </div>
+
+      <div class="modal-actions">
+        <button class="btn-ghost dark" type="button" data-close>Cancel</button>
+        <button class="btn-primary" id="assignLectSave" type="button">Save Assignment</button>
+      </div>
+    </div>`;
+  document.body.appendChild(overlay);
+
+  overlay.addEventListener('click', e => {
+    if (e.target === overlay || e.target.closest('[data-close]')) overlay.remove();
+  });
+
+  overlay.querySelector('#assignLectSave').addEventListener('click', async () => {
+    const val = overlay.querySelector('#assignLectSelect').value;
+    const lecturer_id = val ? Number(val) : null;
+    try {
+      const res = await api(`/api/admin/courses/${courseId}/assign`, {
+        method: 'POST',
+        body: { lecturer_id },
+      });
+      overlay.remove();
+      toast(res.lecturer
+        ? `${res.lecturer.name} assigned to ${course.code} ✅`
+        : 'Lecturer unassigned');
+      coursesCache = [];
+      await loadCourses();
+    } catch (e) {
+      toast(e.message, 'error');
+    }
+  });
+}
 
   async function deleteCourse(id) {
     if (!confirm('Delete this course and all associated records?')) return;

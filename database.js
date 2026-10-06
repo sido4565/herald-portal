@@ -85,6 +85,7 @@ CREATE TABLE IF NOT EXISTS courses (
   code TEXT UNIQUE NOT NULL,
   title TEXT NOT NULL,
   trainer TEXT NOT NULL,
+  lecturer_id INTEGER,
   description TEXT
 );
 
@@ -211,6 +212,14 @@ CREATE TABLE IF NOT EXISTS material_views (
   FOREIGN KEY(student_id) REFERENCES students(id)
 );
 `);
+
+// ---------- Safe migrations ----------
+try {
+  db.prepare('SELECT lecturer_id FROM courses LIMIT 1').get();
+} catch (e) {
+  console.log('🔄 Migrating: adding lecturer_id to courses');
+  db.exec('ALTER TABLE courses ADD COLUMN lecturer_id INTEGER');
+}
 
 // ---------- Safe migrations ----------
 try {
