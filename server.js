@@ -16,6 +16,9 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 const JWT_SECRET = process.env.JWT_SECRET || 'herald-dev-secret-change-me';
 
+// ---------- Global BigInt JSON fix ----------
+BigInt.prototype.toJSON = function () { return Number(this); };
+
 app.use(express.json());
 app.use(cookieParser());
 app.use(express.static(path.join(__dirname, 'public')));
