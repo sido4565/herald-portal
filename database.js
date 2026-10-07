@@ -163,6 +163,13 @@ async function initSchema() {
       assigned_at DATETIME DEFAULT CURRENT_TIMESTAMP,
       UNIQUE(lecturer_id, course_id)
     )`,
+        `CREATE TABLE IF NOT EXISTS lecturer_courses (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      lecturer_id INTEGER NOT NULL,
+      course_id INTEGER NOT NULL,
+      assigned_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      UNIQUE(lecturer_id, course_id)
+    )`,
   ];
 
   for (const sql of statements) {
@@ -174,17 +181,51 @@ async function initSchema() {
 async function seed() {
   const courseCount = await client.execute('SELECT COUNT(*) AS c FROM courses');
   if (courseCount.rows[0].c === 0) {
-    const courses = [
-      ['WD101', 'Web Development Fundamentals', 'Mr. Herald K.', 'HTML, CSS, JavaScript basics'],
-      ['DB201', 'Database Design', 'Ms. Amina T.', 'SQL, normalization, ER diagrams'],
-      ['JS301', 'Advanced JavaScript', 'Mr. Herald K.', 'ES6+, async, modules'],
-      ['PY101', 'Python Programming', 'Dr. Otieno M.', 'Python basics & OOP'],
-      ['NET210', 'Networking Essentials', 'Mr. Brian W.', 'TCP/IP, routing, security'],
+        const courses = [
+      // Short courses
+      ['SC001', 'Digital Marketing & Social Media Marketing', 'Unassigned', '2-4 weeks', 'Short'],
+      ['SC002', 'AI for Business & Productivity', 'Unassigned', '1-2 weeks', 'Short'],
+      ['SC003', 'E-Commerce & Online Business', 'Unassigned', '2-4 weeks', 'Short'],
+      ['SC004', 'Business Management & Entrepreneurship', 'Unassigned', '4 weeks', 'Short'],
+      ['SC005', 'Advanced Excel for Business', 'Unassigned', '2-4 weeks', 'Short'],
+      ['SC006', 'Data Analytics for Business', 'Unassigned', '4-8 weeks', 'Short'],
+      ['SC007', 'Graphic Design for Business', 'Unassigned', '4 weeks', 'Short'],
+      ['SC008', 'Canva Design & Content Creation', 'Unassigned', '1-2 weeks', 'Short'],
+      ['SC009', 'Website Design for Small Businesses', 'Unassigned', '4-8 weeks', 'Short'],
+      ['SC010', 'Content Creation & Video Editing', 'Unassigned', '2-4 weeks', 'Short'],
+      ['SC011', 'Bookkeeping & QuickBooks', 'Unassigned', '4 weeks', 'Short'],
+      ['SC012', 'Accounting for Small Businesses', 'Unassigned', '4 weeks', 'Short'],
+      ['SC013', 'Sales & Customer Relationship Management', 'Unassigned', '2-4 weeks', 'Short'],
+      ['SC014', 'Professional Selling & Sales Management', 'Unassigned', '2-4 weeks', 'Short'],
+      ['SC015', 'Procurement & Supply Chain Basics', 'Unassigned', '4 weeks', 'Short'],
+      ['SC016', 'Project Management', 'Unassigned', '4-8 weeks', 'Short'],
+      ['SC017', 'Business Proposal Writing', 'Unassigned', '1-2 weeks', 'Short'],
+      ['SC018', 'Business Plan Development', 'Unassigned', '1-2 weeks', 'Short'],
+      ['SC019', 'Grant & Tender Proposal Writing', 'Unassigned', '2-4 weeks', 'Short'],
+      ['SC020', 'Personal Branding & LinkedIn Marketing', 'Unassigned', '1-2 weeks', 'Short'],
+      ['SC021', 'Cybersecurity Awareness for Businesses', 'Unassigned', '1-2 weeks', 'Short'],
+      ['SC022', 'Freelancing & Online Work Skills', 'Unassigned', '2-6 weeks', 'Short'],
+      ['SC023', 'Digital Office & Computer Applications', 'Unassigned', '2-6 weeks', 'Short'],
+      ['SC024', 'Leadership & Team Management', 'Unassigned', '2-6 weeks', 'Short'],
+      ['SC025', 'Business Communication & Professional Writing', 'Unassigned', '2-6 weeks', 'Short'],
+      // Certificate courses
+      ['BIZ101', 'Business Management Fundamentals', 'Mr. Herald K.', '8 weeks', 'Certificate'],
+      ['MKT201', 'Digital Marketing & Sales (Certificate)', 'Ms. Amina T.', '6 weeks', 'Certificate'],
+      ['FIN301', 'Finance for Decision Makers', 'Mr. Brian W.', '8 weeks', 'Certificate'],
+      ['ENT401', 'Entrepreneurship & Startup Building', 'Mr. Herald K.', '10 weeks', 'Certificate'],
+      ['LDR501', 'Leadership & Strategy (Certificate)', 'Dr. Otieno M.', '6 weeks', 'Certificate'],
+      // Technical
+      ['ELE101', 'Electrical Engineering Basics', 'Mr. Brian W.', '12 weeks', 'Technical'],
+      ['WEB101', 'Web Development Fundamentals', 'Mr. Herald K.', '10 weeks', 'Technical'],
+      ['DB201', 'Database Design & SQL', 'Ms. Amina T.', '8 weeks', 'Technical'],
+      ['JS301', 'Advanced JavaScript', 'Mr. Herald K.', '8 weeks', 'Technical'],
+      ['PY101', 'Python Programming', 'Dr. Otieno M.', '10 weeks', 'Technical'],
+      ['NET210', 'Networking Essentials', 'Mr. Brian W.', '8 weeks', 'Technical'],
     ];
     for (const c of courses) {
       await client.execute({
-        sql: 'INSERT INTO courses (code, title, trainer, description) VALUES (?, ?, ?, ?)',
-        args: c,
+        sql: 'INSERT OR IGNORE INTO courses (code, title, trainer, description) VALUES (?, ?, ?, ?)',
+        args: [c[0], c[1], c[2], c[4]],  // code, title, trainer, category as description
       });
     }
 

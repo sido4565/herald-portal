@@ -604,7 +604,6 @@ app.post('/api/lecturer/change-password', authLecturer, async (req, res) => {
 
 app.get('/api/lecturer/my-courses', authLecturer, async (req, res) => {
   try {
-    // Primary: use lecturer_courses assignments
     const assigned = await db.execute({
       sql: `SELECT c.*, (SELECT COUNT(*) FROM enrollments WHERE course_id = c.id) AS enrolled_count
             FROM lecturer_courses lc
@@ -614,7 +613,6 @@ app.get('/api/lecturer/my-courses', authLecturer, async (req, res) => {
       args: [req.lecturer.id],
     });
 
-    // Fallback: if no explicit assignments, fall back to name matching (backwards compatible)
     if (assigned.rows.length === 0) {
       const lr = await db.execute({ sql: 'SELECT name FROM lecturers WHERE id = ?', args: [req.lecturer.id] });
       const lecturer = lr.rows[0];
@@ -863,6 +861,7 @@ app.post('/api/admin/lecturers/:id/reactivate', authAdmin, async (req, res) => {
 
 app.delete('/api/admin/lecturers/:id', authAdmin, async (req, res) => {
   try {
+    await db.execute({ sql: 'DELETE FROM lecturer_courses WHERE lecturer_id = ?', args: [req.params.id] });
     await db.execute({ sql: 'DELETE FROM lecturers WHERE id = ?', args: [req.params.id] });
     res.json({ ok: true });
   } catch (err) {
@@ -893,6 +892,87 @@ app.post('/api/admin/lecturers', authAdmin, async (req, res) => {
 });
 
 // ---------- Lecturer Course Assignments ----------
+// Full list of courses with assigned lecturers
+app.get('/api/admin/courses-full', authAdmin, async (req, res) => {
+  try {
+    const courses = await db.execute(`
+      SELECT c.*,
+        (SELECT COUNT(*) FROM enrollments WHERE course_id = c.id) AS enrolled_count,
+        (SELECT COUNT(*) FROM lecturer_courses WHERE course_id = c.id) AS lecturer_count
+      FROM courses c ORDER BY c.code
+    `);
+
+    const enriched = [];
+    for (const c of courses.rows) {
+      const lecturers = await db.execute({
+        sql: `SELECT l.id, l.name, l.staff_no FROM lecturer_courses lc
+              JOIN lecturers l ON l.id = lc.lecturer_id
+              WHERE lc.course_id = ?`,
+        args: [c.id],
+      });
+      enriched.push({ ...c, lecturers: lecturers.rows });
+    }
+    res.json(enriched);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Assign a lecturer to a course
+app.post('/api/admin/courses/:courseId/assign-lecturer', authAdmin, async (req, res) => {
+  const { lecturer_id } = req.body;
+  if (!lecturer_id) return res.status(400).json({ error: 'lecturer_id required' });
+  try {
+    await db.execute({
+      sql: 'INSERT OR IGNORE INTO lecturer_courses (lecturer_id, course_id) VALUES (?, ?)',
+      args: [lecturer_id, req.params.courseId],
+    });
+
+    try {
+      const lr = await db.execute({ sql: 'SELECT name, email FROM lecturers WHERE id = ?', args: [lecturer_id] });
+      const cr = await db.execute({ sql: 'SELECT code, title FROM courses WHERE id = ?', args: [req.params.courseId] });
+      const lecturer = lr.rows[0];
+      const course = cr.rows[0];
+
+      if (lecturer && course) {
+        sendMailSafe('sendMail', {
+          to: lecturer.email,
+          subject: `New Course Assigned: ${course.code}`,
+          html: `
+            <h2>New Course Assignment</h2>
+            <p>Hello ${lecturer.name},</p>
+            <p>You have been assigned to teach <strong>${course.code} — ${course.title}</strong>.</p>
+            <p>Log in to your lecturer dashboard to view enrolled students and post materials.</p>
+            <p style="margin-top:24px;">
+              <a href="${process.env.APP_URL || 'https://herald-portal.onrender.com'}/lecturer-login.html"
+                 style="background:#0b1a33; color:#fff; padding:12px 22px; border-radius:6px; text-decoration:none; font-weight:600;">
+                Open Lecturer Dashboard
+              </a>
+            </p>
+          `,
+        });
+      }
+    } catch (e) { console.error('Assignment email failed:', e.message); }
+
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Remove a lecturer from a course
+app.delete('/api/admin/courses/:courseId/lecturers/:lecturerId', authAdmin, async (req, res) => {
+  try {
+    await db.execute({
+      sql: 'DELETE FROM lecturer_courses WHERE course_id = ? AND lecturer_id = ?',
+      args: [req.params.courseId, req.params.lecturerId],
+    });
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // List courses assigned to a lecturer
 app.get('/api/admin/lecturers/:id/courses', authAdmin, async (req, res) => {
   try {
@@ -938,7 +1018,47 @@ app.delete('/api/admin/lecturers/:id/courses/:courseId', authAdmin, async (req, 
   }
 });
 
-// Lecturer: view own assigned courses (updated to use lecturer_courses)
+// Lecturer workload summary
+app.get('/api/admin/lecturers-workload', authAdmin, async (req, res) => {
+  try {
+    const r = await db.execute(`
+      SELECT l.id, l.staff_no, l.name, l.status,
+        (SELECT COUNT(*) FROM lecturer_courses WHERE lecturer_id = l.id) AS course_count,
+        (SELECT COUNT(DISTINCT e.student_id) FROM lecturer_courses lc
+         JOIN enrollments e ON e.course_id = lc.course_id
+         WHERE lc.lecturer_id = l.id) AS student_count
+      FROM lecturers l
+      WHERE l.approved = 1
+      ORDER BY course_count DESC, l.name
+    `);
+    res.json(r.rows);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Bulk assign
+app.post('/api/admin/lecturers/bulk-assign', authAdmin, async (req, res) => {
+  const { lecturer_ids, course_ids } = req.body;
+  if (!Array.isArray(lecturer_ids) || !Array.isArray(course_ids)) {
+    return res.status(400).json({ error: 'lecturer_ids[] and course_ids[] required' });
+  }
+  let added = 0;
+  try {
+    for (const lid of lecturer_ids) {
+      for (const cid of course_ids) {
+        const r = await db.execute({
+          sql: 'INSERT OR IGNORE INTO lecturer_courses (lecturer_id, course_id) VALUES (?, ?)',
+          args: [lid, cid],
+        });
+        if (r.rowsAffected > 0) added++;
+      }
+    }
+    res.json({ ok: true, added });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
 
 // ---------- Students (admin) ----------
 app.get('/api/admin/students', authAdmin, async (req, res) => {
@@ -1052,7 +1172,7 @@ app.put('/api/admin/courses/:id', authAdmin, async (req, res) => {
 });
 
 app.delete('/api/admin/courses/:id', authAdmin, async (req, res) => {
-  for (const t of ['enrollments', 'results', 'timetable', 'assignments']) {
+  for (const t of ['enrollments', 'results', 'timetable', 'assignments', 'lecturer_courses']) {
     await db.execute({ sql: `DELETE FROM ${t} WHERE course_id = ?`, args: [req.params.id] });
   }
   await db.execute({ sql: 'DELETE FROM courses WHERE id = ?', args: [req.params.id] });

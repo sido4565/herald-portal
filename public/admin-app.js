@@ -409,6 +409,9 @@ function wireLecturerActions() {
   studentsCache = [];
   await loadStudents();
   toast(r.reg_no ? `Student added. Reg No: ${r.reg_no}` : 'Student added.');
+  
+  const bulkBtn = $('#bulkAssignBtn');
+if (bulkBtn) bulkBtn.addEventListener('click', openBulkAssignModal);
 }));
 
     $('#addCourseBtn').addEventListener('click', async () => {
@@ -695,6 +698,7 @@ if (addLectBtn) {
         if (act === 'del-att')       return delAtt(id);
         if (act === 'del-lc')        return delLiveClass(id);
         if (act === 'assign-lecturer') return assignLecturerToCourse(id);
+        if (act === 'assign-lect') return openAssignLecturerModal(id, btn.dataset.code, btn.dataset.title);
       } catch (err) { toast(err.message, 'error'); }
     });
   }
@@ -736,28 +740,229 @@ if (addLectBtn) {
 
   // ---------------- Courses ----------------
   async function loadCourses() {
-  const rows = await api('/api/admin/courses');
+  const rows = await api('/api/admin/courses-full');
   coursesCache = rows;
-  const tb = $('#coursesTable tbody');
-  tb.innerHTML = rows.map(c => {
-    const lecturerDisplay = c.lecturer_name
-      ? `<span style="display:block; font-weight:600;">${esc(c.lecturer_name)}</span><span style="font-size:11px; color:var(--muted); font-family:monospace;">${esc(c.lecturer_staff_no || '')}</span>`
-      : '<span style="color:var(--danger); font-style:italic;">Unassigned</span>';
-    return `
-      <tr>
-        <td>${esc(c.code)}</td>
-        <td>${esc(c.title)}</td>
-        <td>${lecturerDisplay}</td>
-        <td>${c.enrolled_count}</td>
-        <td>
-          <button class="btn-xs" data-act="assign-lecturer" data-id="${c.id}" type="button">Assign</button>
-          <button class="btn-xs" data-act="edit-course" data-id="${c.id}" type="button">Edit</button>
-          <button class="btn-xs" data-act="view-course" data-id="${c.id}" type="button">Students</button>
-          <button class="btn-xs danger" data-act="del-course" data-id="${c.id}" type="button">Delete</button>
-        </td>
-      </tr>`;
-  }).join('') || '<tr><td colspan="5" class="empty">No courses created.</td></tr>';
-  wireTableActions(tb);
+
+  // Search bar
+  const panel = document.querySelector('#panel-courses');
+  let searchWrap = panel.querySelector('.courses-search');
+  if (!searchWrap) {
+    searchWrap = document.createElement('div');
+    searchWrap.className = 'courses-search';
+    searchWrap.style.cssText = 'margin-bottom:16px; position:relative;';
+    searchWrap.innerHTML = `
+      <input type="text" id="courseSearchInput" placeholder="🔍 Search courses by code or title..."
+             style="width:100%; padding:12px 16px; border:1px solid var(--border); border-radius:8px; font-size:14px; font-family:inherit; background:var(--card); color:var(--text);" />
+      <div id="courseSearchResults" style="margin-top:8px; font-size:12px; color:var(--muted);"></div>
+    `;
+    const panelHead = panel.querySelector('.panel-head');
+    panelHead.insertAdjacentElement('afterend', searchWrap);
+  }
+
+  function renderCourseRows(filter = '') {
+    const q = filter.trim().toLowerCase();
+    const filtered = q
+      ? rows.filter(c =>
+          c.code.toLowerCase().includes(q) ||
+          c.title.toLowerCase().includes(q) ||
+          (c.trainer || '').toLowerCase().includes(q))
+      : rows;
+
+    document.getElementById('courseSearchResults').textContent =
+      q ? `${filtered.length} of ${rows.length} courses match` : `${rows.length} courses total`;
+
+    const tb = document.querySelector('#coursesTable tbody');
+    tb.innerHTML = filtered.map(c => {
+      const lecturerNames = c.lecturers && c.lecturers.length
+        ? c.lecturers.map(l => esc(l.name)).join(', ')
+        : 'Unassigned';
+      const lecturerBadge = c.lecturers && c.lecturers.length
+        ? `<span class="pill pill-green">${c.lecturers.length} assigned</span>`
+        : '<span class="pill pill-amber">Unassigned</span>';
+
+      return `
+        <tr>
+          <td>${esc(c.code)}</td>
+          <td>${esc(c.title)}</td>
+          <td>${lecturerNames} ${lecturerBadge}</td>
+          <td>${c.enrolled_count}</td>
+          <td>
+            <button class="btn-xs" data-act="assign-lect" data-id="${c.id}" data-code="${esc(c.code)}" data-title="${esc(c.title)}" type="button">👤 Assign</button>
+            <button class="btn-xs" data-act="edit-course" data-id="${c.id}" type="button">Edit</button>
+            <button class="btn-xs" data-act="view-course" data-id="${c.id}" type="button">Students</button>
+            <button class="btn-xs danger" data-act="del-course" data-id="${c.id}" type="button">Delete</button>
+          </td>
+        </tr>`;
+    }).join('') || '<tr><td colspan="5" class="empty">No courses found.</td></tr>';
+
+    wireTableActions(tb);
+  }
+
+  renderCourseRows();
+
+  // Rebind search
+  const searchInput = document.getElementById('courseSearchInput');
+  searchInput.value = '';
+  searchInput.oninput = () => renderCourseRows(searchInput.value);
+}
+
+
+  // ---------- Assign Lecturer to a Course ----------
+async function openAssignLecturerModal(courseId, courseCode, courseTitle) {
+  try {
+    const [lecturers, assigned] = await Promise.all([
+      api('/api/admin/lecturers'),
+      api(`/api/admin/courses-full`).then(list => {
+        const c = list.find(x => x.id === courseId);
+        return c ? c.lecturers : [];
+      }),
+    ]);
+
+    const approved = lecturers.filter(l => l.approved && l.status === 'active');
+    const assignedIds = new Set(assigned.map(l => l.id));
+
+    const overlay = document.createElement('div');
+    overlay.className = 'modal-overlay';
+    overlay.innerHTML = `
+      <div class="modal" style="max-width: 560px;">
+        <h3>Assign Lecturer — ${esc(courseCode)}</h3>
+        <p style="color: var(--muted); font-size: 13px; margin-bottom: 20px;">
+          Select one or more lecturers for <strong>${esc(courseTitle)}</strong>. They'll see this course in their dashboard and receive an email notification.
+        </p>
+        <div style="max-height: 55vh; overflow-y: auto; border: 1px solid var(--border); border-radius: var(--radius); padding: 12px;">
+          ${approved.length ? approved.map(l => `
+            <label style="display: flex; align-items: center; gap: 12px; padding: 10px; border-radius: 6px; cursor: pointer;">
+              <input type="checkbox" class="lect-checkbox" data-lect-id="${l.id}" ${assignedIds.has(l.id) ? 'checked' : ''}
+                     style="width: 18px; height: 18px; cursor: pointer;" />
+              <div style="flex: 1;">
+                <div style="font-family: monospace; font-size: 11px; color: var(--gold-500); font-weight: 700;">${esc(l.staff_no)}</div>
+                <div style="font-weight: 600; font-size: 14px; margin: 2px 0;">${esc(l.name)}</div>
+                <div style="font-size: 12px; color: var(--muted);">${esc(l.specialization || l.qualification || '')}</div>
+              </div>
+            </label>
+          `).join('') : '<p class="empty">No approved lecturers. Add one first.</p>'}
+        </div>
+        <div class="modal-actions">
+          <button class="btn-ghost dark" type="button" data-close>Cancel</button>
+          <button class="btn-primary" id="saveLectBtn" type="button">Save</button>
+        </div>
+      </div>`;
+    document.body.appendChild(overlay);
+
+    overlay.addEventListener('click', e => {
+      if (e.target === overlay || e.target.closest('[data-close]')) overlay.remove();
+    });
+
+    overlay.querySelector('#saveLectBtn').addEventListener('click', async (e) => {
+      const btn = e.target;
+      btn.disabled = true;
+      btn.textContent = 'Saving...';
+
+      try {
+        const checkboxes = overlay.querySelectorAll('.lect-checkbox');
+        const toAssign = [];
+        const toRemove = [];
+
+        checkboxes.forEach(cb => {
+          const lid = Number(cb.dataset.lectId);
+          const was = assignedIds.has(lid);
+          if (cb.checked && !was) toAssign.push(lid);
+          if (!cb.checked && was) toRemove.push(lid);
+        });
+
+        for (const lid of toAssign) {
+          await api(`/api/admin/courses/${courseId}/assign-lecturer`, {
+            method: 'POST',
+            body: { lecturer_id: lid },
+          });
+        }
+        for (const lid of toRemove) {
+          await api(`/api/admin/courses/${courseId}/lecturers/${lid}`, { method: 'DELETE' });
+        }
+
+        overlay.remove();
+        toast(`${toAssign.length} assigned, ${toRemove.length} removed`);
+        await loadCourses();
+      } catch (err) {
+        toast(err.message, 'error');
+        btn.disabled = false;
+        btn.textContent = 'Save';
+      }
+    });
+  } catch (err) {
+    toast('Could not open assignment: ' + err.message, 'error');
+  }
+}
+
+// ---------- Bulk Assign (optional advanced feature) ----------
+async function openBulkAssignModal() {
+  try {
+    const [lecturers, courses] = await Promise.all([
+      api('/api/admin/lecturers'),
+      api('/api/admin/courses-full'),
+    ]);
+    const approved = lecturers.filter(l => l.approved && l.status === 'active');
+
+    const overlay = document.createElement('div');
+    overlay.className = 'modal-overlay';
+    overlay.innerHTML = `
+      <div class="modal" style="max-width: 780px;">
+        <h3>Bulk Assign Courses</h3>
+        <p style="color: var(--muted); font-size: 13px; margin-bottom: 20px;">
+          Select lecturers and courses below. Every selected lecturer will be assigned every selected course.
+        </p>
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; max-height: 55vh;">
+          <div>
+            <h4 style="font-size:12px; text-transform:uppercase; color:var(--muted); margin-bottom:8px;">Lecturers</h4>
+            <div style="overflow-y:auto; max-height: 45vh; border: 1px solid var(--border); border-radius: 6px; padding: 8px;">
+              ${approved.map(l => `
+                <label style="display:flex; gap:8px; align-items:center; padding:6px; font-size:13px;">
+                  <input type="checkbox" class="bulk-lect" value="${l.id}" />
+                  <span>${esc(l.name)}</span>
+                </label>
+              `).join('')}
+            </div>
+          </div>
+          <div>
+            <h4 style="font-size:12px; text-transform:uppercase; color:var(--muted); margin-bottom:8px;">Courses</h4>
+            <div style="overflow-y:auto; max-height: 45vh; border: 1px solid var(--border); border-radius: 6px; padding: 8px;">
+              ${courses.map(c => `
+                <label style="display:flex; gap:8px; align-items:center; padding:6px; font-size:13px;">
+                  <input type="checkbox" class="bulk-course" value="${c.id}" />
+                  <span>${esc(c.code)} — ${esc(c.title)}</span>
+                </label>
+              `).join('')}
+            </div>
+          </div>
+        </div>
+        <div class="modal-actions">
+          <button class="btn-ghost dark" type="button" data-close>Cancel</button>
+          <button class="btn-primary" id="bulkAssignBtn" type="button">Bulk Assign</button>
+        </div>
+      </div>`;
+    document.body.appendChild(overlay);
+    overlay.addEventListener('click', e => {
+      if (e.target === overlay || e.target.closest('[data-close]')) overlay.remove();
+    });
+    overlay.querySelector('#bulkAssignBtn').addEventListener('click', async (e) => {
+      const lecturer_ids = [...overlay.querySelectorAll('.bulk-lect:checked')].map(cb => Number(cb.value));
+      const course_ids = [...overlay.querySelectorAll('.bulk-course:checked')].map(cb => Number(cb.value));
+      if (!lecturer_ids.length || !course_ids.length) return toast('Select at least one lecturer and one course', 'error');
+      try {
+        const r = await api('/api/admin/lecturers/bulk-assign', {
+          method: 'POST',
+          body: { lecturer_ids, course_ids },
+        });
+        overlay.remove();
+        toast(`${r.added} assignments created`);
+        await loadCourses();
+      } catch (err) {
+        toast(err.message, 'error');
+      }
+    });
+  } catch (err) {
+    toast('Could not open bulk assign: ' + err.message, 'error');
+  }
 }
 
   function editCourse(id) {
