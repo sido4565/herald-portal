@@ -768,64 +768,94 @@ app.get('/api/admin/stats', authAdmin, async (req, res) => {
 
 // ---------- Lecturers (superadmin) ----------
 app.get('/api/admin/lecturers', authAdmin, async (req, res) => {
-  const r = await db.execute(`
-    SELECT id, staff_no, name, email, phone, qualification, specialization,
-           status, approved, created_at, approved_at
-    FROM lecturers ORDER BY approved ASC, created_at DESC
-  `);
-  res.json(r.rows);
+  try {
+    const r = await db.execute(`
+      SELECT id, staff_no, name, email, phone, qualification, specialization,
+             status, approved, created_at, approved_at
+      FROM lecturers ORDER BY approved ASC, created_at DESC
+    `);
+    res.json(r.rows);
+  } catch (err) {
+    console.error('Failed to load lecturers:', err.message);
+    res.status(500).json({ error: 'Failed to load lecturers: ' + err.message });
+  }
 });
 
 app.post('/api/admin/lecturers/:id/approve', authAdmin, async (req, res) => {
-  await db.execute({
-    sql: 'UPDATE lecturers SET approved = 1, status = ?, approved_at = CURRENT_TIMESTAMP WHERE id = ?',
-    args: ['active', req.params.id],
-  });
   try {
-    const lr = await db.execute({ sql: 'SELECT name, email, staff_no FROM lecturers WHERE id = ?', args: [req.params.id] });
-    const lecturer = lr.rows[0];
-    if (lecturer && mailer && mailer.ENABLED && mailer.sendMail) {
-      mailer.sendMail({
-        to: lecturer.email,
-        subject: 'Your Herald Lecturer Account is Approved',
-        html: `<h2>Account Approved</h2><p>Hello ${lecturer.name},</p>
-               <p>Your lecturer account has been approved.</p>
-               <p><strong>Staff No:</strong> ${lecturer.staff_no}</p>`,
-      }).catch(err => console.error('Approval email failed:', err.message));
-    }
-  } catch (e) { console.error(e.message); }
-  res.json({ ok: true });
+    await db.execute({
+      sql: 'UPDATE lecturers SET approved = 1, status = ?, approved_at = CURRENT_TIMESTAMP WHERE id = ?',
+      args: ['active', req.params.id],
+    });
+    try {
+      const lr = await db.execute({ sql: 'SELECT name, email, staff_no FROM lecturers WHERE id = ?', args: [req.params.id] });
+      const lecturer = lr.rows[0];
+      if (lecturer) {
+        sendMailSafe('sendMail', {
+          to: lecturer.email,
+          subject: 'Your Herald Lecturer Account is Approved',
+          html: `<h2>Account Approved</h2><p>Hello ${lecturer.name},</p>
+                 <p>Your lecturer account has been approved.</p>
+                 <p><strong>Staff No:</strong> ${lecturer.staff_no}</p>`,
+        });
+      }
+    } catch (e) { console.error('Approval email failed:', e.message); }
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 app.post('/api/admin/lecturers/:id/reject', authAdmin, async (req, res) => {
-  await db.execute({
-    sql: 'UPDATE lecturers SET approved = 0, status = ? WHERE id = ?',
-    args: ['rejected', req.params.id],
-  });
-  res.json({ ok: true });
+  try {
+    await db.execute({
+      sql: 'UPDATE lecturers SET approved = 0, status = ? WHERE id = ?',
+      args: ['rejected', req.params.id],
+    });
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 app.post('/api/admin/lecturers/:id/suspend', authAdmin, async (req, res) => {
-  await db.execute({ sql: 'UPDATE lecturers SET status = ? WHERE id = ?', args: ['suspended', req.params.id] });
-  res.json({ ok: true });
+  try {
+    await db.execute({
+      sql: 'UPDATE lecturers SET status = ? WHERE id = ?',
+      args: ['suspended', req.params.id],
+    });
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 app.post('/api/admin/lecturers/:id/reactivate', authAdmin, async (req, res) => {
-  await db.execute({
-    sql: 'UPDATE lecturers SET status = ?, approved = 1 WHERE id = ?',
-    args: ['active', req.params.id],
-  });
-  res.json({ ok: true });
+  try {
+    await db.execute({
+      sql: 'UPDATE lecturers SET status = ?, approved = 1 WHERE id = ?',
+      args: ['active', req.params.id],
+    });
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 app.delete('/api/admin/lecturers/:id', authAdmin, async (req, res) => {
-  await db.execute({ sql: 'DELETE FROM lecturers WHERE id = ?', args: [req.params.id] });
-  res.json({ ok: true });
+  try {
+    await db.execute({ sql: 'DELETE FROM lecturers WHERE id = ?', args: [req.params.id] });
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 app.post('/api/admin/lecturers', authAdmin, async (req, res) => {
   const { name, email, phone, password, qualification, specialization, bio } = req.body;
-  if (!name || !email || !password) return res.status(400).json({ error: 'Name, email, password required' });
+  if (!name || !email || !password) {
+    return res.status(400).json({ error: 'Name, email, password required' });
+  }
   try {
     const staff_no = await generateStaffNo();
     const hash = bcrypt.hashSync(password, 10);
@@ -836,7 +866,9 @@ app.post('/api/admin/lecturers', authAdmin, async (req, res) => {
     });
     res.json({ ok: true, staff_no });
   } catch (err) {
-    if (String(err.message).includes('UNIQUE')) return res.status(400).json({ error: 'Email already exists' });
+    if (String(err.message).includes('UNIQUE')) {
+      return res.status(400).json({ error: 'Email already exists' });
+    }
     res.status(500).json({ error: err.message });
   }
 });
