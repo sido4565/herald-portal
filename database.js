@@ -156,6 +156,13 @@ async function initSchema() {
       student_id INTEGER NOT NULL,
       viewed_at DATETIME DEFAULT CURRENT_TIMESTAMP
     )`,
+        `CREATE TABLE IF NOT EXISTS lecturer_courses (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      lecturer_id INTEGER NOT NULL,
+      course_id INTEGER NOT NULL,
+      assigned_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      UNIQUE(lecturer_id, course_id)
+    )`,
   ];
 
   for (const sql of statements) {

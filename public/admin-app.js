@@ -195,6 +195,7 @@ if ($('#adminName')) {
       <td>${esc(l.qualification || '—')}</td>
       <td><span class="pill ${l.status === 'active' ? 'pill-green' : l.status === 'suspended' ? 'pill-red' : 'pill-amber'}">${esc(l.status)}</span></td>
       <td>
+        <button class="btn-xs" data-act="assign-courses" data-id="${l.id}" data-name="${esc(l.name)}" type="button">📚 Assign Courses</button>
         ${l.status === 'active'
           ? `<button class="btn-xs danger" data-act="suspend-lect" data-id="${l.id}" type="button">Suspend</button>`
           : `<button class="btn-xs" data-act="reactivate-lect" data-id="${l.id}" type="button">Reactivate</button>`}
@@ -204,6 +205,97 @@ if ($('#adminName')) {
   `).join('') || '<tr><td colspan="6" class="empty">No approved lecturers.</td></tr>';
 
   wireLecturerActions();
+}
+
+// ---------- Assign Courses to Lecturer Modal ----------
+async function openAssignCoursesModal(lecturerId, lecturerName) {
+  try {
+    // Fetch all courses and currently-assigned courses in parallel
+    const [allCourses, assigned] = await Promise.all([
+      api('/api/admin/courses'),
+      api(`/api/admin/lecturers/${lecturerId}/courses`),
+    ]);
+
+    const assignedIds = new Set(assigned.map(c => c.id));
+
+    const overlay = document.createElement('div');
+    overlay.className = 'modal-overlay';
+    overlay.innerHTML = `
+      <div class="modal" style="max-width: 640px;">
+        <h3>Assign Courses — ${esc(lecturerName)}</h3>
+        <p style="color: var(--muted); font-size: 13px; margin-bottom: 20px;">
+          Check the courses this lecturer teaches. The lecturer will only see these courses in their dashboard.
+        </p>
+        <div id="assignList" style="max-height: 55vh; overflow-y: auto; border: 1px solid var(--border); border-radius: var(--radius); padding: 12px;">
+          ${allCourses.map(c => `
+            <label style="display: flex; align-items: center; gap: 12px; padding: 10px; border-radius: 6px; cursor: pointer; transition: background 0.15s;"
+                   onmouseover="this.style.background='var(--bg-alt)'"
+                   onmouseout="this.style.background='transparent'">
+              <input type="checkbox" class="course-checkbox" data-course-id="${c.id}" ${assignedIds.has(c.id) ? 'checked' : ''}
+                     style="width: 18px; height: 18px; cursor: pointer;" />
+              <div style="flex: 1;">
+                <div style="font-family: monospace; font-size: 11px; color: var(--gold-500); font-weight: 700; letter-spacing: 0.05em;">${esc(c.code)}</div>
+                <div style="font-weight: 600; font-size: 14px; margin: 2px 0;">${esc(c.title)}</div>
+                <div style="font-size: 12px; color: var(--muted);">Trainer label: ${esc(c.trainer)} · ${c.enrolled_count} enrolled</div>
+              </div>
+            </label>
+          `).join('')}
+        </div>
+        <div class="modal-actions">
+          <button class="btn-ghost dark" type="button" data-close>Cancel</button>
+          <button class="btn-primary" id="saveAssignmentsBtn" type="button">Save Assignments</button>
+        </div>
+      </div>`;
+    document.body.appendChild(overlay);
+
+    overlay.addEventListener('click', e => {
+      if (e.target === overlay || e.target.closest('[data-close]')) overlay.remove();
+    });
+
+    overlay.querySelector('#saveAssignmentsBtn').addEventListener('click', async (e) => {
+      const btn = e.target;
+      btn.disabled = true;
+      btn.textContent = 'Saving...';
+
+      try {
+        const checkboxes = overlay.querySelectorAll('.course-checkbox');
+        const toAssign = [];
+        const toRemove = [];
+
+        checkboxes.forEach(cb => {
+          const cid = Number(cb.dataset.courseId);
+          const wasAssigned = assignedIds.has(cid);
+          const isChecked = cb.checked;
+
+          if (isChecked && !wasAssigned) toAssign.push(cid);
+          if (!isChecked && wasAssigned) toRemove.push(cid);
+        });
+
+        // Apply changes
+        for (const cid of toAssign) {
+          await api(`/api/admin/lecturers/${lecturerId}/courses`, {
+            method: 'POST',
+            body: { course_id: cid },
+          });
+        }
+        for (const cid of toRemove) {
+          await api(`/api/admin/lecturers/${lecturerId}/courses/${cid}`, {
+            method: 'DELETE',
+          });
+        }
+
+        overlay.remove();
+        toast(`Assignments saved (${toAssign.length} added, ${toRemove.length} removed)`);
+        await loadLecturers();
+      } catch (err) {
+        toast(err.message, 'error');
+        btn.disabled = false;
+        btn.textContent = 'Save Assignments';
+      }
+    });
+  } catch (err) {
+    toast('Could not open assignments: ' + err.message, 'error');
+  }
 }
 
 function wireLecturerActions() {
@@ -218,6 +310,7 @@ function wireLecturerActions() {
       if (act === 'suspend-lect')    { if (!confirm('Suspend this lecturer?')) return; await api(`/api/admin/lecturers/${id}/suspend`, { method: 'POST' }); toast('Lecturer suspended'); }
       if (act === 'reactivate-lect') { await api(`/api/admin/lecturers/${id}/reactivate`, { method: 'POST' }); toast('Lecturer reactivated'); }
       if (act === 'delete-lect')     { if (!confirm('Delete permanently?')) return; await api(`/api/admin/lecturers/${id}`, { method: 'DELETE' }); toast('Lecturer deleted'); }
+      if (act === 'assign-courses')  { return openAssignCoursesModal(id, btn.dataset.name); }
       await loadLecturers();
     } catch (err) { toast(err.message, 'error'); }
   };

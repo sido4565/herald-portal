@@ -603,14 +603,33 @@ app.post('/api/lecturer/change-password', authLecturer, async (req, res) => {
 });
 
 app.get('/api/lecturer/my-courses', authLecturer, async (req, res) => {
-  const lr = await db.execute({ sql: 'SELECT name FROM lecturers WHERE id = ?', args: [req.lecturer.id] });
-  const lecturer = lr.rows[0];
-  const r = await db.execute({
-    sql: `SELECT c.*, (SELECT COUNT(*) FROM enrollments WHERE course_id = c.id) AS enrolled_count
-          FROM courses c WHERE c.trainer LIKE ? ORDER BY c.code`,
-    args: [`%${lecturer.name}%`],
-  });
-  res.json(r.rows);
+  try {
+    // Primary: use lecturer_courses assignments
+    const assigned = await db.execute({
+      sql: `SELECT c.*, (SELECT COUNT(*) FROM enrollments WHERE course_id = c.id) AS enrolled_count
+            FROM lecturer_courses lc
+            JOIN courses c ON c.id = lc.course_id
+            WHERE lc.lecturer_id = ?
+            ORDER BY c.code`,
+      args: [req.lecturer.id],
+    });
+
+    // Fallback: if no explicit assignments, fall back to name matching (backwards compatible)
+    if (assigned.rows.length === 0) {
+      const lr = await db.execute({ sql: 'SELECT name FROM lecturers WHERE id = ?', args: [req.lecturer.id] });
+      const lecturer = lr.rows[0];
+      const fallback = await db.execute({
+        sql: `SELECT c.*, (SELECT COUNT(*) FROM enrollments WHERE course_id = c.id) AS enrolled_count
+              FROM courses c WHERE c.trainer LIKE ? ORDER BY c.code`,
+        args: [`%${lecturer.name}%`],
+      });
+      return res.json(fallback.rows);
+    }
+
+    res.json(assigned.rows);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 app.get('/api/lecturer/courses/:id/students', authLecturer, async (req, res) => {
@@ -872,6 +891,54 @@ app.post('/api/admin/lecturers', authAdmin, async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 });
+
+// ---------- Lecturer Course Assignments ----------
+// List courses assigned to a lecturer
+app.get('/api/admin/lecturers/:id/courses', authAdmin, async (req, res) => {
+  try {
+    const r = await db.execute({
+      sql: `SELECT c.id, c.code, c.title, c.trainer, lc.assigned_at
+            FROM lecturer_courses lc
+            JOIN courses c ON c.id = lc.course_id
+            WHERE lc.lecturer_id = ?
+            ORDER BY c.code`,
+      args: [req.params.id],
+    });
+    res.json(r.rows);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Assign a course to a lecturer
+app.post('/api/admin/lecturers/:id/courses', authAdmin, async (req, res) => {
+  const { course_id } = req.body;
+  if (!course_id) return res.status(400).json({ error: 'course_id required' });
+  try {
+    await db.execute({
+      sql: 'INSERT OR IGNORE INTO lecturer_courses (lecturer_id, course_id) VALUES (?, ?)',
+      args: [req.params.id, course_id],
+    });
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Unassign a course
+app.delete('/api/admin/lecturers/:id/courses/:courseId', authAdmin, async (req, res) => {
+  try {
+    await db.execute({
+      sql: 'DELETE FROM lecturer_courses WHERE lecturer_id = ? AND course_id = ?',
+      args: [req.params.id, req.params.courseId],
+    });
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Lecturer: view own assigned courses (updated to use lecturer_courses)
 
 // ---------- Students (admin) ----------
 app.get('/api/admin/students', authAdmin, async (req, res) => {
