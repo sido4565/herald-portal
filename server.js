@@ -7,6 +7,11 @@ const fs = require('fs');
 const multer = require('multer');
 const db = require('./database');
 
+// ---------- Global BigInt JSON fix ----------
+// Turso/libsql returns BigInt for large integers; JSON.stringify can't handle them.
+// Patches BigInt so res.json() never crashes with "Do not know how to serialize a BigInt".
+BigInt.prototype.toJSON = function () { return Number(this); };
+
 const app = express();
 const PORT = process.env.PORT || 3000;
 const JWT_SECRET = process.env.JWT_SECRET || 'herald-dev-secret-change-me';
