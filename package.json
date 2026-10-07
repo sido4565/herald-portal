@@ -11,12 +11,11 @@
     "dev": "nodemon server.js"
   },
   "dependencies": {
+    "@libsql/client": "^0.18.0",
     "@turbosmtp/mail": "^0.1.0",
     "bcryptjs": "^2.4.3",
-    "better-sqlite3": "^11.3.0",
     "cookie-parser": "^1.4.6",
     "express": "^4.21.0",
-    "googleapis": "^182.0.0",
     "jsonwebtoken": "^9.0.2",
     "multer": "^2.4.0",
     "nodemailer": "^10.0.12"
