@@ -857,6 +857,88 @@ app.post('/api/lecturer/materials/upload', authLecturer, materialUpload.single('
   }
 });
 
+// ---------- Live Classes (lecturer) ----------
+app.get('/api/lecturer/live-classes', authLecturer, async (req, res) => {
+  try {
+    const r = await db.execute({
+      sql: `
+        SELECT lc.*, c.code, c.title AS course_title
+        FROM live_classes lc
+        JOIN courses c ON c.id = lc.course_id
+        JOIN lecturer_courses lc2 ON lc2.course_id = c.id
+        WHERE lc2.lecturer_id = ?
+        ORDER BY lc.scheduled_at DESC
+      `,
+      args: [req.lecturer.id],
+    });
+    res.json(r.rows);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/lecturer/live-classes', authLecturer, async (req, res) => {
+  const { course_id, title, description, meeting_url, scheduled_at, duration_minutes, notify } = req.body;
+  if (!course_id || !title || !meeting_url || !scheduled_at) {
+    return res.status(400).json({ error: 'course_id, title, meeting_url, scheduled_at required' });
+  }
+  try {
+    const check = await db.execute({
+      sql: 'SELECT 1 FROM lecturer_courses WHERE lecturer_id = ? AND course_id = ?',
+      args: [req.lecturer.id, course_id],
+    });
+    if (check.rows.length === 0) {
+      return res.status(403).json({ error: 'You are not assigned to this course' });
+    }
+
+    const info = await db.execute({
+      sql: `INSERT INTO live_classes (course_id, title, description, meeting_url, scheduled_at, duration_minutes, created_by)
+            VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      args: [course_id, title, description || '', meeting_url, scheduled_at, Number(duration_minutes) || 60, req.lecturer.id],
+    });
+
+    if (notify && mailer && mailer.ENABLED) {
+      try {
+        const sr = await db.execute({
+          sql: `SELECT s.email, s.name FROM students s
+                JOIN enrollments e ON e.student_id = s.id WHERE e.course_id = ?`,
+          args: [course_id],
+        });
+        const cr = await db.execute({ sql: 'SELECT code, title FROM courses WHERE id = ?', args: [course_id] });
+        const course = cr.rows[0];
+        for (const s of sr.rows) {
+          mailer.sendLiveClassNotification({
+            to: s.email, studentName: s.name,
+            courseCode: course.code, courseTitle: course.title,
+            classTitle: title, scheduledAt: new Date(scheduled_at), meetingUrl: meeting_url,
+          }).catch(err => console.error('Class email failed:', err.message));
+        }
+      } catch (e) { console.error('Class notification error:', e.message); }
+    }
+
+    res.json({ ok: true, id: Number(info.lastInsertRowid) });
+  } catch (err) {
+    console.error('Live class create failed:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.delete('/api/lecturer/live-classes/:id', authLecturer, async (req, res) => {
+  try {
+    const check = await db.execute({
+      sql: `SELECT 1 FROM live_classes lc
+            JOIN lecturer_courses lc2 ON lc2.course_id = lc.course_id
+            WHERE lc.id = ? AND lc2.lecturer_id = ?`,
+      args: [req.params.id, req.lecturer.id],
+    });
+    if (check.rows.length === 0) return res.status(403).json({ error: 'Not allowed' });
+    await db.execute({ sql: 'DELETE FROM live_classes WHERE id = ?', args: [req.params.id] });
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // ==================== ADMIN ROUTES ====================
 app.post('/api/admin/login', async (req, res) => {
   const { username, password } = req.body;

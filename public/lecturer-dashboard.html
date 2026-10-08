@@ -33,6 +33,7 @@
       <button class="admin-tab" data-panel="attendance" type="button">Attendance</button>
       <button class="admin-tab" data-panel="announcements" type="button">Announcements</button>
       <button class="admin-tab" data-panel="materials" type="button">Study Materials</button>
+      <button class="admin-tab" data-panel="live-classes" type="button">Live Classes</button>
     </nav>
 
     <!-- Overview -->
@@ -107,6 +108,13 @@
     </section>
   
 <!-- Materials -->
+ <section class="admin-panel" id="panel-live-classes">
+  <div class="panel-head">
+    <h2>Live Classes</h2>
+    <button class="btn-primary" id="addLiveClassBtn" type="button">Schedule Class</button>
+  </div>
+  <div id="liveClassesList" style="display:grid; gap:14px; margin-top:16px;"></div>
+</section>
 <section class="admin-panel" id="panel-materials">
   <div class="panel-head">
     <h2>Study Materials</h2>
@@ -212,6 +220,194 @@
     wrap.innerHTML = '<p class="empty">No materials posted yet. Click "Post Material" to add one.</p>';
     return;
   }
+
+  // ---------- Live Classes ----------
+async function loadLiveClasses() {
+  const wrap = $('#liveClassesList');
+  if (!wrap) return;
+
+  let classes = [];
+  try {
+    classes = await api('/api/lecturer/live-classes');
+  } catch (err) {
+    wrap.innerHTML = `<p class="empty">Could not load: ${esc(err.message)}</p>`;
+    return;
+  }
+
+  if (!classes.length) {
+    wrap.innerHTML = `<p class="empty">No live classes scheduled yet. Click "Schedule Class" to add one.</p>`;
+    return;
+  }
+
+  const now = Date.now();
+  wrap.innerHTML = classes.map(c => {
+    const start = new Date(c.scheduled_at);
+    const end = new Date(start.getTime() + (c.duration_minutes || 60) * 60000);
+    let status = 'upcoming';
+    let badge = 'pill pill-amber';
+    if (now >= start && now <= end) { status = 'live now'; badge = 'pill pill-green'; }
+    else if (now > end) { status = 'ended'; badge = 'pill'; }
+
+    return `
+      <div class="card" style="padding:16px; border:1px solid var(--border); border-radius:10px;">
+        <div style="display:flex; justify-content:space-between; align-items:start; gap:12px; flex-wrap:wrap;">
+          <div>
+            <div style="font-size:11px; font-family:monospace; color:var(--gold-500); font-weight:700;">${esc(c.code || '')}</div>
+            <h3 style="margin:4px 0 6px; font-size:16px;">${esc(c.title)}</h3>
+            <div style="font-size:13px; color:var(--muted);">
+              ${esc(c.course_title || '')} · ${start.toLocaleString('en-KE', { dateStyle: 'medium', timeStyle: 'short' })} · ${c.duration_minutes || 60} min
+            </div>
+          </div>
+          <span class="${badge}">${status}</span>
+        </div>
+        ${c.description ? `<p style="margin:10px 0; color:var(--muted); font-size:13px;">${esc(c.description)}</p>` : ''}
+        <div style="display:flex; gap:8px; margin-top:12px; flex-wrap:wrap;">
+          <a href="${esc(c.meeting_url)}" target="_blank" class="btn-xs" style="text-decoration:none;">🔗 Join Link</a>
+          <button class="btn-xs danger" data-act="del-live" data-id="${c.id}" type="button">Delete</button>
+        </div>
+      </div>
+    `;
+  }).join('');
+
+  wrap.querySelectorAll('[data-act="del-live"]').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      if (!confirm('Delete this live class?')) return;
+      try {
+        await api(`/api/lecturer/live-classes/${btn.dataset.id}`, { method: 'DELETE' });
+        toast('Class deleted');
+        loadLiveClasses();
+      } catch (err) { toast(err.message, 'error'); }
+    });
+  });
+}
+
+async function openScheduleLiveClassModal() {
+  // Fetch the lecturer's assigned courses first
+  let courses = [];
+  try {
+    courses = await api('/api/lecturer/my-courses');
+  } catch (err) {
+    toast('Could not load courses: ' + err.message, 'error');
+    return;
+  }
+  if (!courses.length) {
+    toast('You have no assigned courses yet. Ask admin to assign one.', 'error');
+    return;
+  }
+
+  const overlay = document.createElement('div');
+  overlay.className = 'modal-overlay';
+  overlay.innerHTML = `
+    <div class="modal" style="max-width:560px;">
+      <h3>Schedule Live Class</h3>
+      <p style="color:var(--muted); font-size:13px; margin-bottom:20px;">
+        Fill in the details. Enrolled students will see it on their dashboard${mailerEnabledGuess() ? ' and can be emailed' : ''}.
+      </p>
+      <form id="lcForm" style="display:grid; gap:14px;">
+        <label style="display:grid; gap:6px; font-size:13px; font-weight:600;">
+          Course
+          <select id="lcCourse" required style="padding:10px; border:1px solid var(--border); border-radius:6px;">
+            <option value="">— Select course —</option>
+            ${courses.map(c => `<option value="${c.id}">${esc(c.code)} — ${esc(c.title)}</option>`).join('')}
+          </select>
+        </label>
+        <label style="display:grid; gap:6px; font-size:13px; font-weight:600;">
+          Title
+          <input id="lcTitle" type="text" required placeholder="e.g. Week 3 — Intro to X"
+                 style="padding:10px; border:1px solid var(--border); border-radius:6px;" />
+        </label>
+        <label style="display:grid; gap:6px; font-size:13px; font-weight:600;">
+          Description (optional)
+          <textarea id="lcDesc" rows="2" placeholder="Topic, agenda, notes..."
+                    style="padding:10px; border:1px solid var(--border); border-radius:6px;"></textarea>
+        </label>
+        <label style="display:grid; gap:6px; font-size:13px; font-weight:600;">
+          Meeting URL (Zoom, Meet, Teams…)
+          <input id="lcUrl" type="url" required placeholder="https://..."
+                 style="padding:10px; border:1px solid var(--border); border-radius:6px;" />
+        </label>
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
+          <label style="display:grid; gap:6px; font-size:13px; font-weight:600;">
+            Date & Time
+            <input id="lcWhen" type="datetime-local" required
+                   style="padding:10px; border:1px solid var(--border); border-radius:6px;" />
+          </label>
+          <label style="display:grid; gap:6px; font-size:13px; font-weight:600;">
+            Duration (min)
+            <input id="lcDur" type="number" min="15" max="360" value="60"
+                   style="padding:10px; border:1px solid var(--border); border-radius:6px;" />
+          </label>
+        </div>
+        <label style="display:flex; gap:8px; align-items:center; font-size:13px;">
+          <input id="lcNotify" type="checkbox" checked />
+          Email enrolled students
+        </label>
+        <div class="modal-actions" style="display:flex; justify-content:flex-end; gap:8px; margin-top:6px;">
+          <button type="button" class="btn-ghost dark" data-close>Cancel</button>
+          <button type="submit" class="btn-primary" id="lcSave">Schedule</button>
+        </div>
+      </form>
+    </div>
+  `;
+  document.body.appendChild(overlay);
+
+  overlay.addEventListener('click', e => {
+    if (e.target === overlay || e.target.closest('[data-close]')) overlay.remove();
+  });
+
+  overlay.querySelector('#lcForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const btn = overlay.querySelector('#lcSave');
+    btn.disabled = true;
+    btn.textContent = 'Scheduling…';
+
+    const when = overlay.querySelector('#lcWhen').value; // "2026-10-15T14:30"
+    const payload = {
+      course_id: Number(overlay.querySelector('#lcCourse').value),
+      title: overlay.querySelector('#lcTitle').value.trim(),
+      description: overlay.querySelector('#lcDesc').value.trim(),
+      meeting_url: overlay.querySelector('#lcUrl').value.trim(),
+      scheduled_at: when ? new Date(when).toISOString() : '',
+      duration_minutes: Number(overlay.querySelector('#lcDur').value) || 60,
+      notify: overlay.querySelector('#lcNotify').checked,
+    };
+
+    if (!payload.course_id || !payload.title || !payload.meeting_url || !payload.scheduled_at) {
+      toast('Please fill all required fields', 'error');
+      btn.disabled = false;
+      btn.textContent = 'Schedule';
+      return;
+    }
+
+    try {
+      await api('/api/lecturer/live-classes', { method: 'POST', body: payload });
+      overlay.remove();
+      toast('Live class scheduled');
+      loadLiveClasses();
+    } catch (err) {
+      toast(err.message, 'error');
+      btn.disabled = false;
+      btn.textContent = 'Schedule';
+    }
+  });
+}
+
+// Small helper — returns true if mail notifications are likely enabled
+function mailerEnabledGuess() { return true; }
+
+// Wire the schedule button after DOM is ready
+document.addEventListener('DOMContentLoaded', () => {
+  const btn = $('#addLiveClassBtn');
+  if (btn) btn.addEventListener('click', openScheduleLiveClassModal);
+});
+// Also handle case where script loads after DOMContentLoaded already fired
+if (document.readyState !== 'loading') {
+  const btn = $('#addLiveClassBtn');
+  if (btn && !btn.dataset.wired) {
+    btn.dataset.wired = '1';
+    btn.addEventListener('click', openScheduleLiveClassModal);
+  }
+}
 
   const now = new Date();
   wrap.innerHTML = list.map(m => {
@@ -353,6 +549,7 @@ $('#addMaterialBtn')?.addEventListener('click', async () => {
       if (name === 'attendance') return loadAttendance();
       if (name === 'announcements') return loadAnnouncements();
       if (name === 'materials') return loadMaterials();
+      if (name === 'live-classes') return loadLiveClasses();
     }
 
     async function loadOverview() {
