@@ -9,31 +9,89 @@ const db = require('./database');
 
 // ---------- Global BigInt JSON fix ----------
 // Turso/libsql returns BigInt for large integers; JSON.stringify can't handle them.
-// Patches BigInt so res.json() never crashes with "Do not know how to serialize a BigInt".
 BigInt.prototype.toJSON = function () { return Number(this); };
+
+// ---------- R2 (Cloudflare) S3 client ----------
+const { S3Client, PutObjectCommand, DeleteObjectCommand } = require('@aws-sdk/client-s3');
+
+const R2_ACCOUNT_ID = process.env.R2_ACCOUNT_ID;
+const R2_ACCESS_KEY_ID = process.env.R2_ACCESS_KEY_ID;
+const R2_SECRET_ACCESS_KEY = process.env.R2_SECRET_ACCESS_KEY;
+const R2_BUCKET = process.env.R2_BUCKET || 'herald-portal-uploads';
+const R2_PUBLIC_URL = (process.env.R2_PUBLIC_URL || '').replace(/\/$/, ''); // strip trailing slash
+
+let r2 = null;
+if (R2_ACCOUNT_ID && R2_ACCESS_KEY_ID && R2_SECRET_ACCESS_KEY) {
+  r2 = new S3Client({
+    region: 'auto',
+    endpoint: `https://${R2_ACCOUNT_ID}.r2.cloudflarestorage.com`,
+    credentials: {
+      accessKeyId: R2_ACCESS_KEY_ID,
+      secretAccessKey: R2_SECRET_ACCESS_KEY,
+    },
+  });
+  console.log('☁️  R2 storage configured');
+} else {
+  console.warn('⚠️  R2 env vars missing — falling back to local disk storage');
+}
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 const JWT_SECRET = process.env.JWT_SECRET || 'herald-dev-secret-change-me';
 
-// ---------- Global BigInt JSON fix ----------
-BigInt.prototype.toJSON = function () { return Number(this); };
-
 app.use(express.json());
 app.use(cookieParser());
 app.use(express.static(path.join(__dirname, 'public')));
 
-// ---------- File uploads ----------
+// ---------- File uploads (R2 with local fallback) ----------
 const UPLOAD_DIR = process.env.UPLOAD_DIR || path.join(__dirname, 'uploads');
 if (!fs.existsSync(UPLOAD_DIR)) fs.mkdirSync(UPLOAD_DIR, { recursive: true });
 
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => cb(null, UPLOAD_DIR),
-  filename: (req, file, cb) => {
-    const safe = file.originalname.replace(/[^a-zA-Z0-9._-]/g, '_');
-    cb(null, `${Date.now()}-${req.user?.id || req.lecturer?.id || 'anon'}-${safe}`);
+// Use memory storage — we'll stream the buffer to R2 (or write to disk in fallback)
+const storage = multer.memoryStorage();
+
+async function saveFile(file) {
+  const safe = file.originalname.replace(/[^a-zA-Z0-9._-]/g, '_');
+  const key = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}-${safe}`;
+
+  if (r2 && R2_PUBLIC_URL) {
+    await r2.send(new PutObjectCommand({
+      Bucket: R2_BUCKET,
+      Key: key,
+      Body: file.buffer,
+      ContentType: file.mimetype,
+      ContentDisposition: 'inline',
+    }));
+    return {
+      file_path: `${R2_PUBLIC_URL}/${key}`,
+      file_key: key,
+      file_name: file.originalname,
+      storage: 'r2',
+    };
+  } else {
+    const fullPath = path.join(UPLOAD_DIR, key);
+    fs.writeFileSync(fullPath, file.buffer);
+    return {
+      file_path: `/uploads/${key}`,
+      file_key: key,
+      file_name: file.originalname,
+      storage: 'local',
+    };
   }
-});
+}
+
+async function deleteFile(fileKey, storageType = 'r2') {
+  try {
+    if (storageType === 'r2' && r2) {
+      await r2.send(new DeleteObjectCommand({ Bucket: R2_BUCKET, Key: fileKey }));
+    } else {
+      const fullPath = path.join(UPLOAD_DIR, fileKey);
+      if (fs.existsSync(fullPath)) fs.unlinkSync(fullPath);
+    }
+  } catch (e) {
+    console.error('Delete file failed:', e.message);
+  }
+}
 
 const upload = multer({
   storage,
@@ -62,6 +120,7 @@ const materialUpload = multer({
   },
 });
 
+// Legacy static route — still serves old local uploads if any exist
 app.use('/uploads', express.static(UPLOAD_DIR, {
   setHeaders: (res) => {
     res.setHeader('Content-Disposition', 'inline');
@@ -206,7 +265,6 @@ app.get('/api/me', authStudent, async (req, res) => {
   res.json(r.rows[0]);
 });
 
-// Public course list for registration picker
 app.get('/api/public/courses', async (req, res) => {
   const dbCourses = await db.execute('SELECT DISTINCT title, code FROM courses ORDER BY title');
   const catalog = [
@@ -333,37 +391,47 @@ app.get('/api/my-assignments', authStudent, async (req, res) => {
 });
 
 app.post('/api/submit/:assignmentId', authStudent, upload.single('file'), async (req, res) => {
-  const aid = Number(req.params.assignmentId);
-  const content = (req.body.content || '').trim();
-  const filePath = req.file ? `/uploads/${req.file.filename}` : null;
-  const fileName = req.file ? req.file.originalname : null;
+  try {
+    const aid = Number(req.params.assignmentId);
+    const content = (req.body.content || '').trim();
 
-  if (!content && !filePath) return res.status(400).json({ error: 'Provide text and/or a PDF file' });
-
-  const existing = await db.execute({
-    sql: 'SELECT * FROM submissions WHERE assignment_id = ? AND student_id = ?',
-    args: [aid, req.user.id],
-  });
-
-  if (existing.rows.length) {
-    const old = existing.rows[0];
-    if (old.file_path && filePath && old.file_path !== filePath) {
-      const oldPath = path.join(__dirname, old.file_path);
-      if (fs.existsSync(oldPath)) fs.unlinkSync(oldPath);
+    let filePath = null, fileName = null, fileKey = null;
+    if (req.file) {
+      const saved = await saveFile(req.file);
+      filePath = saved.file_path;
+      fileName = saved.file_name;
+      fileKey = saved.file_key;
     }
-    await db.execute({
-      sql: `UPDATE submissions SET content = ?, file_path = COALESCE(?, file_path),
-            file_name = COALESCE(?, file_name), submitted_at = CURRENT_TIMESTAMP WHERE id = ?`,
-      args: [content, filePath, fileName, old.id],
-    });
-  } else {
-    await db.execute({
-      sql: 'INSERT INTO submissions (assignment_id, student_id, content, file_path, file_name) VALUES (?, ?, ?, ?, ?)',
-      args: [aid, req.user.id, content, filePath, fileName],
-    });
-  }
 
-  res.json({ ok: true, has_file: !!filePath });
+    if (!content && !filePath) return res.status(400).json({ error: 'Provide text and/or a PDF file' });
+
+    const existing = await db.execute({
+      sql: 'SELECT * FROM submissions WHERE assignment_id = ? AND student_id = ?',
+      args: [aid, req.user.id],
+    });
+
+    if (existing.rows.length) {
+      const old = existing.rows[0];
+      if (old.file_key && fileKey && old.file_key !== fileKey) {
+        await deleteFile(old.file_key, 'r2');
+      }
+      await db.execute({
+        sql: `UPDATE submissions SET content = ?, file_path = COALESCE(?, file_path),
+              file_name = COALESCE(?, file_name), submitted_at = CURRENT_TIMESTAMP WHERE id = ?`,
+        args: [content, filePath, fileName, old.id],
+      });
+    } else {
+      await db.execute({
+        sql: 'INSERT INTO submissions (assignment_id, student_id, content, file_path, file_name) VALUES (?, ?, ?, ?, ?)',
+        args: [aid, req.user.id, content, filePath, fileName],
+      });
+    }
+
+    res.json({ ok: true, has_file: !!filePath });
+  } catch (err) {
+    console.error('Submission error:', err);
+    res.status(500).json({ error: err.message });
+  }
 });
 
 app.get('/api/submission/:id/file', authStudent, async (req, res) => {
@@ -371,6 +439,10 @@ app.get('/api/submission/:id/file', authStudent, async (req, res) => {
   const sub = r.rows[0];
   if (!sub || !sub.file_path) return res.status(404).json({ error: 'No file' });
   if (sub.student_id !== req.user.id) return res.status(403).json({ error: 'Not yours' });
+
+  // If R2 URL, redirect
+  if (sub.file_path.startsWith('http')) return res.redirect(sub.file_path);
+
   const fullPath = path.join(__dirname, sub.file_path);
   if (!fs.existsSync(fullPath)) return res.status(404).json({ error: 'File missing' });
   res.setHeader('Content-Type', 'application/pdf');
@@ -512,7 +584,7 @@ app.post('/api/lecturer/register', async (req, res) => {
   try {
     const staff_no = await generateStaffNo();
     const hash = bcrypt.hashSync(password, 10);
-    const info = await db.execute({
+    await db.execute({
       sql: `INSERT INTO lecturers (staff_no, name, email, phone, password, qualification, specialization, bio)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
       args: [staff_no, name.trim(), email.trim().toLowerCase(), phone || '', hash, qualification || '', specialization || '', bio || ''],
@@ -731,22 +803,31 @@ app.get('/api/lecturer/materials', authLecturer, async (req, res) => {
 });
 
 app.post('/api/lecturer/materials', authLecturer, async (req, res) => {
-  const { course_id, title, description, material_type, file_path, file_name, external_url, release_date } = req.body;
-  if (!course_id || !title || !release_date) {
-    return res.status(400).json({ error: 'course_id, title, and release_date are required' });
+  try {
+    const { course_id, title, description, material_type, file_path, file_name, external_url, release_date } = req.body;
+    if (!course_id || !title || !release_date) {
+      return res.status(400).json({ error: 'course_id, title, and release_date are required' });
+    }
+    const info = await db.execute({
+      sql: `INSERT INTO materials (course_id, title, description, material_type, file_path, file_name, external_url, release_date, created_by)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      args: [course_id, title, description || '', material_type || 'file', file_path || null, file_name || null, external_url || null, release_date, req.lecturer.id],
+    });
+    res.json({ ok: true, id: Number(info.lastInsertRowid) });
+  } catch (err) {
+    console.error('Material save failed:', err);
+    res.status(500).json({ error: err.message });
   }
-  const info = await db.execute({
-    sql: `INSERT INTO materials (course_id, title, description, material_type, file_path, file_name, external_url, release_date, created_by)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    args: [course_id, title, description || '', material_type || 'file', file_path || null, file_name || null, external_url || null, release_date, req.lecturer.id],
-  });
-  res.json({ ok: true, id: info.lastInsertRowid });
 });
 
 app.delete('/api/lecturer/materials/:id', authLecturer, async (req, res) => {
-  await db.execute({ sql: 'DELETE FROM material_views WHERE material_id = ?', args: [req.params.id] });
-  await db.execute({ sql: 'DELETE FROM materials WHERE id = ?', args: [req.params.id] });
-  res.json({ ok: true });
+  try {
+    await db.execute({ sql: 'DELETE FROM material_views WHERE material_id = ?', args: [req.params.id] });
+    await db.execute({ sql: 'DELETE FROM materials WHERE id = ?', args: [req.params.id] });
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 app.get('/api/lecturer/materials/:id/views', authLecturer, async (req, res) => {
@@ -759,9 +840,21 @@ app.get('/api/lecturer/materials/:id/views', authLecturer, async (req, res) => {
   res.json(r.rows);
 });
 
-app.post('/api/lecturer/materials/upload', authLecturer, materialUpload.single('file'), (req, res) => {
+app.post('/api/lecturer/materials/upload', authLecturer, materialUpload.single('file'), async (req, res) => {
   if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
-  res.json({ ok: true, file_path: `/uploads/${req.file.filename}`, file_name: req.file.originalname });
+  try {
+    const saved = await saveFile(req.file);
+    res.json({
+      ok: true,
+      file_path: saved.file_path,
+      file_key: saved.file_key,
+      file_name: saved.file_name,
+      storage: saved.storage,
+    });
+  } catch (err) {
+    console.error('Upload failed:', err);
+    res.status(500).json({ error: 'Upload failed: ' + err.message });
+  }
 });
 
 // ==================== ADMIN ROUTES ====================
@@ -900,7 +993,6 @@ app.post('/api/admin/lecturers', authAdmin, async (req, res) => {
 });
 
 // ---------- Lecturer Course Assignments ----------
-// Full list of courses with assigned lecturers
 app.get('/api/admin/courses-full', authAdmin, async (req, res) => {
   try {
     const courses = await db.execute(`
@@ -926,7 +1018,6 @@ app.get('/api/admin/courses-full', authAdmin, async (req, res) => {
   }
 });
 
-// Assign a lecturer to a course
 app.post('/api/admin/courses/:courseId/assign-lecturer', authAdmin, async (req, res) => {
   const { lecturer_id } = req.body;
   if (!lecturer_id) return res.status(400).json({ error: 'lecturer_id required' });
@@ -952,7 +1043,7 @@ app.post('/api/admin/courses/:courseId/assign-lecturer', authAdmin, async (req, 
             <p>You have been assigned to teach <strong>${course.code} — ${course.title}</strong>.</p>
             <p>Log in to your lecturer dashboard to view enrolled students and post materials.</p>
             <p style="margin-top:24px;">
-              <a href="${process.env.APP_URL || 'https://herald-portal.onrender.com'}/lecturer-login.html"
+              <a href="${process.env.APP_URL || 'https://heraldtrainer.co.ke'}/lecturer-login.html"
                  style="background:#0b1a33; color:#fff; padding:12px 22px; border-radius:6px; text-decoration:none; font-weight:600;">
                 Open Lecturer Dashboard
               </a>
@@ -968,7 +1059,6 @@ app.post('/api/admin/courses/:courseId/assign-lecturer', authAdmin, async (req, 
   }
 });
 
-// Remove a lecturer from a course
 app.delete('/api/admin/courses/:courseId/lecturers/:lecturerId', authAdmin, async (req, res) => {
   try {
     await db.execute({
@@ -981,7 +1071,6 @@ app.delete('/api/admin/courses/:courseId/lecturers/:lecturerId', authAdmin, asyn
   }
 });
 
-// List courses assigned to a lecturer
 app.get('/api/admin/lecturers/:id/courses', authAdmin, async (req, res) => {
   try {
     const r = await db.execute({
@@ -998,7 +1087,6 @@ app.get('/api/admin/lecturers/:id/courses', authAdmin, async (req, res) => {
   }
 });
 
-// Assign a course to a lecturer
 app.post('/api/admin/lecturers/:id/courses', authAdmin, async (req, res) => {
   const { course_id } = req.body;
   if (!course_id) return res.status(400).json({ error: 'course_id required' });
@@ -1013,7 +1101,6 @@ app.post('/api/admin/lecturers/:id/courses', authAdmin, async (req, res) => {
   }
 });
 
-// Unassign a course
 app.delete('/api/admin/lecturers/:id/courses/:courseId', authAdmin, async (req, res) => {
   try {
     await db.execute({
@@ -1026,7 +1113,6 @@ app.delete('/api/admin/lecturers/:id/courses/:courseId', authAdmin, async (req, 
   }
 });
 
-// Lecturer workload summary
 app.get('/api/admin/lecturers-workload', authAdmin, async (req, res) => {
   try {
     const r = await db.execute(`
@@ -1045,7 +1131,6 @@ app.get('/api/admin/lecturers-workload', authAdmin, async (req, res) => {
   }
 });
 
-// Bulk assign
 app.post('/api/admin/lecturers/bulk-assign', authAdmin, async (req, res) => {
   const { lecturer_ids, course_ids } = req.body;
   if (!Array.isArray(lecturer_ids) || !Array.isArray(course_ids)) {
@@ -1378,6 +1463,7 @@ app.get('/api/admin/submission/:id/file', authAdmin, async (req, res) => {
   const r = await db.execute({ sql: 'SELECT * FROM submissions WHERE id = ?', args: [req.params.id] });
   const sub = r.rows[0];
   if (!sub || !sub.file_path) return res.status(404).json({ error: 'No file' });
+  if (sub.file_path.startsWith('http')) return res.redirect(sub.file_path);
   const fullPath = path.join(__dirname, sub.file_path);
   if (!fs.existsSync(fullPath)) return res.status(404).json({ error: 'File missing' });
   res.setHeader('Content-Type', 'application/pdf');
@@ -1504,12 +1590,24 @@ app.post('/api/admin/live-classes', authAdmin, async (req, res) => {
     } catch (e) { console.error('Class notification error:', e.message); }
   }
 
-  res.json({ ok: true, id: info.lastInsertRowid });
+  res.json({ ok: true, id: Number(info.lastInsertRowid) });
 });
 
 app.delete('/api/admin/live-classes/:id', authAdmin, async (req, res) => {
   await db.execute({ sql: 'DELETE FROM live_classes WHERE id = ?', args: [req.params.id] });
   res.json({ ok: true });
+});
+
+// ---------- Global error handler (must be last) ----------
+app.use((err, req, res, next) => {
+  if (err instanceof multer.MulterError) {
+    return res.status(400).json({ error: `Upload error: ${err.message}` });
+  }
+  if (err) {
+    console.error('Unhandled error:', err);
+    return res.status(500).json({ error: err.message || 'Server error' });
+  }
+  next();
 });
 
 app.listen(PORT, () => console.log(`Herald Portal running on http://localhost:${PORT}`));
