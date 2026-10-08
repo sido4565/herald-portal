@@ -164,6 +164,69 @@ function sendMailSafe(fnName, payload) {
   mailer[fnName](payload).catch(err => console.error(`✉️  ${fnName} failed:`, err.message));
 }
 
+// ---------- Google Sheets webhook ----------
+const GOOGLE_SHEETS_WEBHOOK_URL = process.env.GOOGLE_SHEETS_WEBHOOK_URL;
+
+async function sendToGoogleSheets(payload) {
+  if (!GOOGLE_SHEETS_WEBHOOK_URL) return;
+  try {
+    const res = await fetch(GOOGLE_SHEETS_WEBHOOK_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    if (!res.ok) {
+      console.warn('Google Sheets webhook returned', res.status);
+    }
+  } catch (err) {
+    console.error('Google Sheets webhook failed:', err.message);
+  }
+}
+
+async function pushAttendanceToSheets({ course_id, date, records, markedBy }) {
+  if (!GOOGLE_SHEETS_WEBHOOK_URL) return;
+
+  try {
+    // Fetch course details once
+    const cr = await db.execute({
+      sql: 'SELECT code, title FROM courses WHERE id = ?',
+      args: [course_id],
+    });
+    const course = cr.rows[0] || { code: '?', title: 'Unknown course' };
+    const courseLabel = `${course.code} — ${course.title}`;
+
+    // Fetch all student details in one go
+    const studentIds = records.map(r => r.student_id);
+    if (!studentIds.length) return;
+
+    const placeholders = studentIds.map(() => '?').join(',');
+    const sr = await db.execute({
+      sql: `SELECT id, reg_no, name FROM students WHERE id IN (${placeholders})`,
+      args: studentIds,
+    });
+    const studentMap = {};
+    sr.rows.forEach(s => { studentMap[s.id] = s; });
+
+    // Build one row per record
+    const rows = records.map(r => {
+      const s = studentMap[r.student_id] || {};
+      return {
+        student_name: s.name || 'Unknown',
+        reg_no: s.reg_no || '',
+        course: courseLabel,
+        date,
+        status: r.status || 'present',
+      };
+    });
+
+    // Send as an array — the Apps Script handles batches
+    await sendToGoogleSheets(rows);
+    console.log(`📊 Sent ${rows.length} attendance rows to Google Sheets`);
+  } catch (err) {
+    console.error('pushAttendanceToSheets failed:', err.message);
+  }
+}
+
 // ---------- Registration number generator ----------
 async function generateRegNo() {
   const year = new Date().getFullYear();
@@ -778,18 +841,29 @@ app.post('/api/lecturer/attendance', authLecturer, async (req, res) => {
   if (!course_id || !date || !Array.isArray(records)) {
     return res.status(400).json({ error: 'course_id, date, records[] required' });
   }
-  for (const r of records) {
-    await db.execute({
-      sql: 'DELETE FROM attendance WHERE course_id = ? AND student_id = ? AND date = ?',
-      args: [course_id, r.student_id, date],
-    });
-    await db.execute({
-      sql: `INSERT INTO attendance (course_id, student_id, date, status, marked_by, notes)
-            VALUES (?, ?, ?, ?, ?, ?)`,
-      args: [course_id, r.student_id, date, r.status || 'present', req.lecturer.id, r.notes || ''],
-    });
+
+  try {
+    for (const r of records) {
+      await db.execute({
+        sql: 'DELETE FROM attendance WHERE course_id = ? AND student_id = ? AND date = ?',
+        args: [course_id, r.student_id, date],
+      });
+      await db.execute({
+        sql: `INSERT INTO attendance (course_id, student_id, date, status, marked_by, notes)
+              VALUES (?, ?, ?, ?, ?, ?)`,
+        args: [course_id, r.student_id, date, r.status || 'present', req.lecturer.id, r.notes || ''],
+      });
+    }
+
+    // Fire-and-forget sync to Google Sheets
+    pushAttendanceToSheets({ course_id, date, records, markedBy: req.lecturer.id })
+      .catch(err => console.error('Sheets sync error:', err.message));
+
+    res.json({ ok: true, count: records.length });
+  } catch (err) {
+    console.error('Attendance save failed:', err);
+    res.status(500).json({ error: err.message });
   }
-  res.json({ ok: true, count: records.length });
 });
 
 app.get('/api/lecturer/materials', authLecturer, async (req, res) => {
@@ -1598,18 +1672,29 @@ app.post('/api/admin/attendance', authAdmin, async (req, res) => {
   if (!course_id || !date || !Array.isArray(records)) {
     return res.status(400).json({ error: 'course_id, date, records[] required' });
   }
-  for (const r of records) {
-    await db.execute({
-      sql: 'DELETE FROM attendance WHERE course_id = ? AND student_id = ? AND date = ?',
-      args: [course_id, r.student_id, date],
-    });
-    await db.execute({
-      sql: `INSERT INTO attendance (course_id, student_id, date, status, marked_by, notes)
-            VALUES (?, ?, ?, ?, ?, ?)`,
-      args: [course_id, r.student_id, date, r.status || 'present', req.admin.id, r.notes || ''],
-    });
+
+  try {
+    for (const r of records) {
+      await db.execute({
+        sql: 'DELETE FROM attendance WHERE course_id = ? AND student_id = ? AND date = ?',
+        args: [course_id, r.student_id, date],
+      });
+      await db.execute({
+        sql: `INSERT INTO attendance (course_id, student_id, date, status, marked_by, notes)
+              VALUES (?, ?, ?, ?, ?, ?)`,
+        args: [course_id, r.student_id, date, r.status || 'present', req.admin.id, r.notes || ''],
+      });
+    }
+
+    // Fire-and-forget sync to Google Sheets
+    pushAttendanceToSheets({ course_id, date, records, markedBy: req.admin.id })
+      .catch(err => console.error('Sheets sync error:', err.message));
+
+    res.json({ ok: true, count: records.length });
+  } catch (err) {
+    console.error('Attendance save failed:', err);
+    res.status(500).json({ error: err.message });
   }
-  res.json({ ok: true, count: records.length });
 });
 
 app.get('/api/admin/attendance-summary/:courseId', authAdmin, async (req, res) => {
