@@ -783,26 +783,96 @@ app.get('/api/lecturer/courses/:id/students', authLecturer, async (req, res) => 
   res.json(r.rows);
 });
 
+// List results — only for courses this lecturer is assigned to
 app.get('/api/lecturer/results', authLecturer, async (req, res) => {
-  const r = await db.execute(`
-    SELECT r.id, r.marks, r.grade, r.term, s.reg_no, s.name AS student_name,
-           c.code, c.title AS course_title
-    FROM results r JOIN students s ON s.id = r.student_id
-    JOIN courses c ON c.id = r.course_id
-    ORDER BY r.id DESC LIMIT 200
-  `);
-  res.json(r.rows);
+  try {
+    const r = await db.execute({
+      sql: `
+        SELECT r.id, r.marks, r.grade, r.term,
+               s.id AS student_id, s.reg_no, s.name AS student_name,
+               c.id AS course_id, c.code, c.title AS course_title
+        FROM results r
+        JOIN students s ON s.id = r.student_id
+        JOIN courses c ON c.id = r.course_id
+        JOIN lecturer_courses lc ON lc.course_id = c.id
+        WHERE lc.lecturer_id = ?
+        ORDER BY r.term DESC, c.code ASC, s.name ASC
+      `,
+      args: [req.lecturer.id],
+    });
+    res.json(r.rows);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 app.post('/api/lecturer/results', authLecturer, async (req, res) => {
   const { student_id, course_id, marks, term } = req.body;
-  if (!student_id || !course_id || marks == null || !term) return res.status(400).json({ error: 'All fields required' });
-  const grade = calcGrade(Number(marks));
-  await db.execute({
-    sql: 'INSERT INTO results (student_id, course_id, marks, grade, term) VALUES (?, ?, ?, ?, ?)',
-    args: [student_id, course_id, marks, grade, term],
-  });
-  res.json({ ok: true, grade });
+  if (!student_id || !course_id || marks == null || !term) {
+    return res.status(400).json({ error: 'All fields required' });
+  }
+  try {
+    // Verify this lecturer teaches this course
+    const check = await db.execute({
+      sql: 'SELECT 1 FROM lecturer_courses WHERE lecturer_id = ? AND course_id = ?',
+      args: [req.lecturer.id, course_id],
+    });
+    if (!check.rows.length) {
+      return res.status(403).json({ error: 'You are not assigned to this course' });
+    }
+
+    const grade = calcGrade(Number(marks));
+    const info = await db.execute({
+      sql: 'INSERT INTO results (student_id, course_id, marks, grade, term) VALUES (?, ?, ?, ?, ?)',
+      args: [student_id, course_id, Number(marks), grade, term],
+    });
+
+    res.json({ ok: true, id: Number(info.lastInsertRowid), grade });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Update an existing result (only if course belongs to this lecturer)
+app.put('/api/lecturer/results/:id', authLecturer, async (req, res) => {
+  const { marks, term } = req.body;
+  if (marks == null || !term) return res.status(400).json({ error: 'marks and term required' });
+  try {
+    const check = await db.execute({
+      sql: `SELECT r.id FROM results r
+            JOIN lecturer_courses lc ON lc.course_id = r.course_id
+            WHERE r.id = ? AND lc.lecturer_id = ?`,
+      args: [req.params.id, req.lecturer.id],
+    });
+    if (!check.rows.length) return res.status(403).json({ error: 'Not allowed' });
+
+    const grade = calcGrade(Number(marks));
+    await db.execute({
+      sql: 'UPDATE results SET marks = ?, grade = ?, term = ? WHERE id = ?',
+      args: [Number(marks), grade, term, req.params.id],
+    });
+    res.json({ ok: true, grade });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Delete a result (only if course belongs to this lecturer)
+app.delete('/api/lecturer/results/:id', authLecturer, async (req, res) => {
+  try {
+    const check = await db.execute({
+      sql: `SELECT r.id FROM results r
+            JOIN lecturer_courses lc ON lc.course_id = r.course_id
+            WHERE r.id = ? AND lc.lecturer_id = ?`,
+      args: [req.params.id, req.lecturer.id],
+    });
+    if (!check.rows.length) return res.status(403).json({ error: 'Not allowed' });
+
+    await db.execute({ sql: 'DELETE FROM results WHERE id = ?', args: [req.params.id] });
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 app.get('/api/lecturer/announcements', authLecturer, async (req, res) => {

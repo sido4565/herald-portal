@@ -70,15 +70,49 @@
       <div id="coursesList"></div>
     </section>
 
-    <!-- Results -->
+        <!-- Results -->
     <section class="admin-panel" id="panel-results">
       <div class="panel-head">
         <h2>Results</h2>
-        <button class="btn-primary" id="addResultBtn" type="button">Add Result</button>
+        <div style="display:flex; gap:8px; flex-wrap:wrap;">
+          <button class="btn-ghost dark" id="exportResultsBtn" type="button">Export CSV</button>
+          <button class="btn-primary" id="addResultBtn" type="button">+ Add Result</button>
+        </div>
       </div>
+
+      <!-- Filters -->
+      <div id="resultsFilters" style="display:flex; gap:10px; flex-wrap:wrap; margin:16px 0;">
+        <select id="filterCourse" style="padding:9px 12px; border:1px solid var(--border); border-radius:6px; background:var(--card); color:var(--text); min-width:180px;">
+          <option value="">All Courses</option>
+        </select>
+        <select id="filterTerm" style="padding:9px 12px; border:1px solid var(--border); border-radius:6px; background:var(--card); color:var(--text); min-width:140px;">
+          <option value="">All Terms</option>
+        </select>
+        <select id="filterGrade" style="padding:9px 12px; border:1px solid var(--border); border-radius:6px; background:var(--card); color:var(--text); min-width:120px;">
+          <option value="">All Grades</option>
+          <option>A</option><option>A-</option><option>B+</option><option>B</option><option>B-</option>
+          <option>C+</option><option>C</option><option>D</option><option>E</option>
+        </select>
+        <input id="filterSearch" type="text" placeholder="🔍 Search student name / reg no..."
+               style="padding:9px 12px; border:1px solid var(--border); border-radius:6px; background:var(--card); color:var(--text); flex:1; min-width:200px;" />
+      </div>
+
+      <!-- Summary -->
+      <div id="resultsSummary" style="display:grid; grid-template-columns:repeat(auto-fit, minmax(140px, 1fr)); gap:12px; margin-bottom:16px;"></div>
+
+      <!-- Table -->
       <div class="table-wrap">
         <table id="resultsTable">
-          <thead><tr><th>Student</th><th>Course</th><th>Marks</th><th>Grade</th><th>Term</th></tr></thead>
+          <thead>
+            <tr>
+              <th>Student</th>
+              <th>Course</th>
+              <th style="text-align:right;">Marks</th>
+              <th>Grade</th>
+              <th>Term</th>
+              <th style="text-align:right;">Actions</th>
+            </tr>
+          </thead>
           <tbody></tbody>
         </table>
       </div>
@@ -582,32 +616,338 @@ $('#addMaterialBtn')?.addEventListener('click', async () => {
       `).join('');
     }
 
-    async function loadResults() {
-      const rows = await api('/api/lecturer/results');
-      $('#resultsTable tbody').innerHTML = rows.map(r => `
-        <tr>
-          <td>${esc(r.reg_no)} — ${esc(r.student_name)}</td>
-          <td>${esc(r.code)} — ${esc(r.course_title)}</td>
-          <td>${r.marks}</td>
-          <td><strong>${esc(r.grade)}</strong></td>
-          <td>${esc(r.term)}</td>
-        </tr>
-      `).join('') || '<tr><td colspan="5" class="empty">No results yet.</td></tr>';
-    }
+    // ---------- Results ----------
+let resultsCache = [];
 
-    $('#addResultBtn').addEventListener('click', async () => {
-      // Fetch all students + courses for dropdowns
-      const students = await fetch('/api/lecturer/my-courses').then(r => r.json());
-      openModal('Add Result', [
-        { name: 'student_id', label: 'Student ID', type: 'number', required: true },
-        { name: 'course_id', label: 'Course ID', type: 'number', required: true },
-        { name: 'marks', label: 'Marks (0-100)', type: 'number', required: true },
-        { name: 'term', label: 'Term', value: 'Term 1 2025', required: true },
-      ], async (d) => {
-        await api('/api/lecturer/results', { method: 'POST', body: d });
-        await loadResults();
-      });
+async function loadResults() {
+  const tbody = $('#resultsTable tbody');
+  tbody.innerHTML = '<tr><td colspan="6" class="empty">Loading…</td></tr>';
+
+  try {
+    resultsCache = await api('/api/lecturer/results');
+  } catch (err) {
+    tbody.innerHTML = `<tr><td colspan="6" class="empty">Could not load: ${esc(err.message)}</td></tr>`;
+    return;
+  }
+
+  // Populate course + term filters (once)
+  const courseSel = $('#filterCourse');
+  const termSel = $('#filterTerm');
+  if (courseSel.options.length <= 1) {
+    const courses = [...new Map(resultsCache.map(r => [r.course_id, r])).values()];
+    courses.forEach(c => {
+      const o = document.createElement('option');
+      o.value = c.course_id;
+      o.textContent = `${c.code} — ${c.course_title}`;
+      courseSel.appendChild(o);
     });
+  }
+  if (termSel.options.length <= 1) {
+    const terms = [...new Set(resultsCache.map(r => r.term))].sort();
+    terms.forEach(t => {
+      const o = document.createElement('option');
+      o.value = t;
+      o.textContent = t;
+      termSel.appendChild(o);
+    });
+  }
+
+  // Bind filter listeners once
+  if (!courseSel.dataset.wired) {
+    courseSel.dataset.wired = '1';
+    ['#filterCourse', '#filterTerm', '#filterGrade', '#filterSearch'].forEach(sel => {
+      const el = $(sel);
+      el.addEventListener('input', applyResultsFilters);
+      el.addEventListener('change', applyResultsFilters);
+    });
+  }
+
+  applyResultsFilters();
+}
+
+function applyResultsFilters() {
+  const courseFilter = $('#filterCourse').value;
+  const termFilter = $('#filterTerm').value;
+  const gradeFilter = $('#filterGrade').value;
+  const search = $('#filterSearch').value.trim().toLowerCase();
+
+  const filtered = resultsCache.filter(r => {
+    if (courseFilter && String(r.course_id) !== String(courseFilter)) return false;
+    if (termFilter && r.term !== termFilter) return false;
+    if (gradeFilter && r.grade !== gradeFilter) return false;
+    if (search) {
+      const hay = `${r.student_name} ${r.reg_no}`.toLowerCase();
+      if (!hay.includes(search)) return false;
+    }
+    return true;
+  });
+
+  renderResultsTable(filtered);
+  renderResultsSummary(filtered);
+}
+
+function renderResultsTable(rows) {
+  const tbody = $('#resultsTable tbody');
+  if (!rows.length) {
+    tbody.innerHTML = '<tr><td colspan="6" class="empty">No results match the current filters.</td></tr>';
+    return;
+  }
+
+  tbody.innerHTML = rows.map(r => {
+    const pill = r.grade && ['A','A-'].includes(r.grade) ? 'pill-green'
+               : r.grade && ['B+','B','B-'].includes(r.grade) ? 'pill-amber'
+               : r.grade === 'E' ? 'pill-red'
+               : 'pill';
+    return `
+      <tr>
+        <td>
+          <div style="font-size:11px; font-family:monospace; color:var(--gold-500); font-weight:700;">${esc(r.reg_no)}</div>
+          <div style="font-weight:600;">${esc(r.student_name)}</div>
+        </td>
+        <td>
+          <div style="font-size:11px; font-family:monospace; color:var(--gold-500); font-weight:700;">${esc(r.code)}</div>
+          <div style="font-size:13px;">${esc(r.course_title)}</div>
+        </td>
+        <td style="text-align:right; font-weight:700; font-size:15px;">${r.marks}</td>
+        <td><span class="pill ${pill}">${esc(r.grade)}</span></td>
+        <td style="font-size:13px;">${esc(r.term)}</td>
+        <td style="text-align:right; white-space:nowrap;">
+          <button class="btn-xs" data-act="edit-result" data-id="${r.id}" type="button" title="Edit">✎</button>
+          <button class="btn-xs danger" data-act="del-result" data-id="${r.id}" type="button" title="Delete">🗑</button>
+        </td>
+      </tr>
+    `;
+  }).join('');
+
+  tbody.querySelectorAll('[data-act="edit-result"]').forEach(btn => {
+    btn.addEventListener('click', () => openEditResultModal(Number(btn.dataset.id)));
+  });
+  tbody.querySelectorAll('[data-act="del-result"]').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      if (!confirm('Delete this result? This cannot be undone.')) return;
+      try {
+        await api(`/api/lecturer/results/${btn.dataset.id}`, { method: 'DELETE' });
+        toast('Result deleted');
+        loadResults();
+      } catch (err) { toast(err.message, 'error'); }
+    });
+  });
+}
+
+function renderResultsSummary(rows) {
+  const wrap = $('#resultsSummary');
+  if (!rows.length) { wrap.innerHTML = ''; return; }
+
+  const total = rows.length;
+  const avg = (rows.reduce((s, r) => s + Number(r.marks), 0) / total).toFixed(1);
+  const passing = rows.filter(r => Number(r.marks) >= 50).length;
+  const passRate = Math.round((passing / total) * 100);
+  const topGrade = rows.reduce((best, r) => {
+    const order = ['A','A-','B+','B','B-','C+','C','D','E'];
+    return order.indexOf(r.grade) < order.indexOf(best) ? r.grade : best;
+  }, 'E');
+
+  const cards = [
+    { label: 'Total Results', value: total },
+    { label: 'Class Average', value: avg },
+    { label: 'Pass Rate', value: `${passRate}%` },
+    { label: 'Top Grade', value: topGrade },
+  ];
+
+  wrap.innerHTML = cards.map(c => `
+    <div style="background:var(--bg-alt); border-radius:10px; padding:14px 16px; border-left:3px solid var(--gold-500);">
+      <div style="font-size:24px; font-weight:800; color:var(--navy-700);">${esc(String(c.value))}</div>
+      <div style="font-size:11px; text-transform:uppercase; letter-spacing:0.06em; color:var(--muted); font-weight:700;">${esc(c.label)}</div>
+    </div>
+  `).join('');
+}
+
+// ---------- Add Result Modal (proper form with cascading dropdowns) ----------
+$('#addResultBtn').addEventListener('click', () => openAddResultModal());
+
+async function openAddResultModal() {
+  let courses = [];
+  try {
+    courses = await api('/api/lecturer/my-courses');
+  } catch (err) {
+    return toast('Could not load courses: ' + err.message, 'error');
+  }
+  if (!courses.length) return toast('You have no assigned courses yet.', 'error');
+
+  const overlay = document.createElement('div');
+  overlay.className = 'modal-overlay';
+  overlay.innerHTML = `
+    <div class="modal" style="max-width:520px;">
+      <h3>Add Result</h3>
+      <form id="resForm" class="modal-form">
+        <label>Course</label>
+        <select name="course_id" id="resCourse" required>
+          <option value="">— Select course —</option>
+          ${courses.map(c => `<option value="${c.id}">${esc(c.code)} — ${esc(c.title)}</option>`).join('')}
+        </select>
+
+        <label>Student</label>
+        <select name="student_id" id="resStudent" required disabled>
+          <option value="">— Select course first —</option>
+        </select>
+
+        <label>Marks (0–100)</label>
+        <input name="marks" id="resMarks" type="number" min="0" max="100" required />
+        <div id="gradePreview" style="font-size:12px; color:var(--muted); margin-top:-4px;"></div>
+
+        <label>Term</label>
+        <input name="term" id="resTerm" type="text" value="Term 1 2025" required />
+      </form>
+      <div class="modal-actions">
+        <button class="btn-ghost dark" type="button" data-close>Cancel</button>
+        <button class="btn-primary" id="resSaveBtn" type="button">Save Result</button>
+      </div>
+    </div>`;
+  document.body.appendChild(overlay);
+
+  overlay.addEventListener('click', e => {
+    if (e.target === overlay || e.target.closest('[data-close]')) overlay.remove();
+  });
+
+  const courseSel = overlay.querySelector('#resCourse');
+  const studentSel = overlay.querySelector('#resStudent');
+  const marksInput = overlay.querySelector('#resMarks');
+  const gradePreview = overlay.querySelector('#gradePreview');
+
+  courseSel.addEventListener('change', async () => {
+    const cid = courseSel.value;
+    studentSel.disabled = true;
+    studentSel.innerHTML = '<option value="">— Loading… —</option>';
+    if (!cid) {
+      studentSel.innerHTML = '<option value="">— Select course first —</option>';
+      return;
+    }
+    try {
+      const students = await api(`/api/lecturer/courses/${cid}/students`);
+      if (!students.length) {
+        studentSel.innerHTML = '<option value="">— No students enrolled —</option>';
+        return;
+      }
+      studentSel.innerHTML = '<option value="">— Select student —</option>' +
+        students.map(s => `<option value="${s.id}">${esc(s.reg_no)} — ${esc(s.name)}</option>`).join('');
+      studentSel.disabled = false;
+    } catch (err) {
+      studentSel.innerHTML = `<option value="">— Error: ${esc(err.message)} —</option>`;
+    }
+  });
+
+  marksInput.addEventListener('input', () => {
+    const m = Number(marksInput.value);
+    if (isNaN(m)) { gradePreview.textContent = ''; return; }
+    const g = m >= 80 ? 'A' : m >= 75 ? 'A-' : m >= 70 ? 'B+' : m >= 65 ? 'B' :
+              m >= 60 ? 'B-' : m >= 55 ? 'C+' : m >= 50 ? 'C' : m >= 45 ? 'D' : 'E';
+    gradePreview.textContent = `Grade preview: ${g}`;
+  });
+
+  overlay.querySelector('#resSaveBtn').addEventListener('click', async () => {
+    const form = overlay.querySelector('#resForm');
+    const data = Object.fromEntries(new FormData(form));
+    if (!data.course_id || !data.student_id || data.marks === '' || !data.term) {
+      return toast('Please fill all fields', 'error');
+    }
+    try {
+      await api('/api/lecturer/results', {
+        method: 'POST',
+        body: {
+          student_id: Number(data.student_id),
+          course_id: Number(data.course_id),
+          marks: Number(data.marks),
+          term: data.term,
+        },
+      });
+      overlay.remove();
+      toast('Result added ✅');
+      loadResults();
+    } catch (err) {
+      toast(err.message, 'error');
+    }
+  });
+}
+
+// ---------- Edit Result Modal ----------
+async function openEditResultModal(id) {
+  const r = resultsCache.find(x => x.id === id);
+  if (!r) return;
+
+  const overlay = document.createElement('div');
+  overlay.className = 'modal-overlay';
+  overlay.innerHTML = `
+    <div class="modal" style="max-width:480px;">
+      <h3>Edit Result</h3>
+      <p style="color:var(--muted); font-size:13px; margin-bottom:16px;">
+        ${esc(r.reg_no)} — ${esc(r.student_name)}<br/>
+        ${esc(r.code)} — ${esc(r.course_title)}
+      </p>
+      <form id="editResForm" class="modal-form">
+        <label>Marks (0–100)</label>
+        <input name="marks" type="number" min="0" max="100" value="${r.marks}" required />
+        <label>Term</label>
+        <input name="term" type="text" value="${esc(r.term)}" required />
+      </form>
+      <div class="modal-actions">
+        <button class="btn-ghost dark" type="button" data-close>Cancel</button>
+        <button class="btn-primary" id="editResSave" type="button">Save Changes</button>
+      </div>
+    </div>`;
+  document.body.appendChild(overlay);
+
+  overlay.addEventListener('click', e => {
+    if (e.target === overlay || e.target.closest('[data-close]')) overlay.remove();
+  });
+
+  overlay.querySelector('#editResSave').addEventListener('click', async () => {
+    const form = overlay.querySelector('#editResForm');
+    const data = Object.fromEntries(new FormData(form));
+    try {
+      await api(`/api/lecturer/results/${id}`, {
+        method: 'PUT',
+        body: { marks: Number(data.marks), term: data.term },
+      });
+      overlay.remove();
+      toast('Result updated ✅');
+      loadResults();
+    } catch (err) {
+      toast(err.message, 'error');
+    }
+  });
+}
+
+// ---------- Export CSV ----------
+$('#exportResultsBtn').addEventListener('click', () => {
+  const rows = resultsCache;
+  if (!rows.length) return toast('No results to export', 'error');
+
+  const header = ['Reg No', 'Student Name', 'Course Code', 'Course Title', 'Marks', 'Grade', 'Term'];
+  const csv = [header.join(',')].concat(
+    rows.map(r => [
+      r.reg_no,
+      `"${r.student_name.replace(/"/g, '""')}"`,
+      r.code,
+      `"${r.course_title.replace(/"/g, '""')}"`,
+      r.marks,
+      r.grade,
+      `"${r.term}"`,
+    ].join(','))
+  ).join('\n');
+
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `herald-results-${new Date().toISOString().slice(0,10)}.csv`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+  toast('CSV downloaded');
+});
+
+
 
     async function loadAttendance() {
       if (!coursesCache.length) coursesCache = await api('/api/lecturer/my-courses');
