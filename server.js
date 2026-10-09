@@ -906,6 +906,43 @@ app.get('/api/lecturer/attendance/:courseId', authLecturer, async (req, res) => 
   res.json(r.rows);
 });
 
+// Attendance for a specific course on a specific date (roster + saved status)
+app.get('/api/lecturer/attendance/:courseId/:date', authLecturer, async (req, res) => {
+  try {
+    const { courseId, date } = req.params;
+
+    // Verify lecturer is assigned to this course
+    const check = await db.execute({
+      sql: 'SELECT 1 FROM lecturer_courses WHERE lecturer_id = ? AND course_id = ?',
+      args: [req.lecturer.id, courseId],
+    });
+    if (!check.rows.length) return res.status(403).json({ error: 'Not assigned to this course' });
+
+    // Get roster + any saved status for that date
+    const r = await db.execute({
+      sql: `
+        SELECT s.id AS student_id, s.reg_no, s.name AS student_name,
+               a.status, a.notes
+        FROM students s
+        JOIN enrollments e ON e.student_id = s.id AND e.course_id = ?
+        LEFT JOIN attendance a ON a.student_id = s.id AND a.course_id = ? AND a.date = ?
+        ORDER BY s.name
+      `,
+      args: [courseId, courseId, date],
+    });
+
+    res.json(r.rows.map(row => ({
+      student_id: row.student_id,
+      reg_no: row.reg_no,
+      student_name: row.student_name,
+      status: row.status || null,   // null = not marked yet
+      notes: row.notes || '',
+    })));
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 app.post('/api/lecturer/attendance', authLecturer, async (req, res) => {
   const { course_id, date, records } = req.body;
   if (!course_id || !date || !Array.isArray(records)) {

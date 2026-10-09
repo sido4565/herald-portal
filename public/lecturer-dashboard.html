@@ -118,15 +118,56 @@
       </div>
     </section>
 
-    <!-- Attendance -->
+        <!-- Attendance -->
     <section class="admin-panel" id="panel-attendance">
       <div class="panel-head">
         <h2>Attendance</h2>
-        <button class="btn-primary" id="takeAttBtn" type="button">Take Attendance</button>
       </div>
+
+      <!-- Course + Date picker -->
+      <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:end; margin:16px 0;">
+        <label style="display:grid; gap:6px; font-size:13px; font-weight:600;">
+          Course
+          <select id="attCourse" style="padding:9px 12px; border:1px solid var(--border); border-radius:6px; background:var(--card); color:var(--text); min-width:220px;">
+            <option value="">— Select course —</option>
+          </select>
+        </label>
+        <label style="display:grid; gap:6px; font-size:13px; font-weight:600;">
+          Date
+          <input id="attDate" type="date" value="" style="padding:9px 12px; border:1px solid var(--border); border-radius:6px; background:var(--card); color:var(--text);" />
+        </label>
+        <button class="btn-primary" id="attLoadBtn" type="button">Load Roster</button>
+      </div>
+
+      <!-- Bulk actions + Save -->
+      <div id="attActions" style="display:none; gap:10px; flex-wrap:wrap; align-items:center; margin:14px 0;">
+        <button class="btn-ghost dark" id="attAllPresent" type="button">✅ All Present</button>
+        <button class="btn-ghost dark" id="attAllAbsent" type="button">❌ All Absent</button>
+        <button class="btn-ghost dark" id="attAllLate" type="button">⏰ All Late</button>
+        <span style="flex:1;"></span>
+        <button class="btn-primary" id="attSaveBtn" type="button">Save Attendance</button>
+      </div>
+
+      <!-- Roster table -->
+      <div id="attRosterWrap" style="display:none;" class="table-wrap">
+        <table id="attRosterTable">
+          <thead>
+            <tr>
+              <th>Student</th>
+              <th>Reg No</th>
+              <th>Status</th>
+              <th>Notes</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+
+      <!-- Recent records -->
+      <h3 style="margin-top:32px; font-size:14px; text-transform:uppercase; letter-spacing:0.06em; color:var(--text-soft);">Recent Records</h3>
       <div class="table-wrap">
         <table id="attTable">
-          <thead><tr><th>Date</th><th>Student</th><th>Status</th><th>Notes</th></tr></thead>
+          <thead><tr><th>Date</th><th>Student</th><th>Status</th><th>Notes</th><th></th></tr></thead>
           <tbody></tbody>
         </table>
       </div>
@@ -948,36 +989,168 @@ $('#exportResultsBtn').addEventListener('click', () => {
 });
 
 
+    // ---------- Attendance ----------
+let attRosterCache = [];
 
-    async function loadAttendance() {
-      if (!coursesCache.length) coursesCache = await api('/api/lecturer/my-courses');
-      if (!coursesCache.length) {
-        $('#attTable tbody').innerHTML = '<tr><td colspan="4" class="empty">No courses assigned.</td></tr>';
-        return;
-      }
-      const rows = await api(`/api/lecturer/attendance/${coursesCache[0].id}`);
-      $('#attTable tbody').innerHTML = rows.map(r => `
-        <tr>
-          <td>${esc(r.date)}</td>
-          <td>${esc(r.reg_no)} — ${esc(r.student_name)}</td>
-          <td><span class="pill ${r.status === 'present' ? 'pill-green' : r.status === 'absent' ? 'pill-red' : 'pill-amber'}">${esc(r.status)}</span></td>
-          <td>${esc(r.notes || '')}</td>
-        </tr>
-      `).join('') || '<tr><td colspan="4" class="empty">No records.</td></tr>';
+async function loadAttendance() {
+  // Populate course dropdown
+  if (!coursesCache.length) coursesCache = await api('/api/lecturer/my-courses');
+  const sel = $('#attCourse');
+  if (sel.options.length <= 1) {
+    coursesCache.forEach(c => {
+      const o = document.createElement('option');
+      o.value = c.id;
+      o.textContent = `${c.code} — ${c.title}`;
+      sel.appendChild(o);
+    });
+  }
+
+  // Default date = today
+  if (!$('#attDate').value) {
+    $('#attDate').value = new Date().toISOString().slice(0, 10);
+  }
+
+  // Wire buttons once
+  if (!sel.dataset.wired) {
+    sel.dataset.wired = '1';
+    $('#attLoadBtn').addEventListener('click', loadAttendanceRoster);
+    $('#attAllPresent').addEventListener('click', () => setAllStatus('present'));
+    $('#attAllAbsent').addEventListener('click', () => setAllStatus('absent'));
+    $('#attAllLate').addEventListener('click', () => setAllStatus('late'));
+    $('#attSaveBtn').addEventListener('click', saveAttendance);
+  }
+
+  // Load recent records for the current course (if any selected)
+  if (sel.value) await loadRecentAttendance(sel.value);
+  else $('#attTable tbody').innerHTML = '<tr><td colspan="5" class="empty">Select a course and date to begin.</td></tr>';
+}
+
+async function loadAttendanceRoster() {
+  const courseId = $('#attCourse').value;
+  const date = $('#attDate').value;
+  if (!courseId || !date) return toast('Pick a course and a date first', 'error');
+
+  $('#attRosterWrap').style.display = 'block';
+  $('#attActions').style.display = 'flex';
+  const tbody = $('#attRosterTable tbody');
+  tbody.innerHTML = '<tr><td colspan="4" class="empty">Loading roster…</td></tr>';
+
+  try {
+    const roster = await api(`/api/lecturer/attendance/${courseId}/${date}`);
+    attRosterCache = roster;
+
+    if (!roster.length) {
+      tbody.innerHTML = '<tr><td colspan="4" class="empty">No students enrolled in this course.</td></tr>';
+      return;
     }
 
-    $('#takeAttBtn').addEventListener('click', async () => {
-      if (!coursesCache.length) coursesCache = await api('/api/lecturer/my-courses');
-      if (!coursesCache.length) return toast('No courses assigned', 'error');
+    tbody.innerHTML = roster.map((s, i) => `
+      <tr data-student-id="${s.student_id}">
+        <td>${esc(s.student_name)}</td>
+        <td style="font-family:monospace; font-size:12px; color:var(--gold-500); font-weight:700;">${esc(s.reg_no)}</td>
+        <td>
+          <div class="att-status-group" data-idx="${i}">
+            <button type="button" class="btn-xs att-btn ${s.status === 'present' ? 'att-active att-present' : ''}" data-status="present">Present</button>
+            <button type="button" class="btn-xs att-btn ${s.status === 'absent'  ? 'att-active att-absent'  : ''}" data-status="absent">Absent</button>
+            <button type="button" class="btn-xs att-btn ${s.status === 'late'    ? 'att-active att-late'    : ''}" data-status="late">Late</button>
+          </div>
+        </td>
+        <td><input type="text" class="att-note" value="${esc(s.notes)}" placeholder="optional" style="padding:6px 10px; border:1px solid var(--border); border-radius:6px; background:var(--card); color:var(--text); width:100%; max-width:200px;" /></td>
+      </tr>
+    `).join('');
 
-      openModal('Take Attendance', [
-        { name: 'course_id', label: 'Course', type: 'select', required: true,
-          options: coursesCache.map(c => ({ value: c.id, label: `${c.code} — ${c.title}` })) },
-        { name: 'date', label: 'Date', type: 'date', value: new Date().toISOString().slice(0,10), required: true },
-      ], async () => {
-        toast('Attendance modal — full form coming soon');
+    // Wire status toggle buttons
+    tbody.querySelectorAll('.att-status-group').forEach(group => {
+      group.querySelectorAll('.att-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          group.querySelectorAll('.att-btn').forEach(b => b.classList.remove('att-active','att-present','att-absent','att-late'));
+          btn.classList.add('att-active', `att-${btn.dataset.status}`);
+          attRosterCache[Number(group.dataset.idx)].status = btn.dataset.status;
+        });
       });
     });
+  } catch (err) {
+    tbody.innerHTML = `<tr><td colspan="4" class="empty">Could not load: ${esc(err.message)}</td></tr>`;
+  }
+}
+
+function setAllStatus(status) {
+  attRosterCache.forEach(r => r.status = status);
+  const tbody = $('#attRosterTable tbody');
+  tbody.querySelectorAll('.att-status-group').forEach(group => {
+    group.querySelectorAll('.att-btn').forEach(b => {
+      b.classList.remove('att-active','att-present','att-absent','att-late');
+      if (b.dataset.status === status) b.classList.add('att-active', `att-${status}`);
+    });
+  });
+}
+
+async function saveAttendance() {
+  const courseId = $('#attCourse').value;
+  const date = $('#attDate').value;
+  if (!courseId || !date) return toast('Pick a course and date first', 'error');
+
+  // Pull notes from inputs
+  $('#attRosterTable tbody').querySelectorAll('tr[data-student-id]').forEach((tr, i) => {
+    const noteInput = tr.querySelector('.att-note');
+    attRosterCache[i].notes = noteInput ? noteInput.value : '';
+  });
+
+  const records = attRosterCache.map(r => ({
+    student_id: r.student_id,
+    status: r.status || 'present',
+    notes: r.notes || '',
+  }));
+
+  try {
+    await api('/api/lecturer/attendance', {
+      method: 'POST',
+      body: { course_id: Number(courseId), date, records },
+    });
+    toast('Attendance saved ✅ — syncing to Google Sheets');
+    await loadRecentAttendance(courseId);
+  } catch (err) {
+    toast(err.message, 'error');
+  }
+}
+
+async function loadRecentAttendance(courseId) {
+  const tbody = $('#attTable tbody');
+  tbody.innerHTML = '<tr><td colspan="5" class="empty">Loading…</td></tr>';
+  try {
+    const rows = await api(`/api/lecturer/attendance/${courseId}`);
+    if (!rows.length) {
+      tbody.innerHTML = '<tr><td colspan="5" class="empty">No records yet for this course.</td></tr>';
+      return;
+    }
+    tbody.innerHTML = rows.slice(0, 50).map(r => `
+      <tr>
+        <td style="font-size:13px;">${esc(r.date)}</td>
+        <td>${esc(r.reg_no)} — ${esc(r.student_name)}</td>
+        <td>
+          <span class="pill ${r.status === 'present' ? 'pill-green' : r.status === 'absent' ? 'pill-red' : 'pill-amber'}">
+            ${esc(r.status)}
+          </span>
+        </td>
+        <td style="font-size:13px; color:var(--muted);">${esc(r.notes || '')}</td>
+        <td></td>
+      </tr>
+    `).join('');
+  } catch (err) {
+    tbody.innerHTML = `<tr><td colspan="5" class="empty">Could not load: ${esc(err.message)}</td></tr>`;
+  }
+}
+
+// ---------- Attendance button styling (inline, no CSS file change needed) ----------
+const attStyle = document.createElement('style');
+attStyle.textContent = `
+  .att-btn { opacity: 0.55; transition: opacity 0.15s, background 0.15s; }
+  .att-btn.att-active { opacity: 1; font-weight: 700; }
+  .att-btn.att-active.att-present { background: #16a34a !important; color: #fff !important; }
+  .att-btn.att-active.att-absent  { background: #dc2626 !important; color: #fff !important; }
+  .att-btn.att-active.att-late    { background: #d97706 !important; color: #fff !important; }
+`;
+document.head.appendChild(attStyle);
 
     async function loadAnnouncements() {
       const list = await api('/api/lecturer/announcements');
