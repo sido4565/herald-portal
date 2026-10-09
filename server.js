@@ -1872,6 +1872,75 @@ app.delete('/api/admin/live-classes/:id', authAdmin, async (req, res) => {
   res.json({ ok: true });
 });
 
+// ---------- SEO: dynamic sitemap ----------
+app.get('/sitemap.xml', async (req, res) => {
+  const base = 'https://heraldtrainer.co.ke';
+  const today = new Date().toISOString().slice(0, 10);
+
+  const staticPages = [
+    { loc: '/',                         changefreq: 'weekly',  priority: '1.0' },
+    { loc: '/welcome.html',             changefreq: 'weekly',  priority: '0.9' },
+    { loc: '/courses.html',             changefreq: 'weekly',  priority: '0.9' },
+    { loc: '/about.html',               changefreq: 'monthly', priority: '0.7' },
+    { loc: '/services.html',            changefreq: 'monthly', priority: '0.7' },
+    { loc: '/why-us.html',              changefreq: 'monthly', priority: '0.6' },
+    { loc: '/contact.html',             changefreq: 'monthly', priority: '0.6' },
+    { loc: '/register.html',            changefreq: 'monthly', priority: '0.8' },
+    { loc: '/lecturer-register.html',   changefreq: 'monthly', priority: '0.6' },
+  ];
+
+  let courseUrls = [];
+  try {
+    const r = await db.execute('SELECT code, title FROM courses ORDER BY code');
+    courseUrls = r.rows.map(c => ({
+      loc: `/welcome.html#course-${c.code.toLowerCase()}`,
+      changefreq: 'monthly',
+      priority: '0.7',
+    }));
+  } catch (e) { /* ignore if table doesn't exist */ }
+
+  const allUrls = [...staticPages, ...courseUrls];
+
+  const xml = `<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+${allUrls.map(u => `  <url>
+    <loc>${base}${u.loc}</loc>
+    <lastmod>${today}</lastmod>
+    <changefreq>${u.changefreq}</changefreq>
+    <priority>${u.priority}</priority>
+  </url>`).join('\n')}
+</urlset>`;
+
+  res.type('application/xml').send(xml);
+});
+
+// ---------- SEO: robots.txt ----------
+app.get('/robots.txt', (req, res) => {
+  const txt = `User-agent: *
+Allow: /
+Allow: /welcome.html
+Allow: /courses.html
+Allow: /about.html
+Allow: /services.html
+Allow: /why-us.html
+Allow: /contact.html
+Allow: /register.html
+Allow: /lecturer-register.html
+
+# Keep private areas out of search results
+Disallow: /admin-
+Disallow: /dashboard.html
+Disallow: /lecturer-dashboard
+Disallow: /lecturer-login
+Disallow: /login.html
+Disallow: /api/
+Disallow: /uploads/
+
+Sitemap: https://heraldtrainer.co.ke/sitemap.xml
+`;
+  res.type('text/plain').send(txt);
+});
+
 // ---------- Global error handler (must be last) ----------
 app.use((err, req, res, next) => {
   if (err instanceof multer.MulterError) {
