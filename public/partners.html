@@ -133,19 +133,67 @@ const PARTNERS = [
   { id:'abma', code:'03', name:'ABMA', fullName:'Association of Business Managers & Administrators',
     blurb:'An international awarding body providing qualifications in business, computing, and specialist fields.',
     programs:['Global Food Security and Nutrition — Diploma (Levels 4, 5 & 6)','Public Relations — Certificate','Public Relations — Diploma','Public Relations — Advanced Diploma','Computing and Information Systems — Certificate (Level 3)','Computing and Information Systems — Diploma (Levels 4, 5 & 6)'] },
-  { id:'icm-imphal', code:'04', name:'ICM Imphal', fullName:'Institute of Cooperative Management, Imphal',
-    blurb:'Provides cooperative management education and computer application training.',
-    programs:['Higher Diploma in Cooperative Management (HDCM)','Post Graduate Diploma in Computer Application (PGDCA)','Bachelor of Business Administration (BBA)','Certificate Course on Computer Application (12 Week / 6 Months)','Certificate Course on Computer Based Accounting (Tally) (2 Months)','Short-term: Credit & Banking','Short-term: Marketing','Short-term: Handloom'] },
-  { id:'icm-jaipur', code:'05', name:'ICM Jaipur', fullName:'Institute of Cooperative Management, Jaipur',
-    blurb:'Specializes in cooperative management, retail, and warehouse training.',
-    programs:['Diploma in Industrial Co-operative Management','Certificate Course for Store Keeper','Certificate Course in Warehouse Manager','Certificate Course in Retail Management','Higher Diploma in Cooperative Management'] },
-  { id:'icm-common', code:'06', name:'ICM (Common Programs)', fullName:'Joint programs across ICM institutes',
-    blurb:'Programs delivered across multiple ICM institutions under common curricula.',
-    programs:['MBA (2 Years)','Diploma in Cooperative Management (DCM)','Diploma in Computer Applications (DCA)','Certificate in Cooperative Management (CHCM)'] },
-  { id:'ics', code:'07', name:'ICS Technical College', fullName:'ICS Technical College',
-    blurb:'TVET institution offering artisan, certificate, diploma, and degree programs.',
-    programs:['Artisan: Carpentry and Joinery','Artisan: Christian Ministry','Artisan: Wildlife Tour Guiding','Artisan: Health Services Support (Nursing Assistant)','Artisan: Community Health','Artisan: Electrical Installation','Artisan: Fashion Design and Garment Making','Artisan: Food and Beverage','Certificate: Agriculture','Certificate: Beauty Therapy','Certificate: Building Technology','Certificate: Business Management','Certificate: CCTV Management','Certificate: Community Health','Certificate: Counselling','Certificate: Health Records and IT','Certificate: Nutrition & Dietetics','Certificate: Perioperative Theatre Technology','Certificate: Science Laboratory Technology','Certificate: Medical Engineering','Certificate: Basic Skills in Security Management','Certificate: Information Communication Technology','Certificate: Food and Beverage Production and Service','Certificate: Plumbing','Certificate: Secretarial Studies','Certificate: Supply Chain Management','Diploma: Health Records and IT','Diploma: Community Health','Diploma: Nutrition & Dietetics','Diploma: Perioperative Theatre Technology','Diploma: Science Laboratory Technology','Diploma: Applied Biology','Diploma: Environmental Science','Diploma: Medical Laboratory Technologist','Diploma: Analytical Chemistry Technology','Diploma: Accountancy','Diploma: Banking and Finance','Diploma: Fashion Design and Clothing Technology','Diploma: Information Communication Technology','Diploma: Secretarial Studies','Diploma: Social Work and Community Development','Diploma: Hospitality Management','Diploma: Human Resource Management','Diploma: Marriage and Family Therapy','Diploma: Project Planning & Management','Diploma: Psychological Principles of Counselling','Diploma: Software Development','Diploma: Supply Chain Management','Bachelor in Business Administration (BBA)'] }
-];
+  {
+    id: 'icm',
+    code: '04',
+    name: 'ICM',
+    fullName: 'Institute of Commercial Management (UK)',
+    blurb: 'Based in the United Kingdom, ICM is an international awarding body offering professional qualifications delivered at ICM Approved Centres worldwide. Programs are assessed either through invigilated examinations or open-book assignments.',
+    programs: [
+      // NEW Professional Diplomas (open-book assignment)
+      'Professional Diploma: Accounting with Auditing and Taxation',
+      'Professional Diploma: Accounting with Financial Management',
+      'Professional Diploma: Business Management with Financial Management',
+      'Professional Diploma: Business Management with Human Resource Management',
+      'Professional Diploma: Business Management with Project Management',
+      'Professional Diploma: Financial Management with Auditing and Taxation',
+      'Professional Diploma: Human Resource Management with Human Resource Development',
+      'Professional Diploma: Marketing with Sales Management',
+      'Professional Diploma: Purchasing with Logistics and Supply Chain Management',
+      'Professional Diploma: Strategic Management with Corporate Governance and Ethics',
+      // Professional Qualifications (invigilated examination)
+      'Accounting and Finance — Certificate, Diploma, Advanced Diploma, Graduate Diploma',
+      'Agribusiness Management — Diploma (New: Sept 2026)',
+      'Business Administration — Diploma, Advanced Diploma',
+      'Business Studies — Certificate, Diploma, Advanced Diploma',
+      'Commercial and Project Management — Diploma (New: Sept 2026)',
+      'Community Development and Social Change — Diploma',
+      'Computer Science and Cyber Security — Diploma',
+      'Entrepreneurship and Enterprise — Diploma (New: Sept 2026)',
+      'Environmental Science — Diploma',
+      'Hospitality Management — Certificate, Diploma, Advanced Diploma',
+      'Human Resource Development — Diploma, Advanced Diploma (New: Sept 2026)',
+      'Human Resource Management — Diploma, Advanced Diploma',
+      'Journalism — Certificate, Diploma',
+      'Journalism & Media Studies — Diploma',
+      'Management Studies — Advanced Diploma, Graduate Diploma (New: Sept 2026)',
+      'Managing Health & Safety — Certificate, Diploma',
+      'Marketing — Diploma',
+      'Marketing, Advertising & Public Relations — Diploma',
+      'Marketing Management — Certificate, Diploma (New: Sept 2026)',
+      'Nutrition, Food Security and Sustainable Development — Diploma',
+      'Office Management — Certificate, Diploma',
+      'Project Management — Advanced Diploma',
+      'Psychological Principles of Counselling — Diploma',
+      'Sales Management & Marketing — Certificate, Diploma',
+      'Tourism & Business Studies — Certificate, Diploma, Advanced Diploma'
+    ]
+  },
+  {
+    id: 'ics',
+    code: '05',
+    name: 'ICS',
+    fullName: 'Institute of Chartered Shipbrokers',
+    blurb: 'Based in London and holding a Royal Charter, ICS is the professional body for the commercial shipping industry worldwide. The ICS Professional Qualification is globally recognised, covering dry cargo chartering, tanker chartering, ship operations, port agency, maritime law, logistics, and finance. Members earn the professional designations MICS (Member) or FICS (Fellow).',
+    programs: [
+      'ICS Professional Qualification — Dry Cargo Chartering',
+      'ICS Professional Qualification — Tanker Chartering',
+      'ICS Professional Qualification — Ship Operations & Management',
+      'ICS Professional Qualification — Port Agency',
+      'ICS Professional Qualification — Maritime Law',
+      'ICS Professional Qualification — Logistics & Finance'
+    ]
+  }];
 
 function renderPartners() {
   const wrap = document.getElementById('partnersWrap');
