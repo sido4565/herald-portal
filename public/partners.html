@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Partner Institutions — Herald Trainer and Consultant</title>
+  <meta name="description" content="Herald Trainer and Consultant partners with KASNEB, ABE, ABMA, ICM Imphal, ICM Jaipur, and ICS Technical College to deliver accredited programs in Kenya." />
+  <link rel="canonical" href="https://heraldtrainer.co.ke/partners.html" />
+  <link rel="icon" type="image/svg+xml" href="favicon.svg" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="style.css" />
+  <style>
+    :root { --navy:#0b1a33; --gold:#b8860b; --gold-light:#e6b84c; --text:#1a1f2e; --muted:#64748b; }
+    * { box-sizing:border-box; margin:0; padding:0; }
+    body { font-family:'Inter',-apple-system,sans-serif; background:#eef1f5; color:var(--text); line-height:1.6; }
+    a { text-decoration:none; color:inherit; }
+    .nav { position:fixed; top:0; left:0; right:0; z-index:100; background:rgba(11,26,51,0.95); backdrop-filter:blur(12px); padding:12px 24px; display:flex; align-items:center; justify-content:space-between; }
+    .nav-brand { display:flex; align-items:center; gap:10px; color:#fff; font-weight:700; font-size:15px; }
+    .nav-brand img { width:36px; height:36px; border-radius:6px; }
+    .nav-links { display:flex; gap:28px; list-style:none; }
+    .nav-links a { color:rgba(255,255,255,0.85); font-size:14px; font-weight:500; }
+    .nav-links a:hover { color:var(--gold-light); }
+    .nav-cta { background:var(--gold); color:#fff; padding:9px 18px; border-radius:8px; font-size:13px; font-weight:600; }
+    @media (max-width:900px) { .nav-links{display:none;} .nav-cta{display:none;} }
+    .page-header { padding:140px 24px 80px; text-align:center; background:linear-gradient(135deg,#0b1a33 0%,#1e3a5f 100%); color:#fff; }
+    .page-header-inner { max-width:820px; margin:0 auto; }
+    .page-breadcrumb { font-size:12px; letter-spacing:0.12em; text-transform:uppercase; font-weight:600; opacity:0.65; margin-bottom:18px; }
+    .page-breadcrumb a { color:#e6b84c; }
+    .page-breadcrumb span { margin:0 8px; opacity:0.5; }
+    .page-header h1 { font-size:clamp(34px,5.5vw,54px); font-weight:900; letter-spacing:-0.025em; line-height:1.05; margin-bottom:20px; }
+    .page-header h1 span { color:#e6b84c; }
+    .page-header p { font-size:clamp(15px,1.8vw,18px); opacity:0.85; max-width:640px; margin:0 auto; line-height:1.7; }
+    .section { padding:80px 24px; max-width:1100px; margin:0 auto; }
+    .disclaimer { background:rgba(184,134,11,0.08); border-left:3px solid var(--gold); border-radius:8px; padding:16px 20px; font-size:13.5px; line-height:1.65; margin-bottom:48px; }
+    .disclaimer strong { color:var(--navy); }
+    .partner-block { background:#eef1f5; border-radius:16px; padding:32px 28px; box-shadow:10px 10px 24px #c8ccd4,-10px -10px 24px #ffffff; margin-bottom:32px; scroll-margin-top:90px; }
+    .partner-head { display:flex; align-items:baseline; gap:14px; flex-wrap:wrap; margin-bottom:8px; }
+    .partner-head h2 { font-size:clamp(20px,2.5vw,26px); font-weight:800; color:var(--navy); margin:0; }
+    .partner-head .code { font-family:'SF Mono',Monaco,monospace; font-size:11px; color:var(--gold); font-weight:700; }
+    .partner-fullname { font-size:12.5px; color:var(--muted); font-weight:600; margin-bottom:12px; }
+    .partner-blurb { font-size:14px; line-height:1.7; margin-bottom:20px; }
+    .program-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(250px,1fr)); gap:12px; }
+    .program-card { background:#eef1f5; border-radius:10px; padding:14px 16px; box-shadow:inset 3px 3px 8px #c8ccd4,inset -3px -3px 8px #ffffff; transition:transform 0.2s; display:flex; flex-direction:column; }
+    .program-card:hover { transform:translateY(-2px); }
+    .program-name { font-weight:700; font-size:14px; color:var(--navy); margin-bottom:8px; line-height:1.35; flex-grow:1; }
+    .program-meta { font-size:11.5px; color:var(--muted); line-height:1.55; margin-bottom:10px; }
+    .program-meta strong { color:var(--navy); }
+    .program-meta .herald { color:var(--gold); font-weight:700; }
+    .program-cta { font-size:12px; color:var(--gold); font-weight:700; align-self:flex-start; }
+    .partners-cta { background:linear-gradient(135deg,#0b1a33,#1e3a5f); border-radius:16px; padding:40px 32px; text-align:center; color:#fff; margin-top:40px; }
+    .partners-cta h3 { font-size:clamp(20px,2.5vw,26px); font-weight:800; margin-bottom:12px; }
+    .partners-cta h3 span { color:var(--gold-light); }
+    .partners-cta p { font-size:14.5px; opacity:0.8; max-width:560px; margin:0 auto 24px; line-height:1.7; }
+    .cta-buttons { display:flex; gap:12px; justify-content:center; flex-wrap:wrap; }
+    .btn-gold { background:linear-gradient(135deg,#b8860b,#d4a017); color:#fff; padding:13px 26px; border-radius:10px; font-size:14px; font-weight:700; }
+    .btn-ghost { background:rgba(255,255,255,0.08); border:1.5px solid rgba(255,255,255,0.25); color:#fff; padding:12px 24px; border-radius:10px; font-size:14px; font-weight:600; }
+    .site-footer { background:#061323; color:rgba(255,255,255,0.6); padding:40px 24px 32px; text-align:center; font-size:13px; margin-top:80px; }
+    .site-footer strong { color:var(--gold-light); }
+    .site-footer .tagline { margin-top:8px; font-size:12px; letter-spacing:0.1em; text-transform:uppercase; opacity:0.5; }
+    .site-footer a { color:var(--gold-light); }
+  </style>
+</head>
+<body>
+
+<nav class="nav">
+  <a href="welcome.html" class="nav-brand">
+    <img src="images/herald-logo.png" alt="Herald" />
+    <span>HERALD</span>
+  </a>
+  <ul class="nav-links">
+    <li><a href="about.html">About</a></li>
+    <li><a href="services.html">Services</a></li>
+    <li><a href="courses.html">Courses</a></li>
+    <li><a href="partners.html">Partners</a></li>
+    <li><a href="why-us.html">Why Us</a></li>
+    <li><a href="contact.html">Contact</a></li>
+  </ul>
+  <a href="register.html" class="nav-cta">Enroll Now</a>
+</nav>
+
+<section class="page-header">
+  <div class="page-header-inner">
+    <div class="page-breadcrumb">
+      <a href="welcome.html">Home</a> <span>/</span> Partners
+    </div>
+    <h1>Our <span>Partner Institutions</span></h1>
+    <p>Accredited awarding bodies and colleges that deliver the qualifications, lectures, and examinations for our partner programs — with Herald Trainer and Consultant providing enrollment and learner support.</p>
+  </div>
+</section>
+
+<section class="section">
+  <div class="disclaimer">
+    <strong>How partner programs work:</strong> Herald Trainer and Consultant acts as a <strong>training and enrollment partner</strong>. Lectures are delivered by the awarding institution's faculty, and examinations are set and certified by that institution. Fees, duration, and intake dates vary by program — contact us for the latest schedule.
+  </div>
+
+  <div id="partnersWrap"></div>
+
+  <div class="partners-cta">
+    <h3>Ready to enroll in a <span>Partner Program?</span></h3>
+    <p>Talk to our team about entry requirements, intake dates, and study modes.</p>
+    <div class="cta-buttons">
+      <a class="btn-gold" href="contact.html">Contact Us</a>
+      <a class="btn-ghost" href="https://wa.me/254107004000" target="_blank" rel="noopener">Chat on WhatsApp</a>
+    </div>
+  </div>
+</section>
+
+<footer class="site-footer">
+  <div><strong>HERALD TRAINER AND CONSULTANT</strong></div>
+  <div class="tagline">Skills · Knowledge · Better Futures</div>
+  <p style="margin-top:24px;">
+    <a href="lecturer-login.html">Lecturer login</a>
+    <span style="opacity:0.4;margin:0 8px;">·</span>
+    <a href="lecturer-register.html">Apply to teach</a>
+  </p>
+  <p style="margin-top:16px;">
+    <a href="mailto:info@heraldtrainer.co.ke">info@heraldtrainer.co.ke</a>
+    <span style="opacity:0.4;margin:0 8px;">·</span>
+    <a href="tel:+254107004000">+254 107 004 000</a>
+    <span style="opacity:0.4;margin:0 8px;">·</span>
+    Mombasa, Kenya
+  </p>
+</footer>
+
+<script>
+const PARTNERS = [
+  { id:'kasneb', code:'01', name:'KASNEB', fullName:'Kenya Accountants & Secretaries National Examinations Board',
+    blurb:'The national body responsible for professional examinations in accountancy, finance, and secretarial practice in Kenya.',
+    programs:['Certified Public Accountants (CPA)','Certified Secretaries (CS)','Certified Investment and Financial Analysts (CIFA)','Certified Credit Professionals (CCP)','Certified Information Systems Solutions Expert (CISSE)','Accounting Technicians Diploma (ATD)','Diploma in Network and System Administration (DCNSA)','Diploma in Data Management and Analytics (DDMA)','Certificate in Accounting and Management Skills (CAMS)','Vocational: Graphics Design','Vocational: Information and Cyber Security','Vocational: Blockchain Technology','Vocational: Entrepreneurship and Innovation'] },
+  { id:'abe', code:'02', name:'ABE', fullName:'Association of Business Executives',
+    blurb:'An international awarding body offering business and management qualifications.',
+    programs:['Business Management — Foundation Diploma (Level 3)','Business Management — Diploma (Levels 3, 4, 5 & 6)','Travel, Tourism and Hospitality — Level 3'] },
+  { id:'abma', code:'03', name:'ABMA', fullName:'Association of Business Managers & Administrators',
+    blurb:'An international awarding body providing qualifications in business, computing, and specialist fields.',
+    programs:['Global Food Security and Nutrition — Diploma (Levels 4, 5 & 6)','Public Relations — Certificate','Public Relations — Diploma','Public Relations — Advanced Diploma','Computing and Information Systems — Certificate (Level 3)','Computing and Information Systems — Diploma (Levels 4, 5 & 6)'] },
+  { id:'icm-imphal', code:'04', name:'ICM Imphal', fullName:'Institute of Cooperative Management, Imphal',
+    blurb:'Provides cooperative management education and computer application training.',
+    programs:['Higher Diploma in Cooperative Management (HDCM)','Post Graduate Diploma in Computer Application (PGDCA)','Bachelor of Business Administration (BBA)','Certificate Course on Computer Application (12 Week / 6 Months)','Certificate Course on Computer Based Accounting (Tally) (2 Months)','Short-term: Credit & Banking','Short-term: Marketing','Short-term: Handloom'] },
+  { id:'icm-jaipur', code:'05', name:'ICM Jaipur', fullName:'Institute of Cooperative Management, Jaipur',
+    blurb:'Specializes in cooperative management, retail, and warehouse training.',
+    programs:['Diploma in Industrial Co-operative Management','Certificate Course for Store Keeper','Certificate Course in Warehouse Manager','Certificate Course in Retail Management','Higher Diploma in Cooperative Management'] },
+  { id:'icm-common', code:'06', name:'ICM (Common Programs)', fullName:'Joint programs across ICM institutes',
+    blurb:'Programs delivered across multiple ICM institutions under common curricula.',
+    programs:['MBA (2 Years)','Diploma in Cooperative Management (DCM)','Diploma in Computer Applications (DCA)','Certificate in Cooperative Management (CHCM)'] },
+  { id:'ics', code:'07', name:'ICS Technical College', fullName:'ICS Technical College',
+    blurb:'TVET institution offering artisan, certificate, diploma, and degree programs.',
+    programs:['Artisan: Carpentry and Joinery','Artisan: Christian Ministry','Artisan: Wildlife Tour Guiding','Artisan: Health Services Support (Nursing Assistant)','Artisan: Community Health','Artisan: Electrical Installation','Artisan: Fashion Design and Garment Making','Artisan: Food and Beverage','Certificate: Agriculture','Certificate: Beauty Therapy','Certificate: Building Technology','Certificate: Business Management','Certificate: CCTV Management','Certificate: Community Health','Certificate: Counselling','Certificate: Health Records and IT','Certificate: Nutrition & Dietetics','Certificate: Perioperative Theatre Technology','Certificate: Science Laboratory Technology','Certificate: Medical Engineering','Certificate: Basic Skills in Security Management','Certificate: Information Communication Technology','Certificate: Food and Beverage Production and Service','Certificate: Plumbing','Certificate: Secretarial Studies','Certificate: Supply Chain Management','Diploma: Health Records and IT','Diploma: Community Health','Diploma: Nutrition & Dietetics','Diploma: Perioperative Theatre Technology','Diploma: Science Laboratory Technology','Diploma: Applied Biology','Diploma: Environmental Science','Diploma: Medical Laboratory Technologist','Diploma: Analytical Chemistry Technology','Diploma: Accountancy','Diploma: Banking and Finance','Diploma: Fashion Design and Clothing Technology','Diploma: Information Communication Technology','Diploma: Secretarial Studies','Diploma: Social Work and Community Development','Diploma: Hospitality Management','Diploma: Human Resource Management','Diploma: Marriage and Family Therapy','Diploma: Project Planning & Management','Diploma: Psychological Principles of Counselling','Diploma: Software Development','Diploma: Supply Chain Management','Bachelor in Business Administration (BBA)'] }
+];
+
+function renderPartners() {
+  const wrap = document.getElementById('partnersWrap');
+  if (!wrap) return;
+  wrap.innerHTML = PARTNERS.map(p => `
+    <div class="partner-block" id="${p.id}">
+      <div class="partner-head">
+        <span class="code">${p.code}</span>
+        <h2>${p.name}</h2>
+      </div>
+      <div class="partner-fullname">${p.fullName}</div>
+      <p class="partner-blurb">${p.blurb}</p>
+      <div class="program-grid">
+        ${p.programs.map(prog => `
+          <div class="program-card">
+            <div class="program-name">${prog}</div>
+            <div class="program-meta">
+              <div>Awarded by: <strong>${p.name}</strong></div>
+              <div>Prepared by: <span class="herald">Herald Trainer and Consultant</span></div>
+            </div>
+            <a class="program-cta" href="contact.html?program=${encodeURIComponent(prog)}">Contact us for fees & duration →</a>
+          </div>
+        `).join('')}
+      </div>
+    </div>
+  `).join('');
+}
+renderPartners();
+</script>
+
+</body>
+</html>
