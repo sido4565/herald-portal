@@ -1443,6 +1443,7 @@ body.dark .contact-item-label { color: #94a3b8; }
     <li><a href="#guides">What Guides Us</a></li>
     <li><a href="#services">Services</a></li>
     <li><a href="#courses">Courses</a></li>
+    <li><a href="partners.html">Partners</a></li>
     <li><a href="#contact">Contact</a></li>
   </ul>
 
@@ -1465,6 +1466,7 @@ body.dark .contact-item-label { color: #94a3b8; }
     <li><a href="#guides"><span>01</span>What Guides Us</a></li>
     <li><a href="#services"><span>02</span>Services</a></li>
     <li><a href="#courses"><span>03</span>Courses</a></li>
+    <li><a href="partners.html">Partners</a></li>
     <li><a href="#contact"><span>04</span>Contact</a></li>
   </ul>
   <div class="mobile-menu-cta">
@@ -1545,6 +1547,17 @@ body.dark .contact-item-label { color: #94a3b8; }
       <span class="toggle-arrow">▼</span>
     </button>
   </div>
+</section>
+
+<!-- Partner Programs Section -->
+<section class="section" id="partner-programs">
+  <div class="section-head">
+    <span class="section-label">In Partnership With</span>
+    <h2>Partner Programs</h2>
+    <p>Accredited qualifications awarded by our partner institutions. Herald Trainer and Consultant provides enrollment, learner support, and local coordination — lectures and examinations are delivered by the awarding body.</p>
+  </div>
+
+  <div id="partnerProgramsWrap"></div>
 </section>
 
 <!-- Contact -->
@@ -1740,30 +1753,30 @@ const SERVICES = [
 const COURSES = [
   // --- Priority Short Courses (25) ---
   { code: 'SC001', title: 'Digital Marketing & Social Media Marketing', category: 'Short', priority: true, image: 'images/courses/marketing.jpg', fee: 6500, short: 'Reach customers, build brands, and drive sales using modern digital tools.', full: 'Learn how to plan, execute, and measure digital marketing campaigns across social media, search, and email.', duration: '2 to 4 weeks', level: 'Beginner', trainer: 'Ms. Amina T.', features: ['Social media strategy (Facebook, Instagram, TikTok, LinkedIn)','Google Ads and SEO fundamentals','Email marketing and automation','Content planning and copywriting','Analytics — measuring what matters'] },
-  { code: 'SC002', title: 'AI for Business & Productivity', category: 'Short', priority: true, image: 'images/courses/ai.jpg', fee: 4500, short: 'Harness AI tools to work faster and smarter in every role.', full: 'A practical, no-jargon introduction to using AI in business.', duration: '1 to 2 weeks', level: 'Beginner', trainer: 'Mr. Herald K.', features: ['AI tools overview (ChatGPT, Copilot, Gemini)','Writing emails and reports with AI','Automating routine tasks','AI for research and data analysis','Responsible AI use'] },
-  { code: 'SC003', title: 'E-Commerce & Online Business', category: 'Short', priority: true, image: 'images/courses/ecommerce.jpg', fee: 7500, short: 'Launch and grow a profitable online store from scratch.', full: 'Everything you need to start selling online — from platform choice to payments and shipping.', duration: '2 to 4 weeks', level: 'Beginner', trainer: 'Ms. Amina T.', features: ['Choosing a platform','Product photography and listings','Payments and mobile money integration','Shipping and fulfillment','Marketing your store'] },
+  { code: 'SC002', title: 'AI for Business & Productivity', category: 'Short', priority: true, image: 'images/courses/placeholder.svg', fee: 4500, short: 'Harness AI tools to work faster and smarter in every role.', full: 'A practical, no-jargon introduction to using AI in business.', duration: '1 to 2 weeks', level: 'Beginner', trainer: 'Mr. Herald K.', features: ['AI tools overview (ChatGPT, Copilot, Gemini)','Writing emails and reports with AI','Automating routine tasks','AI for research and data analysis','Responsible AI use'] },
+  { code: 'SC003', title: 'E-Commerce & Online Business', category: 'Short', priority: true, image: 'images/courses/placeholder.svg', fee: 7500, short: 'Launch and grow a profitable online store from scratch.', full: 'Everything you need to start selling online — from platform choice to payments and shipping.', duration: '2 to 4 weeks', level: 'Beginner', trainer: 'Ms. Amina T.', features: ['Choosing a platform','Product photography and listings','Payments and mobile money integration','Shipping and fulfillment','Marketing your store'] },
   { code: 'SC004', title: 'Business Management & Entrepreneurship', category: 'Short', priority: true, image: 'images/courses/business.jpg', fee: 8500, short: 'Master the essentials of running and growing a business.', full: 'A comprehensive introduction to business management for entrepreneurs and managers.', duration: '4 weeks', level: 'Beginner', trainer: 'Mr. Herald K.', features: ['Business structures in Kenya','Strategic planning','Operations basics','Financial literacy','Team leadership'] },
-  { code: 'SC005', title: 'Advanced Excel for Business', category: 'Short', priority: true, image: 'images/courses/excel.jpg', fee: 6500, short: 'Turn Excel into your most powerful business tool.', full: 'From pivot tables to Power Query — the Excel skills employers look for.', duration: '2 to 4 weeks', level: 'Intermediate', trainer: 'Mr. Brian W.', features: ['Advanced formulas','Pivot tables','Power Query','Charts and dashboards','Macros'] },
-  { code: 'SC006', title: 'Data Analytics for Business', category: 'Short', priority: true, image: 'images/courses/data.jpg', fee: 14500, short: 'Turn raw data into decisions that drive growth.', full: 'Learn to collect, clean, analyze, and visualize data.', duration: '4 to 8 weeks', level: 'Intermediate', trainer: 'Dr. Otieno M.', features: ['Data collection and cleaning','Descriptive analytics','Power BI dashboards','Intro to Python','Storytelling with data'] },
-  { code: 'SC007', title: 'Graphic Design for Business', category: 'Short', priority: true, image: 'images/courses/design.jpg', fee: 8500, short: 'Design professional visuals for your brand.', full: 'Learn the fundamentals of graphic design using free and paid tools.', duration: '4 weeks', level: 'Beginner', trainer: 'Ms. Amina T.', features: ['Design principles','Logos and branding','Print and digital design','Canva and Figma','Exporting'] },
-  { code: 'SC008', title: 'Canva Design & Content Creation', category: 'Short', priority: true, image: 'images/courses/canva.jpg', fee: 3500, short: 'Create stunning content in minutes.', full: 'Fast, practical course on using Canva to create professional content.', duration: '1 to 2 weeks', level: 'Beginner', trainer: 'Ms. Amina T.', features: ['Canva essentials','Brand kits','Social media posts','Presentations and flyers','Scheduling content'] },
+  { code: 'SC005', title: 'Advanced Excel for Business', category: 'Short', priority: true, image: 'images/courses/placeholder.svg', fee: 6500, short: 'Turn Excel into your most powerful business tool.', full: 'From pivot tables to Power Query — the Excel skills employers look for.', duration: '2 to 4 weeks', level: 'Intermediate', trainer: 'Mr. Brian W.', features: ['Advanced formulas','Pivot tables','Power Query','Charts and dashboards','Macros'] },
+  { code: 'SC006', title: 'Data Analytics for Business', category: 'Short', priority: true, image: 'images/courses/placeholder.svg', fee: 14500, short: 'Turn raw data into decisions that drive growth.', full: 'Learn to collect, clean, analyze, and visualize data.', duration: '4 to 8 weeks', level: 'Intermediate', trainer: 'Dr. Otieno M.', features: ['Data collection and cleaning','Descriptive analytics','Power BI dashboards','Intro to Python','Storytelling with data'] },
+  { code: 'SC007', title: 'Graphic Design for Business', category: 'Short', priority: true, image: 'images/courses/placeholder.svg', fee: 8500, short: 'Design professional visuals for your brand.', full: 'Learn the fundamentals of graphic design using free and paid tools.', duration: '4 weeks', level: 'Beginner', trainer: 'Ms. Amina T.', features: ['Design principles','Logos and branding','Print and digital design','Canva and Figma','Exporting'] },
+  { code: 'SC008', title: 'Canva Design & Content Creation', category: 'Short', priority: true, image: 'images/courses/placeholder.svg', fee: 3500, short: 'Create stunning content in minutes.', full: 'Fast, practical course on using Canva to create professional content.', duration: '1 to 2 weeks', level: 'Beginner', trainer: 'Ms. Amina T.', features: ['Canva essentials','Brand kits','Social media posts','Presentations and flyers','Scheduling content'] },
   { code: 'SC009', title: 'Website Design for Small Businesses', category: 'Short', priority: true, image: 'images/courses/web.jpg', fee: 15500, short: 'Build a professional website without code.', full: 'Create and launch business websites using WordPress and no-code tools.', duration: '4 to 8 weeks', level: 'Beginner', trainer: 'Mr. Herald K.', features: ['Choosing a platform','Domains and hosting','WordPress essentials','Basic SEO','Launching'] },
-  { code: 'SC010', title: 'Content Creation & Video Editing', category: 'Short', priority: true, image: 'images/courses/content.jpg', fee: 7500, short: 'Create scroll-stopping content.', full: 'Learn to script, shoot, edit, and publish video content.', duration: '2 to 4 weeks', level: 'Beginner', trainer: 'Mr. Herald K.', features: ['Scripting and storyboarding','Shooting','Editing (CapCut, Premiere)','Sound and captions','Publishing'] },
-  { code: 'SC011', title: 'Bookkeeping & QuickBooks', category: 'Short', priority: true, image: 'images/courses/bookkeeping.jpg', fee: 9500, short: 'Keep clean books and stay compliant.', full: 'Learn bookkeeping fundamentals and master QuickBooks.', duration: '4 weeks', level: 'Beginner', trainer: 'Mr. Brian W.', features: ['Double-entry basics','Recording transactions','Bank reconciliation','QuickBooks','Reports'] },
-  { code: 'SC012', title: 'Accounting for Small Businesses', category: 'Short', priority: true, image: 'images/courses/accounting.jpg', fee: 8500, short: 'Understand your numbers and stay tax-compliant.', full: 'Practical accounting for business owners.', duration: '4 weeks', level: 'Beginner', trainer: 'Mr. Brian W.', features: ['Financial statements','Cash flow','KRA and tax basics','Budgets','Working with accountants'] },
-  { code: 'SC013', title: 'Sales & Customer Relationship Management', category: 'Short', priority: true, image: 'images/courses/sales.jpg', fee: 6500, short: 'Build a sales engine that keeps customers coming back.', full: 'Learn the fundamentals of sales and CRM.', duration: '2 to 4 weeks', level: 'Beginner', trainer: 'Ms. Amina T.', features: ['Sales process','CRM tools','Lead generation','Follow-up','Measuring performance'] },
-  { code: 'SC014', title: 'Professional Selling & Sales Management', category: 'Short', priority: true, image: 'images/courses/selling.jpg', fee: 7500, short: 'Master high-impact selling.', full: 'Advanced sales training for experienced salespeople.', duration: '2 to 4 weeks', level: 'Advanced', trainer: 'Mr. Herald K.', features: ['Consultative selling','Negotiation','Key account management','Managing sales teams','Forecasting'] },
-  { code: 'SC015', title: 'Procurement & Supply Chain Basics', category: 'Short', priority: true, image: 'images/courses/procurement.jpg', fee: 8500, short: 'Source smarter, save money, reduce risk.', full: 'Introduction to procurement and supply chain.', duration: '4 weeks', level: 'Beginner', trainer: 'Mr. Brian W.', features: ['Procurement process','Supplier evaluation','Contract and tender','Inventory','Risk management'] },
-  { code: 'SC016', title: 'Project Management', category: 'Short', priority: true, image: 'images/courses/project.jpg', fee: 15500, short: 'Deliver projects on time and budget.', full: 'Plan, execute, and close projects using Agile and Waterfall.', duration: '4 to 8 weeks', level: 'Intermediate', trainer: 'Mr. Herald K.', features: ['Project lifecycle','Scope and time','Risk and stakeholders','Agile and Scrum','Tools'] },
-  { code: 'SC017', title: 'Business Proposal Writing', category: 'Short', priority: true, image: 'images/courses/proposal.jpg', fee: 4500, short: 'Write proposals that get funded.', full: 'Craft compelling business proposals.', duration: '1 to 2 weeks', level: 'Beginner', trainer: 'Ms. Amina T.', features: ['Structure and format','Executive summaries','Pricing','Common mistakes','Templates'] },
-  { code: 'SC018', title: 'Business Plan Development', category: 'Short', priority: true, image: 'images/courses/businessplan.jpg', fee: 5500, short: 'Turn your idea into a fundable business plan.', full: 'Build a complete professional business plan.', duration: '1 to 2 weeks', level: 'Beginner', trainer: 'Mr. Herald K.', features: ['Market analysis','Financial projections','Marketing and operations','Executive summary','Pitfalls'] },
-  { code: 'SC019', title: 'Grant & Tender Proposal Writing', category: 'Short', priority: true, image: 'images/courses/grants.jpg', fee: 7500, short: 'Win grants and tenders.', full: 'Write successful grant applications and tender responses.', duration: '2 to 4 weeks', level: 'Intermediate', trainer: 'Dr. Otieno M.', features: ['Tender requirements','Compliance','Technical and financial proposals','Disqualification reasons','Post-award'] },
-  { code: 'SC020', title: 'Personal Branding & LinkedIn Marketing', category: 'Short', priority: true, image: 'images/courses/personalbrand.jpg', fee: 4500, short: 'Become visible and in-demand.', full: 'Build a personal brand — online and offline.', duration: '1 to 2 weeks', level: 'Beginner', trainer: 'Ms. Amina T.', features: ['Brand position','LinkedIn optimization','Content strategy','Networking','Measuring impact'] },
-  { code: 'SC021', title: 'Cybersecurity Awareness for Businesses', category: 'Short', priority: true, image: 'images/courses/cybersecurity.jpg', fee: 5500, short: 'Protect your business from cyber threats.', full: 'Practical cybersecurity for staff and managers.', duration: '1 to 2 weeks', level: 'Beginner', trainer: 'Mr. Brian W.', features: ['Phishing','Password management','Device hygiene','Data protection','Incident response'] },
-  { code: 'SC022', title: 'Freelancing & Online Work Skills', category: 'Short', priority: true, image: 'images/courses/freelancing.jpg', fee: 9500, short: 'Earn income online.', full: 'Start freelancing successfully.', duration: '2 to 6 weeks', level: 'Beginner', trainer: 'Mr. Herald K.', features: ['Choosing a niche','Upwork, Fiverr setup','Proposals','Pricing and contracts','Getting paid'] },
-  { code: 'SC023', title: 'Digital Office & Computer Applications', category: 'Short', priority: true, image: 'images/courses/digitaloffice.jpg', fee: 8500, short: 'Work confidently with office tools.', full: 'Essential computer skills for office roles.', duration: '2 to 6 weeks', level: 'Beginner', trainer: 'Ms. Amina T.', features: ['MS Word','MS Excel','MS PowerPoint','Google Workspace','Email and calendar'] },
+  { code: 'SC010', title: 'Content Creation & Video Editing', category: 'Short', priority: true, image: 'images/courses/placeholder.svg', fee: 7500, short: 'Create scroll-stopping content.', full: 'Learn to script, shoot, edit, and publish video content.', duration: '2 to 4 weeks', level: 'Beginner', trainer: 'Mr. Herald K.', features: ['Scripting and storyboarding','Shooting','Editing (CapCut, Premiere)','Sound and captions','Publishing'] },
+  { code: 'SC011', title: 'Bookkeeping & QuickBooks', category: 'Short', priority: true, image: 'images/courses/placeholder.svg', fee: 9500, short: 'Keep clean books and stay compliant.', full: 'Learn bookkeeping fundamentals and master QuickBooks.', duration: '4 weeks', level: 'Beginner', trainer: 'Mr. Brian W.', features: ['Double-entry basics','Recording transactions','Bank reconciliation','QuickBooks','Reports'] },
+  { code: 'SC012', title: 'Accounting for Small Businesses', category: 'Short', priority: true, image: 'images/courses/placeholder.svg', fee: 8500, short: 'Understand your numbers and stay tax-compliant.', full: 'Practical accounting for business owners.', duration: '4 weeks', level: 'Beginner', trainer: 'Mr. Brian W.', features: ['Financial statements','Cash flow','KRA and tax basics','Budgets','Working with accountants'] },
+  { code: 'SC013', title: 'Sales & Customer Relationship Management', category: 'Short', priority: true, image: 'images/courses/placeholder.svg', fee: 6500, short: 'Build a sales engine that keeps customers coming back.', full: 'Learn the fundamentals of sales and CRM.', duration: '2 to 4 weeks', level: 'Beginner', trainer: 'Ms. Amina T.', features: ['Sales process','CRM tools','Lead generation','Follow-up','Measuring performance'] },
+  { code: 'SC014', title: 'Professional Selling & Sales Management', category: 'Short', priority: true, image: 'images/courses/placeholder.svg', fee: 7500, short: 'Master high-impact selling.', full: 'Advanced sales training for experienced salespeople.', duration: '2 to 4 weeks', level: 'Advanced', trainer: 'Mr. Herald K.', features: ['Consultative selling','Negotiation','Key account management','Managing sales teams','Forecasting'] },
+  { code: 'SC015', title: 'Procurement & Supply Chain Basics', category: 'Short', priority: true, image: 'images/courses/placeholder.svg', fee: 8500, short: 'Source smarter, save money, reduce risk.', full: 'Introduction to procurement and supply chain.', duration: '4 weeks', level: 'Beginner', trainer: 'Mr. Brian W.', features: ['Procurement process','Supplier evaluation','Contract and tender','Inventory','Risk management'] },
+  { code: 'SC016', title: 'Project Management', category: 'Short', priority: true, image: 'images/courses/placeholder.svg', fee: 15500, short: 'Deliver projects on time and budget.', full: 'Plan, execute, and close projects using Agile and Waterfall.', duration: '4 to 8 weeks', level: 'Intermediate', trainer: 'Mr. Herald K.', features: ['Project lifecycle','Scope and time','Risk and stakeholders','Agile and Scrum','Tools'] },
+  { code: 'SC017', title: 'Business Proposal Writing', category: 'Short', priority: true, image: 'images/courses/placeholder.svg', fee: 4500, short: 'Write proposals that get funded.', full: 'Craft compelling business proposals.', duration: '1 to 2 weeks', level: 'Beginner', trainer: 'Ms. Amina T.', features: ['Structure and format','Executive summaries','Pricing','Common mistakes','Templates'] },
+  { code: 'SC018', title: 'Business Plan Development', category: 'Short', priority: true, image: 'images/courses/placeholder.svg', fee: 5500, short: 'Turn your idea into a fundable business plan.', full: 'Build a complete professional business plan.', duration: '1 to 2 weeks', level: 'Beginner', trainer: 'Mr. Herald K.', features: ['Market analysis','Financial projections','Marketing and operations','Executive summary','Pitfalls'] },
+  { code: 'SC019', title: 'Grant & Tender Proposal Writing', category: 'Short', priority: true, image: 'images/courses/placeholder.svg', fee: 7500, short: 'Win grants and tenders.', full: 'Write successful grant applications and tender responses.', duration: '2 to 4 weeks', level: 'Intermediate', trainer: 'Dr. Otieno M.', features: ['Tender requirements','Compliance','Technical and financial proposals','Disqualification reasons','Post-award'] },
+  { code: 'SC020', title: 'Personal Branding & LinkedIn Marketing', category: 'Short', priority: true, image: 'images/courses/placeholder.svg', fee: 4500, short: 'Become visible and in-demand.', full: 'Build a personal brand — online and offline.', duration: '1 to 2 weeks', level: 'Beginner', trainer: 'Ms. Amina T.', features: ['Brand position','LinkedIn optimization','Content strategy','Networking','Measuring impact'] },
+  { code: 'SC021', title: 'Cybersecurity Awareness for Businesses', category: 'Short', priority: true, image: 'images/courses/placeholder.svg', fee: 5500, short: 'Protect your business from cyber threats.', full: 'Practical cybersecurity for staff and managers.', duration: '1 to 2 weeks', level: 'Beginner', trainer: 'Mr. Brian W.', features: ['Phishing','Password management','Device hygiene','Data protection','Incident response'] },
+  { code: 'SC022', title: 'Freelancing & Online Work Skills', category: 'Short', priority: true, image: 'images/courses/placeholder.svg', fee: 9500, short: 'Earn income online.', full: 'Start freelancing successfully.', duration: '2 to 6 weeks', level: 'Beginner', trainer: 'Mr. Herald K.', features: ['Choosing a niche','Upwork, Fiverr setup','Proposals','Pricing and contracts','Getting paid'] },
+  { code: 'SC023', title: 'Digital Office & Computer Applications', category: 'Short', priority: true, image: 'images/courses/placeholder.svg', fee: 8500, short: 'Work confidently with office tools.', full: 'Essential computer skills for office roles.', duration: '2 to 6 weeks', level: 'Beginner', trainer: 'Ms. Amina T.', features: ['MS Word','MS Excel','MS PowerPoint','Google Workspace','Email and calendar'] },
   { code: 'SC024', title: 'Leadership & Team Management', category: 'Short', priority: true, image: 'images/courses/leadership.jpg', fee: 10500, short: 'Lead with clarity and confidence.', full: 'For supervisors and managers building high-performing teams.', duration: '2 to 6 weeks', level: 'Intermediate', trainer: 'Dr. Otieno M.', features: ['Leadership styles','Feedback','Difficult conversations','Motivation','Conflict resolution'] },
-  { code: 'SC025', title: 'Business Communication & Professional Writing', category: 'Short', priority: true, image: 'images/courses/communication.jpg', fee: 8500, short: 'Communicate with clarity.', full: 'Sharpen your business writing and verbal communication.', duration: '2 to 6 weeks', level: 'Beginner', trainer: 'Ms. Amina T.', features: ['Email writing','Reports','Presentations','Meetings and negotiation','Cross-cultural'] },
+  { code: 'SC025', title: 'Business Communication & Professional Writing', category: 'Short', priority: true, image: 'images/courses/placeholder.svg', fee: 8500, short: 'Communicate with clarity.', full: 'Sharpen your business writing and verbal communication.', duration: '2 to 6 weeks', level: 'Beginner', trainer: 'Ms. Amina T.', features: ['Email writing','Reports','Presentations','Meetings and negotiation','Cross-cultural'] },
 
   // --- Existing Certificate Courses ---
   { code: 'BIZ101', title: 'Business Management Fundamentals', category: 'Business', priority: true, image: 'images/courses/business.jpg', fee: 18000, short: 'Master the essentials of running a business.', full: 'Comprehensive business management.', duration: '8 weeks', level: 'Beginner', trainer: 'Mr. Herald K.', features: ['Business structures','Strategic planning','Operations','Finance','Leadership'] },
@@ -1771,7 +1784,7 @@ const COURSES = [
   { code: 'FIN301', title: 'Finance for Decision Makers', category: 'Business', image: 'images/courses/finance.jpg', fee: 22000, short: 'Read the numbers confidently.', full: 'Practical finance for managers.', duration: '8 weeks', level: 'Intermediate', trainer: 'Mr. Brian W.', features: ['P&L and balance sheet','Budgets','Cost control','Investment appraisal','Risk'] },
   { code: 'ENT401', title: 'Entrepreneurship & Startup Building', category: 'Business', image: 'images/courses/entrepreneur.jpg', fee: 24000, short: 'From idea to first customer.', full: 'Hands-on for aspiring founders.', duration: '10 weeks', level: 'Beginner', trainer: 'Mr. Herald K.', features: ['Idea validation','Canvas','MVP','Unit economics','Pitching'] },
   { code: 'LDR501', title: 'Leadership & Strategy (Certificate)', category: 'Business', image: 'images/courses/leadership.jpg', fee: 20000, short: 'Lead with strategic thinking.', full: 'Advanced leadership program.', duration: '6 weeks', level: 'Advanced', trainer: 'Dr. Otieno M.', features: ['Leadership styles','Strategy frameworks','Performance','Change','Trust'] },
-  { code: 'ELE101', title: 'Electrical Engineering Basics', category: 'Technical', priority: true, image: 'images/courses/electrical.jpg', fee: 38000, short: 'Start a career in electrical work.', full: 'Entry-level electrical program.', duration: '12 weeks', level: 'Beginner', trainer: 'Mr. Brian W.', features: ['Safety and code','Circuits','Wiring','Motor controls','Diagrams'] },
+  { code: 'ELE101', title: 'Electrical Engineering Basics', category: 'Technical', priority: true, image: 'images/courses/placeholder.svg', fee: 38000, short: 'Start a career in electrical work.', full: 'Entry-level electrical program.', duration: '12 weeks', level: 'Beginner', trainer: 'Mr. Brian W.', features: ['Safety and code','Circuits','Wiring','Motor controls','Diagrams'] },
   { code: 'WEB101', title: 'Web Development Fundamentals', category: 'Technical', image: 'images/courses/web.jpg', fee: 28000, short: 'Build websites from scratch.', full: 'HTML, CSS, JavaScript.', duration: '10 weeks', level: 'Beginner', trainer: 'Mr. Herald K.', features: ['HTML','CSS','JavaScript','Responsive','Deploying'] },
   { code: 'DB201', title: 'Database Design & SQL', category: 'Technical', image: 'images/courses/db.jpg', fee: 25000, short: 'Design and query databases.', full: 'Real-world database skills.', duration: '8 weeks', level: 'Intermediate', trainer: 'Ms. Amina T.', features: ['Relational','ER diagrams','SQL','Indexes','NoSQL'] },
   { code: 'JS301', title: 'Advanced JavaScript', category: 'Technical', image: 'images/courses/js.jpg', fee: 30000, short: 'Level up your JS skills.', full: 'For serious app developers.', duration: '8 weeks', level: 'Advanced', trainer: 'Mr. Herald K.', features: ['ES6+','Async','APIs','Patterns','React'] },
@@ -2193,6 +2206,196 @@ document.querySelectorAll('.nav-links a, .hero-cta a[href^="#"]').forEach(link =
 // ═══════════════════════════════════════════════════════════
 renderTabs();
 renderCourses();
+
+// ═══════════════════════════════════════════════════════════
+// PARTNER PROGRAMS — Awarded by accredited partner institutions
+// ═══════════════════════════════════════════════════════════
+const PARTNERS = [
+  {
+    id: 'kasneb',
+    name: 'KASNEB',
+    fullName: 'Kenya Accountants & Secretaries National Examinations Board',
+    blurb: 'The national body responsible for professional examinations in accountancy, finance, and secretarial practice in Kenya.',
+    programs: [
+      { name: 'Certified Public Accountants (CPA)' },
+      { name: 'Certified Secretaries (CS)' },
+      { name: 'Certified Investment and Financial Analysts (CIFA)' },
+      { name: 'Certified Credit Professionals (CCP)' },
+      { name: 'Certified Information Systems Solutions Expert (CISSE)' },
+      { name: 'Accounting Technicians Diploma (ATD)' },
+      { name: 'Diploma in Network and System Administration (DCNSA)' },
+      { name: 'Diploma in Data Management and Analytics (DDMA)' },
+      { name: 'Certificate in Accounting and Management Skills (CAMS)' },
+      { name: 'Vocational: Graphics Design' },
+      { name: 'Vocational: Information and Cyber Security' },
+      { name: 'Vocational: Blockchain Technology' },
+      { name: 'Vocational: Entrepreneurship and Innovation' },
+    ],
+  },
+  {
+    id: 'abe',
+    name: 'ABE',
+    fullName: 'Association of Business Executives',
+    blurb: 'An international awarding body offering business and management qualifications.',
+    programs: [
+      { name: 'Business Management — Foundation Diploma (Level 3)' },
+      { name: 'Business Management — Diploma (Levels 3, 4, 5 & 6)' },
+      { name: 'Travel, Tourism and Hospitality — Level 3' },
+    ],
+  },
+  {
+    id: 'abma',
+    name: 'ABMA',
+    fullName: 'Association of Business Managers & Administrators',
+    blurb: 'An international awarding body providing qualifications in business, computing, and specialist fields.',
+    programs: [
+      { name: 'Global Food Security and Nutrition — Diploma (Levels 4, 5 & 6)' },
+      { name: 'Public Relations — Certificate' },
+      { name: 'Public Relations — Diploma' },
+      { name: 'Public Relations — Advanced Diploma' },
+      { name: 'Computing and Information Systems — Certificate (Level 3)' },
+      { name: 'Computing and Information Systems — Diploma (Levels 4, 5 & 6)' },
+    ],
+  },
+  {
+    id: 'icm-imphal',
+    name: 'ICM Imphal',
+    fullName: 'Institute of Cooperative Management, Imphal',
+    blurb: 'Provides cooperative management education and computer application training.',
+    programs: [
+      { name: 'Higher Diploma in Cooperative Management (HDCM)' },
+      { name: 'Post Graduate Diploma in Computer Application (PGDCA)' },
+      { name: 'Bachelor of Business Administration (BBA)' },
+      { name: 'Certificate Course on Computer Application (12 Week / 6 Months)' },
+      { name: 'Certificate Course on Computer Based Accounting (Tally) (2 Months)' },
+      { name: 'Short-term: Credit & Banking' },
+      { name: 'Short-term: Marketing' },
+      { name: 'Short-term: Handloom' },
+    ],
+  },
+  {
+    id: 'icm-jaipur',
+    name: 'ICM Jaipur',
+    fullName: 'Institute of Cooperative Management, Jaipur',
+    blurb: 'Specializes in cooperative management, retail, and warehouse training.',
+    programs: [
+      { name: 'Diploma in Industrial Co-operative Management' },
+      { name: 'Certificate Course for Store Keeper' },
+      { name: 'Certificate Course in Warehouse Manager' },
+      { name: 'Certificate Course in Retail Management' },
+      { name: 'Higher Diploma in Cooperative Management' },
+    ],
+  },
+  {
+    id: 'icm-common',
+    name: 'ICM (Common Programs)',
+    fullName: 'Joint programs across ICM institutes',
+    blurb: 'Programs offered across multiple ICM institutions.',
+    programs: [
+      { name: 'MBA (2 Years)' },
+      { name: 'Diploma in Cooperative Management (DCM)' },
+      { name: 'Diploma in Computer Applications (DCA)' },
+      { name: 'Certificate in Cooperative Management (CHCM)' },
+    ],
+  },
+  {
+    id: 'ics',
+    name: 'ICS Technical College',
+    fullName: 'ICS Technical College',
+    blurb: 'TVET institution offering artisan, certificate, diploma, and degree programs.',
+    programs: [
+      // Artisan Level
+      { name: 'Artisan: Carpentry and Joinery' },
+      { name: 'Artisan: Christian Ministry' },
+      { name: 'Artisan: Wildlife Tour Guiding' },
+      { name: 'Artisan: Health Services Support (Nursing Assistant)' },
+      { name: 'Artisan: Community Health' },
+      { name: 'Artisan: Electrical Installation' },
+      { name: 'Artisan: Fashion Design and Garment Making' },
+      { name: 'Artisan: Food and Beverage' },
+      // Certificate Level
+      { name: 'Certificate: Agriculture' },
+      { name: 'Certificate: Beauty Therapy' },
+      { name: 'Certificate: Building Technology' },
+      { name: 'Certificate: Business Management' },
+      { name: 'Certificate: CCTV Management' },
+      { name: 'Certificate: Community Health' },
+      { name: 'Certificate: Counselling' },
+      { name: 'Certificate: Health Records and IT' },
+      { name: 'Certificate: Nutrition & Dietetics' },
+      { name: 'Certificate: Perioperative Theatre Technology' },
+      { name: 'Certificate: Science Laboratory Technology' },
+      { name: 'Certificate: Medical Engineering' },
+      { name: 'Certificate: Basic Skills in Security Management' },
+      { name: 'Certificate: Information Communication Technology' },
+      { name: 'Certificate: Food and Beverage Production and Service' },
+      { name: 'Certificate: Plumbing' },
+      { name: 'Certificate: Secretarial Studies' },
+      { name: 'Certificate: Supply Chain Management' },
+      // Diploma Level
+      { name: 'Diploma: Health Records and IT' },
+      { name: 'Diploma: Community Health' },
+      { name: 'Diploma: Nutrition & Dietetics' },
+      { name: 'Diploma: Perioperative Theatre Technology' },
+      { name: 'Diploma: Science Laboratory Technology' },
+      { name: 'Diploma: Applied Biology' },
+      { name: 'Diploma: Environmental Science' },
+      { name: 'Diploma: Medical Laboratory Technologist' },
+      { name: 'Diploma: Analytical Chemistry Technology' },
+      { name: 'Diploma: Accountancy' },
+      { name: 'Diploma: Banking and Finance' },
+      { name: 'Diploma: Fashion Design and Clothing Technology' },
+      { name: 'Diploma: Information Communication Technology' },
+      { name: 'Diploma: Secretarial Studies' },
+      { name: 'Diploma: Social Work and Community Development' },
+      { name: 'Diploma: Hospitality Management' },
+      { name: 'Diploma: Human Resource Management' },
+      { name: 'Diploma: Marriage and Family Therapy' },
+      { name: 'Diploma: Project Planning & Management' },
+      { name: 'Diploma: Psychological Principles of Counselling' },
+      { name: 'Diploma: Software Development' },
+      { name: 'Diploma: Supply Chain Management' },
+      // Degree
+      { name: 'Bachelor in Business Administration (BBA)' },
+    ],
+  },
+];
+
+function renderPartnerPrograms() {
+  const wrap = document.getElementById('partnerProgramsWrap');
+  if (!wrap) return;
+
+  wrap.innerHTML = PARTNERS.map(p => `
+    <div id="${p.id}" style="margin-bottom:44px;">
+      <div style="display:flex; align-items:baseline; gap:14px; flex-wrap:wrap; margin-bottom:8px;">
+        <h3 style="font-size:22px; font-weight:800; color:var(--navy); margin:0;">${p.name}</h3>
+        <span style="font-size:12px; color:var(--muted); font-weight:600;">${p.fullName}</span>
+      </div>
+      <p style="color:var(--muted); font-size:14px; margin:0 0 18px;">${p.blurb}</p>
+      <div style="display:grid; grid-template-columns:repeat(auto-fill, minmax(260px, 1fr)); gap:12px;">
+        ${p.programs.map(pr => `
+          <div style="background:#eef1f5; border-radius:10px; padding:14px 16px; box-shadow:6px 6px 16px #c8ccd4, -6px -6px 16px #ffffff;">
+            <div style="font-weight:700; font-size:14px; color:var(--navy); margin-bottom:6px; line-height:1.35;">${pr.name}</div>
+            <div style="font-size:11.5px; color:var(--muted); line-height:1.5;">
+              <div>Awarded by: <strong style="color:var(--navy);">${p.name}</strong></div>
+              <div>Prepared by: <strong style="color:var(--gold);">Herald Trainer and Consultant</strong></div>
+            </div>
+            <a href="contact.html?program=${encodeURIComponent(pr.name)}" style="display:inline-block; margin-top:10px; font-size:12px; color:var(--gold); font-weight:700; text-decoration:none;">
+              Contact us for fees & duration →
+            </a>
+          </div>
+        `).join('')}
+      </div>
+    </div>
+  `).join('');
+}
+
+// Call it once the DOM is ready
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', renderPartnerPrograms);
+} else {
+  renderPartnerPrograms();
+}
 
 </script>
 
