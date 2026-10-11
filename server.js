@@ -1,4 +1,7 @@
-require('dotenv').config();
+// Load .env only if it exists (local dev). On Render, env vars come from the dashboard.
+if (require('fs').existsSync(require('path').join(__dirname, '.env'))) {
+  require('dotenv').config();
+}
 const express = require('express');
 const cookieParser = require('cookie-parser');
 const bcrypt = require('bcryptjs');
