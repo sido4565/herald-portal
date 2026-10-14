@@ -1427,6 +1427,21 @@ body.dark .contact-item-label { color: #94a3b8; }
   .page-header { padding: 120px 20px 60px; }
 }
 
+    /* ─── Partner programs (synced from partners.html) ─── */
+    .partner-block { background:#eef1f5; border-radius:16px; padding:32px 28px; box-shadow:10px 10px 24px #c8ccd4,-10px -10px 24px #ffffff; margin-bottom:32px; scroll-margin-top:90px; }
+    .partner-head { display:flex; align-items:baseline; gap:14px; flex-wrap:wrap; margin-bottom:8px; }
+    .partner-head h2 { font-size:clamp(20px,2.5vw,26px); font-weight:800; color:var(--navy); margin:0; }
+    .partner-head .code { font-family:'SF Mono',Monaco,monospace; font-size:11px; color:var(--gold); font-weight:700; }
+    .partner-fullname { font-size:12.5px; color:var(--muted); font-weight:600; margin-bottom:12px; }
+    .partner-blurb { font-size:14px; line-height:1.7; margin-bottom:20px; }
+    .program-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(250px,1fr)); gap:12px; }
+    .program-card { background:#eef1f5; border-radius:10px; padding:14px 16px; box-shadow:inset 3px 3px 8px #c8ccd4,inset -3px -3px 8px #ffffff; transition:transform 0.2s; display:flex; flex-direction:column; }
+    .program-card:hover { transform:translateY(-2px); }
+    .program-name { font-weight:700; font-size:14px; color:var(--navy); margin-bottom:8px; line-height:1.35; flex-grow:1; }
+    .program-meta { font-size:11.5px; color:var(--muted); line-height:1.55; margin-bottom:10px; }
+    .program-meta strong { color:var(--navy); }
+    .program-meta .herald { color:var(--gold); font-weight:700; }
+    .program-cta { font-size:12px; color:var(--gold); font-weight:700; align-self:flex-start; }
 </style>
 </head>
 <body>
@@ -2213,153 +2228,156 @@ renderCourses();
 // ═══════════════════════════════════════════════════════════
 const PARTNERS = [
   {
-    id: 'kasneb',
-    name: 'KASNEB',
+    id: 'kasneb', code: '01', name: 'KASNEB',
     fullName: 'Kenya Accountants & Secretaries National Examinations Board',
     blurb: 'The national body responsible for professional examinations in accountancy, finance, and secretarial practice in Kenya.',
     programs: [
-      { name: 'Certified Public Accountants (CPA)' },
-      { name: 'Certified Secretaries (CS)' },
-      { name: 'Certified Investment and Financial Analysts (CIFA)' },
-      { name: 'Certified Credit Professionals (CCP)' },
-      { name: 'Certified Information Systems Solutions Expert (CISSE)' },
-      { name: 'Accounting Technicians Diploma (ATD)' },
-      { name: 'Diploma in Network and System Administration (DCNSA)' },
-      { name: 'Diploma in Data Management and Analytics (DDMA)' },
-      { name: 'Certificate in Accounting and Management Skills (CAMS)' },
-      { name: 'Vocational: Graphics Design' },
-      { name: 'Vocational: Information and Cyber Security' },
-      { name: 'Vocational: Blockchain Technology' },
-      { name: 'Vocational: Entrepreneurship and Innovation' },
-    ],
+      'Certified Public Accountants (CPA)',
+      'Certified Secretaries (CS)',
+      'Certified Investment and Financial Analysts (CIFA)',
+      'Certified Credit Professionals (CCP)',
+      'Certified Information Systems Solutions Expert (CISSE)',
+      'Accounting Technicians Diploma (ATD)',
+      'Diploma in Network and System Administration (DCNSA)',
+      'Diploma in Data Management and Analytics (DDMA)',
+      'Certificate in Accounting and Management Skills (CAMS)',
+      'Vocational: Graphics Design',
+      'Vocational: Information and Cyber Security',
+      'Vocational: Blockchain Technology',
+      'Vocational: Entrepreneurship and Innovation'
+    ]
   },
   {
-    id: 'abe',
-    name: 'ABE',
+    id: 'abe', code: '02', name: 'ABE',
     fullName: 'Association of Business Executives',
     blurb: 'An international awarding body offering business and management qualifications.',
     programs: [
-      { name: 'Business Management — Foundation Diploma (Level 3)' },
-      { name: 'Business Management — Diploma (Levels 3, 4, 5 & 6)' },
-      { name: 'Travel, Tourism and Hospitality — Level 3' },
-    ],
+      'Business Management — Foundation Diploma (Level 3)',
+      'Business Management — Diploma (Levels 3, 4, 5 & 6)',
+      'Travel, Tourism and Hospitality — Level 3'
+    ]
   },
   {
-    id: 'abma',
-    name: 'ABMA',
-    fullName: 'Association of Business Managers & Administrators',
-    blurb: 'An international awarding body providing qualifications in business, computing, and specialist fields.',
+    id: 'abma', code: '03', name: 'ABMA',
+    fullName: 'ABMA Education (UK)',
+    blurb: 'A UK awarding body based in Leeds, England, offering Ofqual-regulated qualifications in business, computing, and specialist fields. ABMA Education is regulated by Ofqual and delivers programs through approved centres worldwide.',
     programs: [
-      { name: 'Global Food Security and Nutrition — Diploma (Levels 4, 5 & 6)' },
-      { name: 'Public Relations — Certificate' },
-      { name: 'Public Relations — Diploma' },
-      { name: 'Public Relations — Advanced Diploma' },
-      { name: 'Computing and Information Systems — Certificate (Level 3)' },
-      { name: 'Computing and Information Systems — Diploma (Levels 4, 5 & 6)' },
-    ],
+      // Business & Management
+      'Diploma in Purchasing & Supply Management',
+      // Computing & IT
+      'Diploma in Computing & Information Systems (Level 4)',
+      'Diploma in Computing & Information Systems (Level 5)',
+      'Diploma in Computing & Information Systems (Level 6)',
+      // Shipping & Logistics
+      'Diploma in Clearing, Shipping & Logistics (Level 4)',
+      'Diploma in Clearing, Shipping & Logistics (Level 5)',
+      'Diploma in Clearing, Shipping & Logistics (Level 6)',
+      // Specialist
+      'Global Food Security and Nutrition — Diploma (Levels 4, 5 & 6)',
+      'Public Relations — Certificate',
+      'Public Relations — Diploma',
+      'Public Relations — Advanced Diploma',
+      'Computing and Information Systems — Certificate (Level 3)'
+    ]
   },
   {
-    id: 'icm-imphal',
-    name: 'ICM Imphal',
-    fullName: 'Institute of Cooperative Management, Imphal',
-    blurb: 'Provides cooperative management education and computer application training.',
+    id: 'icm', code: '04', name: 'ICM',
+    fullName: 'Institute of Commercial Management (UK)',
+    blurb: 'Based in the United Kingdom, ICM is an international awarding body offering professional qualifications delivered at ICM Approved Centres worldwide. Programs are assessed either through invigilated examinations or open-book assignments.',
     programs: [
-      { name: 'Higher Diploma in Cooperative Management (HDCM)' },
-      { name: 'Post Graduate Diploma in Computer Application (PGDCA)' },
-      { name: 'Bachelor of Business Administration (BBA)' },
-      { name: 'Certificate Course on Computer Application (12 Week / 6 Months)' },
-      { name: 'Certificate Course on Computer Based Accounting (Tally) (2 Months)' },
-      { name: 'Short-term: Credit & Banking' },
-      { name: 'Short-term: Marketing' },
-      { name: 'Short-term: Handloom' },
-    ],
+      // ── Business Management Department ──
+      'Diploma in Business Management',
+      'Diploma in Office Management',
+      'Advanced Diploma in Office Management',
+      // ── Information Technology Department ──
+      'Diploma in Computer Science & Cyber Security',
+      // ── Journalism & Media Studies Department ──
+      'Diploma in Journalism & Media Studies',
+      'Certificate in Video Production',
+      // ── Hospitality Management Department ──
+      'Diploma in Hospitality Management',
+      // ── Professional Diplomas (open-book assignment) ──
+      'Professional Diploma: Accounting with Auditing and Taxation',
+      'Professional Diploma: Accounting with Financial Management',
+      'Professional Diploma: Business Management with Financial Management',
+      'Professional Diploma: Business Management with Human Resource Management',
+      'Professional Diploma: Business Management with Project Management',
+      'Professional Diploma: Financial Management with Auditing and Taxation',
+      'Professional Diploma: Human Resource Management with Human Resource Development',
+      'Professional Diploma: Marketing with Sales Management',
+      'Professional Diploma: Purchasing with Logistics and Supply Chain Management',
+      'Professional Diploma: Strategic Management with Corporate Governance and Ethics',
+      // ── Professional Qualifications (invigilated examination) ──
+      'Accounting and Finance — Certificate, Diploma, Advanced Diploma, Graduate Diploma',
+      'Agribusiness Management — Diploma',
+      'Business Administration — Diploma, Advanced Diploma',
+      'Business Studies — Certificate, Diploma, Advanced Diploma',
+      'Commercial and Project Management — Diploma',
+      'Community Development and Social Change — Diploma',
+      'Computer Science and Cyber Security — Diploma',
+      'Entrepreneurship and Enterprise — Diploma',
+      'Environmental Science — Diploma',
+      'Hospitality Management — Certificate, Diploma, Advanced Diploma',
+      'Human Resource Development — Diploma, Advanced Diploma',
+      'Human Resource Management — Diploma, Advanced Diploma',
+      'Journalism — Certificate, Diploma',
+      'Journalism & Media Studies — Diploma',
+      'Management Studies — Advanced Diploma, Graduate Diploma',
+      'Managing Health & Safety — Certificate, Diploma',
+      'Marketing — Diploma',
+      'Marketing, Advertising & Public Relations — Diploma',
+      'Marketing Management — Certificate, Diploma',
+      'Nutrition, Food Security and Sustainable Development — Diploma',
+      'Office Management — Certificate, Diploma',
+      'Project Management — Advanced Diploma',
+      'Psychological Principles of Counselling — Diploma',
+      'Sales Management & Marketing — Certificate, Diploma',
+      'Tourism & Business Studies — Certificate, Diploma, Advanced Diploma'
+    ]
   },
   {
-    id: 'icm-jaipur',
-    name: 'ICM Jaipur',
-    fullName: 'Institute of Cooperative Management, Jaipur',
-    blurb: 'Specializes in cooperative management, retail, and warehouse training.',
+    id: 'ics', code: '05', name: 'ICS',
+    fullName: 'Institute of Chartered Shipbrokers',
+    blurb: 'Based in London and holding a Royal Charter, ICS is the professional body for the commercial shipping industry worldwide. The ICS Professional Qualification is globally recognised, covering dry cargo chartering, tanker chartering, ship operations, port agency, maritime law, logistics, and finance. Members earn the professional designations MICS (Member) or FICS (Fellow).',
     programs: [
-      { name: 'Diploma in Industrial Co-operative Management' },
-      { name: 'Certificate Course for Store Keeper' },
-      { name: 'Certificate Course in Warehouse Manager' },
-      { name: 'Certificate Course in Retail Management' },
-      { name: 'Higher Diploma in Cooperative Management' },
-    ],
+      'ICS Professional Qualification — Dry Cargo Chartering',
+      'ICS Professional Qualification — Tanker Chartering',
+      'ICS Professional Qualification — Ship Operations & Management',
+      'ICS Professional Qualification — Port Agency',
+      'ICS Professional Qualification — Maritime Law',
+      'ICS Professional Qualification — Logistics & Finance'
+    ]
   },
   {
-    id: 'icm-common',
-    name: 'ICM (Common Programs)',
-    fullName: 'Joint programs across ICM institutes',
-    blurb: 'Programs offered across multiple ICM institutions.',
+    id: 'nita', code: '06', name: 'NITA',
+    fullName: 'National Industrial Training Authority (Kenya)',
+    blurb: 'A Kenyan state corporation under the Ministry of Labour that regulates and accredits industrial training. NITA certifies competence-based artisan, craft, and technician programs across trade and service sectors.',
     programs: [
-      { name: 'MBA (2 Years)' },
-      { name: 'Diploma in Cooperative Management (DCM)' },
-      { name: 'Diploma in Computer Applications (DCA)' },
-      { name: 'Certificate in Cooperative Management (CHCM)' },
-    ],
+      // Information Technology
+      'Computer Application Systems Course',
+      'Certificate in Graphic Design',
+      'Certificate in Programming & Web Design',
+      // Hospitality
+      'Certificate in Pastry & Bakery',
+      // Hairdressing & Beauty Therapy
+      'Hairdressing & Beauty Therapy (Grade III)',
+      'Hairdressing & Beauty Therapy (Grade II)',
+      'Hairdressing & Beauty Therapy (Grade I)',
+      // Electrical Engineering
+      'Electrical Wireman (Grade III)',
+      'Electrical Wireman (Grade II)',
+      'Electrical Wireman (Grade I)'
+    ]
   },
   {
-    id: 'ics',
-    name: 'ICS Technical College',
-    fullName: 'ICS Technical College',
-    blurb: 'TVET institution offering artisan, certificate, diploma, and degree programs.',
+    id: 'iata', code: '07', name: 'IATA',
+    fullName: 'International Air Transport Association (Canada)',
+    blurb: 'The global trade association for the airline industry, headquartered in Montreal, Canada. IATA Training and Development Institute delivers industry-recognised qualifications in travel, tourism, cargo, and aviation operations.',
     programs: [
-      // Artisan Level
-      { name: 'Artisan: Carpentry and Joinery' },
-      { name: 'Artisan: Christian Ministry' },
-      { name: 'Artisan: Wildlife Tour Guiding' },
-      { name: 'Artisan: Health Services Support (Nursing Assistant)' },
-      { name: 'Artisan: Community Health' },
-      { name: 'Artisan: Electrical Installation' },
-      { name: 'Artisan: Fashion Design and Garment Making' },
-      { name: 'Artisan: Food and Beverage' },
-      // Certificate Level
-      { name: 'Certificate: Agriculture' },
-      { name: 'Certificate: Beauty Therapy' },
-      { name: 'Certificate: Building Technology' },
-      { name: 'Certificate: Business Management' },
-      { name: 'Certificate: CCTV Management' },
-      { name: 'Certificate: Community Health' },
-      { name: 'Certificate: Counselling' },
-      { name: 'Certificate: Health Records and IT' },
-      { name: 'Certificate: Nutrition & Dietetics' },
-      { name: 'Certificate: Perioperative Theatre Technology' },
-      { name: 'Certificate: Science Laboratory Technology' },
-      { name: 'Certificate: Medical Engineering' },
-      { name: 'Certificate: Basic Skills in Security Management' },
-      { name: 'Certificate: Information Communication Technology' },
-      { name: 'Certificate: Food and Beverage Production and Service' },
-      { name: 'Certificate: Plumbing' },
-      { name: 'Certificate: Secretarial Studies' },
-      { name: 'Certificate: Supply Chain Management' },
-      // Diploma Level
-      { name: 'Diploma: Health Records and IT' },
-      { name: 'Diploma: Community Health' },
-      { name: 'Diploma: Nutrition & Dietetics' },
-      { name: 'Diploma: Perioperative Theatre Technology' },
-      { name: 'Diploma: Science Laboratory Technology' },
-      { name: 'Diploma: Applied Biology' },
-      { name: 'Diploma: Environmental Science' },
-      { name: 'Diploma: Medical Laboratory Technologist' },
-      { name: 'Diploma: Analytical Chemistry Technology' },
-      { name: 'Diploma: Accountancy' },
-      { name: 'Diploma: Banking and Finance' },
-      { name: 'Diploma: Fashion Design and Clothing Technology' },
-      { name: 'Diploma: Information Communication Technology' },
-      { name: 'Diploma: Secretarial Studies' },
-      { name: 'Diploma: Social Work and Community Development' },
-      { name: 'Diploma: Hospitality Management' },
-      { name: 'Diploma: Human Resource Management' },
-      { name: 'Diploma: Marriage and Family Therapy' },
-      { name: 'Diploma: Project Planning & Management' },
-      { name: 'Diploma: Psychological Principles of Counselling' },
-      { name: 'Diploma: Software Development' },
-      { name: 'Diploma: Supply Chain Management' },
-      // Degree
-      { name: 'Bachelor in Business Administration (BBA)' },
-    ],
-  },
+      'IATA Tours & Travel & Business Studies Diploma',
+      'IATA Diploma in Cabin Crew'
+    ]
+  }
 ];
 
 function renderPartnerPrograms() {
@@ -2374,14 +2392,14 @@ function renderPartnerPrograms() {
       </div>
       <p style="color:var(--muted); font-size:14px; margin:0 0 18px;">${p.blurb}</p>
       <div style="display:grid; grid-template-columns:repeat(auto-fill, minmax(260px, 1fr)); gap:12px;">
-        ${p.programs.map(pr => `
+        ${p.programs.map(prog => `
           <div style="background:#eef1f5; border-radius:10px; padding:14px 16px; box-shadow:6px 6px 16px #c8ccd4, -6px -6px 16px #ffffff;">
-            <div style="font-weight:700; font-size:14px; color:var(--navy); margin-bottom:6px; line-height:1.35;">${pr.name}</div>
+            <div style="font-weight:700; font-size:14px; color:var(--navy); margin-bottom:6px; line-height:1.35;">${prog}</div>
             <div style="font-size:11.5px; color:var(--muted); line-height:1.5;">
               <div>Awarded by: <strong style="color:var(--navy);">${p.name}</strong></div>
               <div>Prepared by: <strong style="color:var(--gold);">Herald Trainer and Consultant</strong></div>
             </div>
-            <a href="contact.html?program=${encodeURIComponent(pr.name)}" style="display:inline-block; margin-top:10px; font-size:12px; color:var(--gold); font-weight:700; text-decoration:none;">
+            <a href="contact.html?program=${encodeURIComponent(prog)}" style="display:inline-block; margin-top:10px; font-size:12px; color:var(--gold); font-weight:700; text-decoration:none;">
               Contact us for fees & duration →
             </a>
           </div>
@@ -2389,6 +2407,13 @@ function renderPartnerPrograms() {
       </div>
     </div>
   `).join('');
+}
+
+// Call it once the DOM is ready
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', renderPartnerPrograms);
+} else {
+  renderPartnerPrograms();
 }
 
 // Call it once the DOM is ready
