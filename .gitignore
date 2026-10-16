@@ -30,3 +30,11 @@ Thumbs.db
 .idea/
 .env.mail
 .env.turso
+
+# Local backups and one-off scripts
+*.bak
+*.bom-bak
+*.before-contact
+fix-bom.js
+.backup-partners-*/
+{
