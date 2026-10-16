@@ -90,13 +90,34 @@
   btn.addEventListener('click', () => window.scrollTo({ top: 0, behavior: 'smooth' }));
 })();
 
+
 // ---------- Contact form handler ----------
-function handleContactSubmit(e) {
+async function handleContactSubmit(e) {
   e.preventDefault();
+  const form = e.target;
   const msg = document.getElementById('contactMsg');
-  if (!msg) return;
-  msg.style.color = '#16a34a';
-  msg.textContent = '✅ Thank you! We will get back to you shortly.';
-  e.target.reset();
-  setTimeout(() => { msg.textContent = ''; }, 5000);
+  const btn = form.querySelector('button[type="submit"]');
+
+  if (msg) { msg.textContent = ''; msg.style.color = ''; }
+  if (btn) { btn.disabled = true; btn.dataset.originalText = btn.textContent; btn.textContent = 'Sending...'; }
+
+  try {
+    const res = await fetch('/api/contact', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(Object.fromEntries(new FormData(form))),
+    });
+    const json = await res.json().catch(() => ({}));
+    if (res.ok) {
+      if (msg) { msg.style.color = '#16a34a'; msg.textContent = 'Thank you! Your message was sent.'; }
+      form.reset();
+      setTimeout(() => { if (msg) msg.textContent = ''; }, 8000);
+    } else {
+      if (msg) { msg.style.color = '#dc2626'; msg.textContent = json.error || 'Could not send. Try WhatsApp.'; }
+    }
+  } catch {
+    if (msg) { msg.style.color = '#dc2626'; msg.textContent = 'Network error. Please try again.'; }
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = btn.dataset.originalText || 'Send Message'; }
+  }
 }
