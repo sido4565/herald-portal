@@ -1876,6 +1876,55 @@ app.delete('/api/admin/live-classes/:id', authAdmin, async (req, res) => {
   res.json({ ok: true });
 });
 
+
+// ---------- Contact form (Brevo) ----------
+app.post('/api/contact', async (req, res) => {
+  const { name, email, phone, subject, message } = req.body || {};
+  if (!name || !email || !message) return res.status(400).json({ error: 'Name, email and message are required.' });
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return res.status(400).json({ error: 'Please enter a valid email address.' });
+  if (message.length > 5000) return res.status(400).json({ error: 'Message is too long (max 5000 characters).' });
+
+  const esc = s => String(s || '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  const BREVO_KEY  = process.env.BREVO_API_KEY;
+  const FROM_EMAIL = process.env.MAIL_FROM_EMAIL || 'info@heraldtrainer.co.ke';
+  const TO_EMAIL   = process.env.MAIL_TO || 'info@heraldtrainer.co.ke';
+
+  if (!BREVO_KEY) {
+    console.error('Contact: BREVO_API_KEY missing');
+    return res.status(503).json({ error: 'Email service not configured.' });
+  }
+
+  const htmlBody = '<h2>New Website Message</h2>' +
+    '<p><strong>Name:</strong> ' + esc(name) + '</p>' +
+    '<p><strong>Email:</strong> ' + esc(email) + '</p>' +
+    '<p><strong>Phone:</strong> ' + (esc(phone) || '-') + '</p>' +
+    '<p><strong>Subject:</strong> ' + (esc(subject) || '-') + '</p>' +
+    '<h3>Message</h3><p>' + esc(message).replace(/\n/g, '<br>') + '</p>';
+
+  try {
+    const r = await fetch('https://api.brevo.com/v3/smtp/email', {
+      method: 'POST',
+      headers: { 'accept': 'application/json', 'api-key': BREVO_KEY, 'content-type': 'application/json' },
+      body: JSON.stringify({
+        sender:   { name: 'Herald Website', email: FROM_EMAIL },
+        to:       [{ email: TO_EMAIL }],
+        replyTo:  { email, name },
+        subject:  'Website Contact: ' + (subject || 'General inquiry'),
+        htmlContent: htmlBody,
+      }),
+    });
+    if (!r.ok) {
+      const t = await r.text();
+      console.error('Brevo error:', r.status, t);
+      return res.status(502).json({ error: 'Could not send your message.' });
+    }
+    console.log('Contact: message from ' + email + ' sent to ' + TO_EMAIL);
+    res.json({ ok: true });
+  } catch (err) {
+    console.error('Contact error:', err);
+    res.status(500).json({ error: 'Could not send your message.' });
+  }
+});
 // ---------- SEO: dynamic sitemap ----------
 app.get('/sitemap.xml', async (req, res) => {
   const base = 'https://heraldtrainer.co.ke';
@@ -1918,6 +1967,55 @@ ${allUrls.map(u => `  <url>
   res.type('application/xml').send(xml);
 });
 
+
+// ---------- Contact form (Brevo) ----------
+app.post('/api/contact', async (req, res) => {
+  const { name, email, phone, subject, message } = req.body || {};
+  if (!name || !email || !message) return res.status(400).json({ error: 'Name, email and message are required.' });
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return res.status(400).json({ error: 'Please enter a valid email address.' });
+  if (message.length > 5000) return res.status(400).json({ error: 'Message is too long (max 5000 characters).' });
+
+  const esc = s => String(s || '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  const BREVO_KEY  = process.env.BREVO_API_KEY;
+  const FROM_EMAIL = process.env.MAIL_FROM_EMAIL || 'info@heraldtrainer.co.ke';
+  const TO_EMAIL   = process.env.MAIL_TO || 'info@heraldtrainer.co.ke';
+
+  if (!BREVO_KEY) {
+    console.error('Contact: BREVO_API_KEY missing');
+    return res.status(503).json({ error: 'Email service not configured.' });
+  }
+
+  const htmlBody = '<h2>New Website Message</h2>' +
+    '<p><strong>Name:</strong> ' + esc(name) + '</p>' +
+    '<p><strong>Email:</strong> ' + esc(email) + '</p>' +
+    '<p><strong>Phone:</strong> ' + (esc(phone) || '-') + '</p>' +
+    '<p><strong>Subject:</strong> ' + (esc(subject) || '-') + '</p>' +
+    '<h3>Message</h3><p>' + esc(message).replace(/\n/g, '<br>') + '</p>';
+
+  try {
+    const r = await fetch('https://api.brevo.com/v3/smtp/email', {
+      method: 'POST',
+      headers: { 'accept': 'application/json', 'api-key': BREVO_KEY, 'content-type': 'application/json' },
+      body: JSON.stringify({
+        sender:   { name: 'Herald Website', email: FROM_EMAIL },
+        to:       [{ email: TO_EMAIL }],
+        replyTo:  { email, name },
+        subject:  'Website Contact: ' + (subject || 'General inquiry'),
+        htmlContent: htmlBody,
+      }),
+    });
+    if (!r.ok) {
+      const t = await r.text();
+      console.error('Brevo error:', r.status, t);
+      return res.status(502).json({ error: 'Could not send your message.' });
+    }
+    console.log('Contact: message from ' + email + ' sent to ' + TO_EMAIL);
+    res.json({ ok: true });
+  } catch (err) {
+    console.error('Contact error:', err);
+    res.status(500).json({ error: 'Could not send your message.' });
+  }
+});
 // ---------- SEO: robots.txt ----------
 app.get('/robots.txt', (req, res) => {
   const txt = `User-agent: *
