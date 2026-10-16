@@ -2055,4 +2055,16 @@ app.use((err, req, res, next) => {
   next();
 });
 
+
+// ---------- Health check (env debug) ----------
+app.get('/api/health', (req, res) => {
+  const k = process.env.BREVO_API_KEY || '';
+  res.json({
+    hasBrevoKey: k.length > 0,
+    brevoKeyPrefix: k ? k.slice(0, 12) + '...' : null,
+    brevoKeyLength: k.length,
+    mailFrom: process.env.MAIL_FROM_EMAIL || null,
+    mailTo: process.env.MAIL_TO || null,
+  });
+});
 app.listen(PORT, () => console.log(`Herald Portal running on http://localhost:${PORT}`));
