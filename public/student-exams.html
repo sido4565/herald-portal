@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>My Exams — Herald Portal</title>
+  <link rel="stylesheet" href="style.css" />
+  <style>
+    body { background: #f7f6f2; font-family: 'DM Sans', sans-serif; }
+    .container { max-width: 900px; margin: 40px auto; padding: 0 20px; }
+    h1 { color: #10243a; margin-bottom: 24px; }
+    .exam-card {
+      background: #fff; border: 1px solid #e6e9ed; border-radius: 12px;
+      padding: 20px; margin-bottom: 16px;
+      box-shadow: 0 4px 12px rgba(16,36,58,0.04);
+      display: flex; justify-content: space-between; align-items: center; gap: 20px;
+    }
+    .exam-info h3 { margin: 0 0 4px; color: #10243a; font-size: 17px; }
+    .exam-info .meta { color: #647386; font-size: 13px; margin: 0; }
+    .exam-action { flex: 0 0 auto; }
+    .btn-take {
+      background: #10243a; color: #fff; padding: 10px 20px; border-radius: 8px;
+      text-decoration: none; font-size: 13px; font-weight: 700;
+      display: inline-block;
+    }
+    .btn-take:hover { background: #1d405e; }
+    .btn-done {
+      background: #eaf3ef; color: #2d6d59; padding: 10px 20px; border-radius: 8px;
+      font-size: 13px; font-weight: 700; cursor: default;
+    }
+    .empty { color: #647386; text-align: center; padding: 40px; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>My Exams</h1>
+    <div id="examsList"><p class="empty">Loading...</p></div>
+  </div>
+
+  <script>
+    fetch('/api/student/exams', { credentials: 'same-origin' })
+      .then(r => r.json())
+      .then(exams => {
+        const wrap = document.getElementById('examsList');
+        if (!exams.length) {
+          wrap.innerHTML = '<p class="empty">No exams available yet. Check back later.</p>';
+          return;
+        }
+        wrap.innerHTML = exams.map(e => {
+          let action;
+          if (e.submitted_attempt) {
+            action = '<div class="btn-done">✅ Completed</div>';
+          } else if (e.in_progress) {
+            action = '<a href="exam.html?id=' + e.id + '" class="btn-take">Resume Exam →</a>';
+          } else {
+            action = '<a href="exam.html?id=' + e.id + '" class="btn-take">Take Exam →</a>';
+          }
+          return `
+            <div class="exam-card">
+              <div class="exam-info">
+                <h3>${escapeHtml(e.title)}</h3>
+                <p class="meta">${escapeHtml(e.code || '')} · ${escapeHtml(e.course_title || '')} · ${e.duration_minutes} min · ${e.total_marks} marks</p>
+              </div>
+              <div class="exam-action">${action}</div>
+            </div>
+          `;
+        }).join('');
+      })
+      .catch(err => {
+        document.getElementById('examsList').innerHTML = '<p class="empty">Could not load exams: ' + err.message + '</p>';
+      });
+
+    function escapeHtml(s) {
+      return String(s || '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+    }
+  </script>
+</body>
+</html>
