@@ -692,18 +692,25 @@ app.get('/api/student/transcript/pdf', authStudent, async (req, res) => {
     doc.text(`Date Generated: ${new Date().toLocaleDateString('en-KE')}`);
     doc.moveDown(2);
 
-    // --- Results Table ---
+        // --- Results Table ---
     doc.fontSize(12).font('Helvetica-Bold').text('Academic Results:');
     doc.moveDown(0.5);
+
+    // Define column X positions
+    const colCode = 50;
+    const colTitle = 100;
+    const colTerm = 320;
+    const colMarks = 460;
+    const colGrade = 510;
 
     // Table header
     const tableTop = doc.y;
     doc.fontSize(10).font('Helvetica-Bold');
-    doc.text('Code', 50, tableTop);
-    doc.text('Course Title', 120, tableTop);
-    doc.text('Term', 350, tableTop);
-    doc.text('Marks', 450, tableTop);
-    doc.text('Grade', 500, tableTop);
+    doc.text('Code', colCode, tableTop);
+    doc.text('Course Title', colTitle, tableTop);
+    doc.text('Term', colTerm, tableTop);
+    doc.text('Marks', colMarks, tableTop);
+    doc.text('Grade', colGrade, tableTop);
 
     // Draw a line
     doc.moveTo(50, tableTop + 15).lineTo(550, tableTop + 15).stroke();
@@ -713,18 +720,27 @@ app.get('/api/student/transcript/pdf', authStudent, async (req, res) => {
     doc.font('Helvetica').fontSize(10);
     
     results.forEach(r => {
-      doc.text(r.course_code, 50, y);
-      doc.text(r.course_title, 120, y, { width: 220 });
-      doc.text(r.term, 350, y);
-      doc.text(r.marks.toString(), 450, y);
-      doc.text(r.grade, 500, y);
-      y += 20; // Move down for next row
+      doc.text(r.course_code, colCode, y);
+      // width: 210 prevents the title from bleeding into the Term column
+      doc.text(r.course_title, colTitle, y, { width: 210 }); 
+      // width: 130 prevents the term from bleeding into the Marks column
+      doc.text(r.term, colTerm, y, { width: 130 });
+      doc.text(r.marks.toString(), colMarks, y);
+      doc.text(r.grade, colGrade, y);
+      
+      // Move down for next row. Use Math.max in case the title wrapped to a second line
+      y = Math.max(y + 20, doc.y + 20); 
     });
 
     doc.moveDown(2);
     
-    // --- Footer ---
-    doc.fontSize(10).font('Helvetica-Oblique').text('This is a computer-generated transcript and does not require a physical signature.', { align: 'center' });
+    // --- Footer (Reset X position to 50 so it spans full width) ---
+    doc.fontSize(10).font('Helvetica-Oblique').text(
+      'This is a computer-generated transcript and does not require a physical signature.', 
+      50, 
+      doc.y, 
+      { align: 'center', width: 500 }
+    );
     
     // Finalize the PDF
     doc.end();
