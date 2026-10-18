@@ -642,6 +642,102 @@ app.get('/api/my-transcript', authStudent, async (req, res) => {
   });
 });
 
+const PDFDocument = require('pdfkit');
+
+// ---------- Download PDF Transcript ----------
+app.get('/api/student/transcript/pdf', authStudent, async (req, res) => {
+  try {
+    // 1. Fetch student details
+    const sRes = await db.execute({
+      sql: 'SELECT reg_no, name, email, course FROM students WHERE id = ?',
+      args: [req.user.id],
+    });
+    const student = sRes.rows[0];
+
+    // 2. Fetch results
+    const rRes = await db.execute({
+      sql: `SELECT r.marks, r.grade, r.term, c.code AS course_code, c.title AS course_title
+            FROM results r JOIN courses c ON c.id = r.course_id
+            WHERE r.student_id = ?
+            ORDER BY r.term ASC, c.code ASC`,
+      args: [req.user.id],
+    });
+    const results = rRes.rows;
+
+    // 3. Create the PDF
+    const doc = new PDFDocument({ margin: 50 });
+
+    // Set response headers to trigger a file download
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename="Herald-Transcript-${student.reg_no}.pdf"`);
+
+    // Pipe the PDF directly to the response
+    doc.pipe(res);
+
+    // --- Header ---
+    doc.fontSize(20).font('Helvetica-Bold').text('HERALD TRAINER AND CONSULTANT', { align: 'center' });
+    doc.fontSize(10).font('Helvetica').text('Mombasa, Kenya | info@heraldtrainer.co.ke | +254 107 004 000', { align: 'center' });
+    doc.moveDown(2);
+
+    doc.fontSize(16).font('Helvetica-Bold').text('OFFICIAL ACADEMIC TRANSCRIPT', { align: 'center', underline: true });
+    doc.moveDown(2);
+
+    // --- Student Info ---
+    doc.fontSize(12).font('Helvetica-Bold').text('Student Information:');
+    doc.font('Helvetica').fontSize(11);
+    doc.text(`Name: ${student.name}`);
+    doc.text(`Registration Number: ${student.reg_no}`);
+    doc.text(`Program: ${student.course}`);
+    doc.text(`Email: ${student.email}`);
+    doc.text(`Date Generated: ${new Date().toLocaleDateString('en-KE')}`);
+    doc.moveDown(2);
+
+    // --- Results Table ---
+    doc.fontSize(12).font('Helvetica-Bold').text('Academic Results:');
+    doc.moveDown(0.5);
+
+    // Table header
+    const tableTop = doc.y;
+    doc.fontSize(10).font('Helvetica-Bold');
+    doc.text('Code', 50, tableTop);
+    doc.text('Course Title', 120, tableTop);
+    doc.text('Term', 350, tableTop);
+    doc.text('Marks', 450, tableTop);
+    doc.text('Grade', 500, tableTop);
+
+    // Draw a line
+    doc.moveTo(50, tableTop + 15).lineTo(550, tableTop + 15).stroke();
+
+    // Table rows
+    let y = tableTop + 25;
+    doc.font('Helvetica').fontSize(10);
+    
+    results.forEach(r => {
+      doc.text(r.course_code, 50, y);
+      doc.text(r.course_title, 120, y, { width: 220 });
+      doc.text(r.term, 350, y);
+      doc.text(r.marks.toString(), 450, y);
+      doc.text(r.grade, 500, y);
+      y += 20; // Move down for next row
+    });
+
+    doc.moveDown(2);
+    
+    // --- Footer ---
+    doc.fontSize(10).font('Helvetica-Oblique').text('This is a computer-generated transcript and does not require a physical signature.', { align: 'center' });
+    
+    // Finalize the PDF
+    doc.end();
+
+  } catch (err) {
+    console.error('PDF Generation Error:', err);
+    // If headers haven't been sent yet, send an error
+    if (!res.headersSent) {
+      res.status(500).json({ error: 'Could not generate PDF transcript.' });
+    }
+  }
+});
+
 // ==================== LECTURER ROUTES ====================
 app.post('/api/lecturer/register', async (req, res) => {
   const { name, email, phone, password, qualification, specialization, bio } = req.body;
