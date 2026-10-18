@@ -1,0 +1,508 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="robots" content="noindex, nofollow" />
+  <title>Exam Management — Herald Admin</title>
+  <link rel="icon" type="image/svg+xml" href="favicon.svg" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800&family=Manrope:wght@500;600;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="style.css" />
+  <link rel="stylesheet" href="dashboard.css" />
+  <style>
+    /* Admin Exam specific styles */
+    .exam-toolbar {
+      display: flex; justify-content: space-between; align-items: center;
+      gap: 16px; margin-bottom: 24px; flex-wrap: wrap;
+    }
+    .exam-toolbar h2 { margin: 0; color: var(--navy); font-family: 'Manrope', sans-serif; }
+    .btn-new-exam {
+      background: var(--navy); color: #fff; padding: 10px 20px; border: 0;
+      border-radius: 8px; font-size: 13px; font-weight: 700; cursor: pointer;
+      font-family: inherit; transition: background 0.15s;
+    }
+    .btn-new-exam:hover { background: #1d405e; }
+
+    .exam-list { display: grid; gap: 14px; }
+
+    .admin-exam-card {
+      background: #fff; border: 1px solid var(--line); border-radius: 12px;
+      padding: 20px; box-shadow: 0 4px 12px rgba(16,36,58,0.04);
+      display: flex; justify-content: space-between; align-items: flex-start;
+      gap: 20px; flex-wrap: wrap;
+    }
+    .admin-exam-card .info { flex: 1 1 300px; min-width: 0; }
+    .admin-exam-card h3 {
+      margin: 0 0 6px; font-size: 17px; color: var(--navy);
+      font-family: 'Manrope', sans-serif;
+    }
+    .admin-exam-card .meta {
+      font-size: 13px; color: var(--muted); margin: 0;
+      line-height: 1.6;
+    }
+    .admin-exam-card .meta strong { color: var(--navy); }
+    .admin-exam-card .stats {
+      display: flex; gap: 20px; margin-top: 12px; flex-wrap: wrap;
+    }
+    .admin-exam-card .stat {
+      font-size: 12px; color: var(--muted);
+    }
+    .admin-exam-card .stat strong {
+      font-size: 18px; color: var(--navy);
+      display: block; font-family: 'Manrope', sans-serif;
+    }
+    .admin-exam-card .actions {
+      display: flex; gap: 8px; flex-wrap: wrap; align-items: flex-start;
+    }
+    .btn-sm {
+      padding: 8px 14px; border-radius: 7px; font-size: 12px;
+      font-weight: 700; cursor: pointer; border: 1px solid var(--line);
+      background: #fff; color: var(--navy); font-family: inherit;
+      transition: background 0.12s;
+    }
+    .btn-sm:hover { background: #f1f4f6; }
+    .btn-sm.primary { background: var(--navy); color: #fff; border-color: var(--navy); }
+    .btn-sm.primary:hover { background: #1d405e; }
+    .btn-sm.danger { background: #fef2f2; color: #b91c1c; border-color: #fecaca; }
+    .btn-sm.danger:hover { background: #fee2e2; }
+
+    .empty-state {
+      text-align: center; padding: 60px 20px; color: var(--muted);
+      background: #fff; border-radius: 12px; border: 1px dashed var(--line);
+    }
+    .empty-state h3 { color: var(--navy); margin: 0 0 8px; }
+
+    /* Modal */
+    .modal-overlay {
+      position: fixed; inset: 0; background: rgba(16,36,58,0.75);
+      backdrop-filter: blur(4px);
+      display: none; align-items: center; justify-content: center;
+      padding: 20px; z-index: 500;
+    }
+    .modal-overlay.open { display: flex; }
+    .modal {
+      background: #fff; border-radius: 16px; max-width: 560px; width: 100%;
+      max-height: 90vh; overflow-y: auto; padding: 32px;
+      box-shadow: 0 24px 60px rgba(0,0,0,0.3);
+    }
+    .modal.large { max-width: 780px; }
+    .modal h2 { margin: 0 0 20px; color: var(--navy); font-family: 'Manrope', sans-serif; }
+    .modal .field { margin-bottom: 16px; }
+    .modal .field label {
+      display: block; font-size: 12px; font-weight: 700;
+      color: var(--navy); margin-bottom: 6px;
+    }
+    .modal .field input, .modal .field select, .modal .field textarea {
+      width: 100%; padding: 10px 14px; border: 1px solid #dfe4e9;
+      border-radius: 8px; font-size: 14px; font-family: inherit;
+      box-sizing: border-box; background: #fbfcfd;
+    }
+    .modal .field input:focus, .modal .field select:focus {
+      outline: 0; border-color: var(--gold-soft); background: #fff;
+    }
+    .modal-actions {
+      display: flex; justify-content: flex-end; gap: 10px;
+      margin-top: 24px; padding-top: 20px; border-top: 1px solid var(--line);
+    }
+    .modal-actions .btn {
+      padding: 10px 20px; border-radius: 8px; font-size: 13px;
+      font-weight: 700; cursor: pointer; font-family: inherit;
+      border: 1px solid var(--line); background: #fff; color: var(--navy);
+    }
+    .modal-actions .btn.primary {
+      background: var(--navy); color: #fff; border-color: var(--navy);
+    }
+
+    /* Question list inside modal */
+    .question-item {
+      background: #f7f6f2; border-radius: 8px; padding: 14px;
+      margin-bottom: 10px; position: relative;
+    }
+    .question-item .q-text {
+      font-weight: 700; color: var(--navy); font-size: 14px;
+      margin-bottom: 8px;
+    }
+    .question-item .q-options {
+      display: grid; grid-template-columns: 1fr 1fr; gap: 6px;
+      font-size: 12.5px; color: var(--muted);
+    }
+    .question-item .q-options span strong {
+      display: inline-block; min-width: 20px;
+      color: var(--navy);
+    }
+    .question-item .correct {
+      color: #16a34a; font-weight: 800;
+    }
+    .question-item .remove-btn {
+      position: absolute; top: 10px; right: 10px;
+      background: #fef2f2; color: #b91c1c; border: 0;
+      width: 24px; height: 24px; border-radius: 50%; cursor: pointer;
+      font-size: 14px; font-weight: 800;
+    }
+
+    .add-question-form {
+      background: #f7f6f2; border-radius: 10px; padding: 16px;
+      margin-top: 20px;
+    }
+    .add-question-form h4 { margin: 0 0 12px; color: var(--navy); font-size: 14px; }
+
+    .toast-msg {
+      position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%);
+      background: var(--navy); color: #fff; padding: 12px 24px;
+      border-radius: 10px; font-size: 13px; font-weight: 700;
+      z-index: 1000; opacity: 0; transition: opacity 0.3s;
+      box-shadow: 0 8px 24px rgba(0,0,0,0.25);
+    }
+    .toast-msg.show { opacity: 1; }
+    .toast-msg.error { background: #b91c1c; }
+    .toast-msg.success { background: #16a34a; }
+
+    /* Header */
+    .site-header { position: relative; }
+  </style>
+</head>
+<body class="admin-body">
+
+<header class="admin-topbar">
+  <div class="brand">Herald Admin — Exams</div>
+  <div class="user-box">
+    <span>superadmin</span>
+    <a href="admin-dashboard.html" class="theme-toggle" style="text-decoration:none; padding: 8px 14px;">← Back to Dashboard</a>
+  </div>
+</header>
+
+<main class="container" style="padding-top: 24px;">
+  <div class="exam-toolbar">
+    <h2>Exam Management</h2>
+    <button class="btn-new-exam" onclick="openCreateExamModal()">+ Create Exam</button>
+  </div>
+
+  <div id="examList" class="exam-list">
+    <div class="empty-state"><h3>Loading...</h3></div>
+  </div>
+</main>
+
+<!-- Create Exam Modal -->
+<div class="modal-overlay" id="createExamModal">
+  <div class="modal">
+    <h2>Create New Exam</h2>
+    <div class="field">
+      <label>Course</label>
+      <select id="newExamCourse">
+        <option value="">— Select a course —</option>
+      </select>
+    </div>
+    <div class="field">
+      <label>Exam Title</label>
+      <input type="text" id="newExamTitle" placeholder="e.g. JS301 Final Exam" />
+    </div>
+    <div class="field">
+      <label>Description (optional)</label>
+      <textarea id="newExamDesc" rows="2" placeholder="Brief description"></textarea>
+    </div>
+    <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
+      <div class="field">
+        <label>Duration (minutes)</label>
+        <input type="number" id="newExamDuration" value="60" min="5" max="300" />
+      </div>
+      <div class="field">
+        <label>Total marks</label>
+        <input type="number" id="newExamMarks" value="100" min="1" />
+      </div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn" onclick="closeModal('createExamModal')">Cancel</button>
+      <button class="btn primary" onclick="createExam()">Create Exam</button>
+    </div>
+  </div>
+</div>
+
+<!-- Manage Questions Modal -->
+<div class="modal-overlay" id="manageQuestionsModal">
+  <div class="modal large">
+    <h2 id="manageQTitle">Manage Questions</h2>
+    <div id="questionsList" style="margin-bottom: 16px;"></div>
+
+    <div class="add-question-form">
+      <h4>➕ Add New Question</h4>
+      <div class="field">
+        <label>Question text</label>
+        <textarea id="qText" rows="2" placeholder="Enter the question..."></textarea>
+      </div>
+      <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
+        <div class="field"><label>Option A</label><input type="text" id="qA" /></div>
+        <div class="field"><label>Option B</label><input type="text" id="qB" /></div>
+        <div class="field"><label>Option C</label><input type="text" id="qC" /></div>
+        <div class="field"><label>Option D</label><input type="text" id="qD" /></div>
+      </div>
+      <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
+        <div class="field">
+          <label>Correct answer</label>
+          <select id="qCorrect">
+            <option value="A">A</option>
+            <option value="B">B</option>
+            <option value="C">C</option>
+            <option value="D">D</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>Marks</label>
+          <input type="number" id="qMarks" value="5" min="1" />
+        </div>
+      </div>
+      <button class="btn-sm primary" onclick="addQuestion()" style="margin-top: 8px;">Add Question</button>
+    </div>
+
+    <div class="modal-actions">
+      <button class="btn primary" onclick="closeModal('manageQuestionsModal')">Close</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast" class="toast-msg"></div>
+
+<script>
+let currentExamId = null;
+let allCourses = [];
+
+// ─── Load exams on page load ───
+async function loadExams() {
+  const wrap = document.getElementById('examList');
+  try {
+    const res = await fetch('/api/admin/exams', { credentials: 'same-origin' });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const exams = await res.json();
+
+    if (!exams.length) {
+      wrap.innerHTML = `
+        <div class="empty-state">
+          <h3>No exams yet</h3>
+          <p>Click "+ Create Exam" above to get started.</p>
+        </div>`;
+      return;
+    }
+
+    wrap.innerHTML = exams.map(e => `
+      <div class="admin-exam-card">
+        <div class="info">
+          <h3>${esc(e.title)}</h3>
+          <p class="meta">${esc(e.code || '')} — ${esc(e.course_title || 'Unknown course')}</p>
+          <div class="stats">
+            <div class="stat"><strong>${e.duration_minutes}</strong>min</div>
+            <div class="stat"><strong>${e.total_marks}</strong>marks</div>
+            <div class="stat"><strong>${e.question_count}</strong>questions</div>
+            <div class="stat"><strong>${e.submission_count}</strong>submissions</div>
+          </div>
+        </div>
+        <div class="actions">
+          <button class="btn-sm primary" onclick="openManageQuestions(${e.id}, '${esc(e.title).replace(/'/g, "\\'")}')">Manage Questions</button>
+          <button class="btn-sm danger" onclick="deleteExam(${e.id})">Delete</button>
+        </div>
+      </div>
+    `).join('');
+  } catch (err) {
+    wrap.innerHTML = `<div class="empty-state"><h3>Error loading exams</h3><p>${esc(err.message)}</p></div>`;
+  }
+}
+
+// ─── Load courses for the dropdown ───
+async function loadCourses() {
+  try {
+    const res = await fetch('/api/admin/courses', { credentials: 'same-origin' });
+    if (!res.ok) return;
+    allCourses = await res.json();
+    const sel = document.getElementById('newExamCourse');
+    sel.innerHTML = '<option value="">— Select a course —</option>' +
+      allCourses.map(c => `<option value="${c.id}">${esc(c.code)} — ${esc(c.title)}</option>`).join('');
+  } catch (err) {
+    console.error('Could not load courses:', err);
+  }
+}
+
+// ─── Create exam ───
+function openCreateExamModal() {
+  document.getElementById('newExamCourse').value = '';
+  document.getElementById('newExamTitle').value = '';
+  document.getElementById('newExamDesc').value = '';
+  document.getElementById('newExamDuration').value = '60';
+  document.getElementById('newExamMarks').value = '100';
+  document.getElementById('createExamModal').classList.add('open');
+}
+
+async function createExam() {
+  const course_id = Number(document.getElementById('newExamCourse').value);
+  const title = document.getElementById('newExamTitle').value.trim();
+  const description = document.getElementById('newExamDesc').value.trim();
+  const duration_minutes = Number(document.getElementById('newExamDuration').value);
+  const total_marks = Number(document.getElementById('newExamMarks').value);
+
+  if (!course_id || !title || !duration_minutes) {
+    return toast('Please fill all required fields', 'error');
+  }
+
+  try {
+    const res = await fetch('/api/admin/exams', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'same-origin',
+      body: JSON.stringify({ course_id, title, description, duration_minutes, total_marks }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Failed to create exam');
+
+    toast('Exam created successfully ✅', 'success');
+    closeModal('createExamModal');
+    loadExams();
+  } catch (err) {
+    toast(err.message, 'error');
+  }
+}
+
+// ─── Manage questions ───
+async function openManageQuestions(examId, examTitle) {
+  currentExamId = examId;
+  document.getElementById('manageQTitle').textContent = 'Questions — ' + examTitle;
+  document.getElementById('questionsList').innerHTML = '<p style="color:#647386;">Loading...</p>';
+  document.getElementById('qText').value = '';
+  document.getElementById('qA').value = '';
+  document.getElementById('qB').value = '';
+  document.getElementById('qC').value = '';
+  document.getElementById('qD').value = '';
+  document.getElementById('qCorrect').value = 'A';
+  document.getElementById('qMarks').value = '5';
+
+  document.getElementById('manageQuestionsModal').classList.add('open');
+  await loadQuestions(examId);
+}
+
+async function loadQuestions(examId) {
+  const wrap = document.getElementById('questionsList');
+  try {
+    const res = await fetch(`/api/admin/exams/${examId}/questions`, { credentials: 'same-origin' });
+    if (!res.ok) throw new Error('Could not load questions');
+    const questions = await res.json();
+
+    if (!questions.length) {
+      wrap.innerHTML = '<p style="color:#647386; padding: 12px;">No questions yet. Add one below.</p>';
+      return;
+    }
+
+    wrap.innerHTML = questions.map((q, i) => `
+      <div class="question-item">
+        <div class="q-text">${i + 1}. ${esc(q.question_text)} <span style="color:#b77b16; font-size:12px;">(${q.marks} mark${q.marks !== 1 ? 's' : ''})</span></div>
+        <div class="q-options">
+          <span><strong>A.</strong> ${esc(q.option_a)} ${q.correct_option === 'A' ? '<span class="correct">✓</span>' : ''}</span>
+          <span><strong>B.</strong> ${esc(q.option_b)} ${q.correct_option === 'B' ? '<span class="correct">✓</span>' : ''}</span>
+          <span><strong>C.</strong> ${esc(q.option_c)} ${q.correct_option === 'C' ? '<span class="correct">✓</span>' : ''}</span>
+          <span><strong>D.</strong> ${esc(q.option_d)} ${q.correct_option === 'D' ? '<span class="correct">✓</span>' : ''}</span>
+        </div>
+        <button class="remove-btn" onclick="deleteQuestion(${q.id})" title="Delete">×</button>
+      </div>
+    `).join('');
+  } catch (err) {
+    wrap.innerHTML = `<p style="color:#b91c1c;">${esc(err.message)}</p>`;
+  }
+}
+
+async function addQuestion() {
+  if (!currentExamId) return;
+
+  const q = {
+    question_text: document.getElementById('qText').value.trim(),
+    option_a: document.getElementById('qA').value.trim(),
+    option_b: document.getElementById('qB').value.trim(),
+    option_c: document.getElementById('qC').value.trim(),
+    option_d: document.getElementById('qD').value.trim(),
+    correct_option: document.getElementById('qCorrect').value,
+    marks: Number(document.getElementById('qMarks').value) || 1,
+  };
+
+  if (!q.question_text || !q.option_a || !q.option_b || !q.option_c || !q.option_d) {
+    return toast('All fields are required', 'error');
+  }
+
+  try {
+    const res = await fetch(`/api/admin/exams/${currentExamId}/questions`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'same-origin',
+      body: JSON.stringify({ questions: [q] }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Failed to add question');
+
+    toast('Question added ✅', 'success');
+    document.getElementById('qText').value = '';
+    document.getElementById('qA').value = '';
+    document.getElementById('qB').value = '';
+    document.getElementById('qC').value = '';
+    document.getElementById('qD').value = '';
+    document.getElementById('qCorrect').value = 'A';
+    document.getElementById('qMarks').value = '5';
+
+    await loadQuestions(currentExamId);
+    loadExams();
+  } catch (err) {
+    toast(err.message, 'error');
+  }
+}
+
+async function deleteQuestion(questionId) {
+  if (!currentExamId) return;
+  if (!confirm('Delete this question?')) return;
+  try {
+    const res = await fetch(`/api/admin/exams/${currentExamId}/questions/${questionId}`, {
+      method: 'DELETE',
+      credentials: 'same-origin',
+    });
+    if (!res.ok) {
+      const data = await res.json();
+      throw new Error(data.error || 'Failed to delete');
+    }
+    toast('Question deleted', 'success');
+    await loadQuestions(currentExamId);
+    loadExams();
+  } catch (err) {
+    toast(err.message, 'error');
+  }
+}
+
+async function deleteExam(examId) {
+  if (!confirm('Delete this exam? All attempts and questions will be lost.')) return;
+  try {
+    const res = await fetch(`/api/admin/exams/${examId}`, {
+      method: 'DELETE',
+      credentials: 'same-origin',
+    });
+    if (!res.ok) throw new Error('Failed to delete');
+    toast('Exam deleted', 'success');
+    loadExams();
+  } catch (err) {
+    toast(err.message, 'error');
+  }
+}
+
+// ─── Helpers ───
+function closeModal(id) {
+  document.getElementById(id).classList.remove('open');
+}
+
+function toast(msg, type) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.className = 'toast-msg show ' + (type || '');
+  setTimeout(() => el.classList.remove('show'), 3000);
+}
+
+function esc(s) {
+  return String(s || '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+// ─── Init ───
+loadExams();
+loadCourses();
+</script>
+
+</body>
+</html>

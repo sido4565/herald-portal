@@ -1,0 +1,323 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="robots" content="noindex, nofollow" />
+  <title>Examination — Herald Portal</title>
+  <link rel="icon" type="image/svg+xml" href="favicon.svg" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800&family=Manrope:wght@500;600;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="style.css" />
+  <style>
+    body { background: #f7f6f2; margin: 0; font-family: 'DM Sans', sans-serif; }
+    .exam-header {
+      position: fixed; top: 0; left: 0; right: 0; z-index: 100;
+      background: #10243a; color: #fff;
+      padding: 14px 24px;
+      display: flex; align-items: center; justify-content: space-between;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+    }
+    .exam-header h2 { margin: 0; font-size: 16px; font-weight: 700; font-family: 'Manrope', sans-serif; }
+    .exam-header .course-code { font-family: monospace; font-size: 11px; color: #f0c873; opacity: 0.8; margin-top: 2px; }
+    .timer {
+      font-family: 'SF Mono', Monaco, monospace;
+      font-size: 22px; font-weight: 800; color: #f0c873;
+      padding: 8px 18px; background: rgba(240,200,115,0.1);
+      border-radius: 8px; border: 1px solid rgba(240,200,115,0.3);
+    }
+    .timer.warning { color: #dc2626; border-color: #dc2626; background: rgba(220,38,38,0.1); animation: pulse 1s infinite; }
+    @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.5; } }
+    .exam-container { max-width: 820px; margin: 100px auto 120px; padding: 0 20px; }
+    .question-card {
+      background: #fff; border: 1px solid #e6e9ed; border-radius: 14px;
+      padding: 24px; margin-bottom: 16px;
+      box-shadow: 0 4px 12px rgba(16,36,58,0.04);
+    }
+    .question-num { font-size: 11px; color: #b77b16; font-weight: 800; letter-spacing: 0.1em; text-transform: uppercase; margin-bottom: 8px; }
+    .question-text { font-size: 17px; font-weight: 600; color: #10243a; margin-bottom: 16px; line-height: 1.4; }
+    .option-label {
+      display: flex; align-items: flex-start; gap: 12px;
+      padding: 14px 16px; margin-bottom: 8px;
+      border: 1.5px solid #e6e9ed; border-radius: 10px;
+      cursor: pointer; transition: all 0.15s;
+    }
+    .option-label:hover { background: #f7f6f2; border-color: #b77b16; }
+    .option-label input[type="radio"] { width: 18px; height: 18px; margin-top: 1px; cursor: pointer; accent-color: #10243a; }
+    .option-label input[type="radio"]:checked + span { color: #10243a; font-weight: 600; }
+    .option-label span { font-size: 14px; line-height: 1.5; color: #445469; }
+    .option-label strong { display: inline-block; min-width: 20px; font-weight: 800; color: #10243a; margin-right: 6px; }
+    .submit-bar {
+      position: fixed; bottom: 0; left: 0; right: 0;
+      background: #fff; border-top: 1px solid #e6e9ed;
+      padding: 16px; text-align: center; z-index: 100;
+      box-shadow: 0 -4px 12px rgba(0,0,0,0.05);
+    }
+    .submit-btn {
+      background: #10243a; color: #fff; border: 0;
+      padding: 14px 40px; border-radius: 10px;
+      font-size: 15px; font-weight: 700; cursor: pointer;
+      font-family: inherit;
+    }
+    .submit-btn:hover { background: #1d405e; }
+    .submit-btn:disabled { background: #647386; cursor: not-allowed; }
+    .modal-overlay {
+      position: fixed; inset: 0; background: rgba(16,36,58,0.75);
+      z-index: 500; display: none; align-items: center; justify-content: center;
+      padding: 20px;
+    }
+    .modal-overlay.open { display: flex; }
+    .modal { background: #fff; border-radius: 16px; max-width: 520px; width: 100%; padding: 32px; }
+    .modal h2 { margin: 0 0 16px; color: #10243a; font-size: 22px; }
+    .modal ul { color: #647386; font-size: 14px; line-height: 1.7; padding-left: 20px; }
+    .modal .btn-start { width: 100%; background: #10243a; color: #fff; border: 0; padding: 16px; border-radius: 10px; font-size: 16px; font-weight: 700; cursor: pointer; margin-top: 20px; }
+    .result-screen { text-align: center; margin-top: 15vh; padding: 20px; }
+    .result-screen h1 { color: #16a34a; font-size: 3rem; margin-bottom: 10px; }
+    .result-screen .score { font-size: 2.5rem; font-weight: 800; color: #10243a; margin: 20px 0; }
+    .autosave-indicator {
+      position: fixed; bottom: 90px; right: 24px;
+      background: #eaf3ef; color: #2d6d59;
+      padding: 8px 16px; border-radius: 8px;
+      font-size: 12px; font-weight: 700;
+      opacity: 0; transition: opacity 0.3s;
+      z-index: 90;
+    }
+    .autosave-indicator.show { opacity: 1; }
+  </style>
+</head>
+<body oncontextmenu="return false;">
+
+<!-- Start screen -->
+<div id="startScreen" class="modal-overlay open">
+  <div class="modal">
+    <h2>⚠️ Before You Begin</h2>
+    <p style="color: #647386; margin: 0 0 16px;">You are about to start <strong id="startTitle">the exam</strong></p>
+    <ul>
+      <li>You have <strong id="startDuration">—</strong> to complete this exam</li>
+      <li>You get <strong>ONE attempt only</strong></li>
+      <li>The exam <strong>auto-submits</strong> when time runs out</li>
+      <li>Do not refresh or close this tab</li>
+      <li>Your progress is saved automatically</li>
+    </ul>
+    <button class="btn-start" onclick="startExam()">I Understand — Start Exam</button>
+  </div>
+</div>
+
+<!-- Exam UI -->
+<div id="examUI" style="display:none;">
+  <header class="exam-header">
+    <div>
+      <h2 id="examTitle">Exam</h2>
+      <div class="course-code" id="courseCode"></div>
+    </div>
+    <div class="timer" id="timerDisplay">--:--</div>
+  </header>
+
+  <div class="exam-container" id="questionsContainer"></div>
+
+  <div class="submit-bar">
+    <button class="submit-btn" id="submitBtn" onclick="submitExam()">Submit Examination</button>
+  </div>
+
+  <div class="autosave-indicator" id="autosaveIndicator">✓ Saved</div>
+</div>
+
+<!-- Result screen -->
+<div id="resultScreen" style="display:none;" class="result-screen">
+  <h1>✅ Exam Submitted</h1>
+  <p style="color: #647386; font-size: 16px;">Your results have been recorded</p>
+  <div class="score" id="scoreDisplay">— / —</div>
+  <p style="color: #647386;">You will be redirected in a moment...</p>
+</div>
+
+<script>
+// ─── State ───
+const params = new URLSearchParams(window.location.search);
+const examId = params.get('id');
+
+let attemptId = null;
+let timerInterval = null;
+let autosaveInterval = null;
+let timeRemaining = 0;
+let isSubmitting = false;
+let answers = {};
+
+// ─── Start ───
+async function startExam() {
+  if (!examId) {
+    alert('No exam specified.');
+    return;
+  }
+
+  document.getElementById('startScreen').classList.remove('open');
+
+  try {
+    const res = await fetch(`/api/student/exams/${examId}/start`, {
+      method: 'POST',
+      credentials: 'same-origin',
+    });
+    const data = await res.json();
+
+    if (!res.ok) {
+      alert(data.error || 'Could not start exam.');
+      window.location.href = 'dashboard.html';
+      return;
+    }
+
+    attemptId = data.attempt_id;
+    timeRemaining = data.remaining_seconds;
+    answers = data.saved_answers || {};
+
+    document.getElementById('examTitle').textContent = data.exam.title;
+    document.getElementById('courseCode').textContent = data.exam.code || '';
+    document.getElementById('examUI').style.display = 'block';
+
+    renderQuestions(data.questions);
+    startTimer();
+    startAutosave();
+
+    // Warn before leaving
+    window.addEventListener('beforeunload', (e) => {
+      if (!isSubmitting) {
+        e.preventDefault();
+        e.returnValue = 'You have an exam in progress. Are you sure you want to leave?';
+      }
+    });
+  } catch (err) {
+    alert('Connection error: ' + err.message);
+    window.location.href = 'dashboard.html';
+  }
+}
+
+// ─── Render questions ───
+function renderQuestions(questions) {
+  const container = document.getElementById('questionsContainer');
+  container.innerHTML = questions.map((q, idx) => `
+    <div class="question-card">
+      <div class="question-num">Question ${idx + 1} of ${questions.length} · ${q.marks} mark${q.marks !== 1 ? 's' : ''}</div>
+      <div class="question-text">${escapeHtml(q.question_text)}</div>
+      ${['A', 'B', 'C', 'D'].map(opt => `
+        <label class="option-label">
+          <input type="radio" name="q_${q.id}" value="${opt}" ${answers[q.id] === opt ? 'checked' : ''}>
+          <span><strong>${opt}.</strong> ${escapeHtml(q['option_' + opt.toLowerCase()])}</span>
+        </label>
+      `).join('')}
+    </div>
+  `).join('');
+
+  // Bind change events
+  container.querySelectorAll('input[type="radio"]').forEach(input => {
+    input.addEventListener('change', (e) => {
+      const qId = e.target.name.replace('q_', '');
+      answers[qId] = e.target.value;
+    });
+  });
+}
+
+function escapeHtml(str) {
+  return String(str || '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+// ─── Timer ───
+function startTimer() {
+  const display = document.getElementById('timerDisplay');
+
+  function update() {
+    const m = Math.floor(timeRemaining / 60).toString().padStart(2, '0');
+    const s = (timeRemaining % 60).toString().padStart(2, '0');
+    display.textContent = `${m}:${s}`;
+
+    if (timeRemaining <= 60) {
+      display.classList.add('warning');
+    }
+
+    if (timeRemaining <= 0) {
+      clearInterval(timerInterval);
+      alert('⏰ Time is up! Your exam will be submitted automatically.');
+      submitExam();
+    }
+
+    timeRemaining--;
+  }
+
+  update();
+  timerInterval = setInterval(update, 1000);
+}
+
+// ─── Autosave ───
+function startAutosave() {
+  autosaveInterval = setInterval(async () => {
+    try {
+      const res = await fetch(`/api/student/exams/${attemptId}/save`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'same-origin',
+        body: JSON.stringify({ answers }),
+      });
+      if (res.ok) {
+        const ind = document.getElementById('autosaveIndicator');
+        ind.classList.add('show');
+        setTimeout(() => ind.classList.remove('show'), 1500);
+      }
+    } catch (err) {
+      console.error('Autosave failed:', err);
+    }
+  }, 30000); // every 30s
+}
+
+// ─── Submit ───
+async function submitExam() {
+  if (isSubmitting) return;
+  if (!confirm('Are you sure you want to submit? You cannot make changes after this.')) return;
+
+  isSubmitting = true;
+  clearInterval(timerInterval);
+  clearInterval(autosaveInterval);
+
+  const btn = document.getElementById('submitBtn');
+  btn.textContent = 'Submitting...';
+  btn.disabled = true;
+
+  try {
+    const res = await fetch(`/api/student/exams/${attemptId}/submit`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'same-origin',
+      body: JSON.stringify({ answers }),
+    });
+    const data = await res.json();
+
+    if (!res.ok) {
+      throw new Error(data.error || 'Submission failed');
+    }
+
+    // Show result screen
+    document.getElementById('examUI').style.display = 'none';
+    document.getElementById('resultScreen').style.display = 'block';
+    document.getElementById('scoreDisplay').textContent = `${data.score} / ${data.total} (${data.percentage}%)`;
+
+    setTimeout(() => { window.location.href = 'dashboard.html'; }, 4000);
+  } catch (err) {
+    alert('Submission error: ' + err.message);
+    isSubmitting = false;
+    btn.textContent = 'Submit Examination';
+    btn.disabled = false;
+  }
+}
+
+// ─── Auto-fill metadata on load ───
+if (examId) {
+  fetch(`/api/student/exams`, { credentials: 'same-origin' })
+    .then(r => r.json())
+    .then(exams => {
+      const exam = exams.find(e => String(e.id) === String(examId));
+      if (exam) {
+        document.getElementById('startTitle').textContent = exam.title;
+        document.getElementById('startDuration').textContent = `${exam.duration_minutes} minutes`;
+      }
+    })
+    .catch(() => {});
+}
+</script>
+</body>
+</html>

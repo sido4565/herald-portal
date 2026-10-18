@@ -1947,6 +1947,426 @@ app.post('/api/contact', async (req, res) => {
   }
 });
 
+// ═══════════════════════════════════════════════════════════
+// EXAM SYSTEM
+// ═══════════════════════════════════════════════════════════
+
+// ─── ADMIN: Create exam ───
+app.post('/api/admin/exams', authAdmin, async (req, res) => {
+  const { course_id, title, description, duration_minutes, total_marks } = req.body;
+  if (!course_id || !title || !duration_minutes) {
+    return res.status(400).json({ error: 'course_id, title, and duration_minutes required' });
+  }
+  try {
+    const info = await db.execute({
+      sql: `INSERT INTO exams (course_id, title, description, duration_minutes, total_marks, created_by)
+            VALUES (?, ?, ?, ?, ?, ?)`,
+      args: [course_id, title, description || '', duration_minutes, total_marks || 100, req.admin.id],
+    });
+    res.json({ ok: true, id: Number(info.lastInsertRowid) });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ─── ADMIN: List exams ───
+app.get('/api/admin/exams', authAdmin, async (req, res) => {
+  try {
+    const r = await db.execute(`
+      SELECT e.*, c.code, c.title AS course_title,
+        (SELECT COUNT(*) FROM exam_questions WHERE exam_id = e.id) AS question_count,
+        (SELECT COUNT(*) FROM exam_attempts WHERE exam_id = e.id AND status = 'submitted') AS submission_count
+        FROM exams e LEFT JOIN courses c ON c.id = e.course_id
+        ORDER BY e.id DESC
+    `);
+    res.json(r.rows);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ─── ADMIN: Add questions to an exam ───
+app.post('/api/admin/exams/:id/questions', authAdmin, async (req, res) => {
+  const examId = req.params.id;
+  const { questions } = req.body; // Array of { question_text, option_a, option_b, option_c, option_d, correct_option, marks }
+  if (!Array.isArray(questions) || !questions.length) {
+    return res.status(400).json({ error: 'questions[] required' });
+  }
+  try {
+    for (const q of questions) {
+      if (!q.question_text || !q.option_a || !q.option_b || !q.option_c || !q.option_d || !q.correct_option) {
+        return res.status(400).json({ error: 'All question fields required (text + 4 options + correct)' });
+      }
+      await db.execute({
+        sql: `INSERT INTO exam_questions (exam_id, question_text, option_a, option_b, option_c, option_d, correct_option, marks)
+              VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+        args: [examId, q.question_text, q.option_a, q.option_b, q.option_c, q.option_d,
+               q.correct_option.toUpperCase(), Number(q.marks) || 1],
+      });
+    }
+    res.json({ ok: true, added: questions.length });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ─── ADMIN: Delete exam ───
+app.delete('/api/admin/exams/:id', authAdmin, async (req, res) => {
+  try {
+    await db.execute({ sql: 'DELETE FROM exam_attempts WHERE exam_id = ?', args: [req.params.id] });
+    await db.execute({ sql: 'DELETE FROM exam_questions WHERE exam_id = ?', args: [req.params.id] });
+    await db.execute({ sql: 'DELETE FROM exams WHERE id = ?', args: [req.params.id] });
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ─── LECTURER: Create exam (only for their assigned courses) ───
+app.post('/api/lecturer/exams', authLecturer, async (req, res) => {
+  const { course_id, title, description, duration_minutes, total_marks, questions } = req.body;
+  if (!course_id || !title || !duration_minutes) {
+    return res.status(400).json({ error: 'course_id, title, and duration_minutes required' });
+  }
+  try {
+    // Verify lecturer teaches this course
+    const check = await db.execute({
+      sql: 'SELECT 1 FROM lecturer_courses WHERE lecturer_id = ? AND course_id = ?',
+      args: [req.lecturer.id, course_id],
+    });
+    if (!check.rows.length) {
+      return res.status(403).json({ error: 'You are not assigned to this course' });
+    }
+
+    const info = await db.execute({
+      sql: `INSERT INTO exams (course_id, title, description, duration_minutes, total_marks, created_by)
+            VALUES (?, ?, ?, ?, ?, ?)`,
+      args: [course_id, title, description || '', duration_minutes, total_marks || 100, req.lecturer.id],
+    });
+    const examId = Number(info.lastInsertRowid);
+
+    // Insert questions if provided
+    if (Array.isArray(questions) && questions.length) {
+      for (const q of questions) {
+        if (q.question_text && q.option_a && q.option_b && q.option_c && q.option_d && q.correct_option) {
+          await db.execute({
+            sql: `INSERT INTO exam_questions (exam_id, question_text, option_a, option_b, option_c, option_d, correct_option, marks)
+                  VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+            args: [examId, q.question_text, q.option_a, q.option_b, q.option_c, q.option_d,
+                   q.correct_option.toUpperCase(), Number(q.marks) || 1],
+          });
+        }
+      }
+    }
+
+    res.json({ ok: true, id: examId, question_count: (questions || []).length });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ─── LECTURER: List exams for their courses ───
+app.get('/api/lecturer/exams', authLecturer, async (req, res) => {
+  try {
+    const r = await db.execute({
+      sql: `
+        SELECT e.*, c.code, c.title AS course_title,
+          (SELECT COUNT(*) FROM exam_questions WHERE exam_id = e.id) AS question_count,
+          (SELECT COUNT(*) FROM exam_attempts WHERE exam_id = e.id AND status = 'submitted') AS submission_count
+        FROM exams e
+        JOIN courses c ON c.id = e.course_id
+        JOIN lecturer_courses lc ON lc.course_id = c.id
+        WHERE lc.lecturer_id = ?
+        ORDER BY e.id DESC
+      `,
+      args: [req.lecturer.id],
+    });
+    res.json(r.rows);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ─── LECTURER: View exam submissions ───
+app.get('/api/lecturer/exams/:id/submissions', authLecturer, async (req, res) => {
+  try {
+    const check = await db.execute({
+      sql: `SELECT 1 FROM exams e
+            JOIN lecturer_courses lc ON lc.course_id = e.course_id
+            WHERE e.id = ? AND lc.lecturer_id = ?`,
+      args: [req.params.id, req.lecturer.id],
+    });
+    if (!check.rows.length) return res.status(403).json({ error: 'Not allowed' });
+
+    const r = await db.execute({
+      sql: `SELECT a.*, s.reg_no, s.name AS student_name
+            FROM exam_attempts a
+            JOIN students s ON s.id = a.student_id
+            WHERE a.exam_id = ? AND a.status = 'submitted'
+            ORDER BY a.submitted_at DESC`,
+      args: [req.params.id],
+    });
+    res.json(r.rows);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ─── STUDENT: List available exams ───
+app.get('/api/student/exams', authStudent, async (req, res) => {
+  try {
+    const r = await db.execute({
+      sql: `SELECT DISTINCT e.*, c.code, c.title AS course_title,
+              (SELECT id FROM exam_attempts WHERE exam_id = e.id AND student_id = ? AND status = 'submitted') as submitted_attempt,
+              (SELECT status FROM exam_attempts WHERE exam_id = e.id AND student_id = ? AND status = 'in_progress' LIMIT 1) as in_progress
+              FROM exams e
+              LEFT JOIN courses c ON c.id = e.course_id
+              JOIN enrollments en ON en.course_id = e.course_id AND en.student_id = ?
+            WHERE e.is_active = 1
+            ORDER BY e.id DESC`,
+      args: [req.user.id, req.user.id, req.user.id],
+    });
+    res.json(r.rows);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ─── STUDENT: Start or resume an exam ───
+app.post('/api/student/exams/:id/start', authStudent, async (req, res) => {
+  const examId = req.params.id;
+  try {
+    const exam = await db.execute({ sql: 'SELECT * FROM exams WHERE id = ? AND is_active = 1', args: [examId] });
+    if (!exam.rows.length) return res.status(404).json({ error: 'Exam not found or inactive' });
+    const e = exam.rows[0];
+
+    // Verify student is enrolled in the course
+    const enrolled = await db.execute({
+      sql: 'SELECT 1 FROM enrollments WHERE student_id = ? AND course_id = ?',
+      args: [req.user.id, e.course_id],
+    });
+    if (!enrolled.rows.length) return res.status(403).json({ error: 'You are not enrolled in this course' });
+
+    // Check for existing attempt
+    const existing = await db.execute({
+      sql: "SELECT * FROM exam_attempts WHERE exam_id = ? AND student_id = ?",
+      args: [examId, req.user.id],
+    });
+
+    let attemptId, startedAt, answers = {};
+
+    if (existing.rows.length) {
+      const att = existing.rows[0];
+      if (att.status === 'submitted') {
+        return res.status(403).json({ error: 'You have already submitted this exam.' });
+      }
+      attemptId = att.id;
+      startedAt = att.started_at;
+      try { answers = JSON.parse(att.answers_json || '{}'); } catch (_) {}
+    } else {
+      startedAt = new Date().toISOString();
+      const ins = await db.execute({
+        sql: 'INSERT INTO exam_attempts (exam_id, student_id, started_at) VALUES (?, ?, ?)',
+        args: [examId, req.user.id, startedAt],
+      });
+      attemptId = Number(ins.lastInsertRowid);
+    }
+
+    // Calculate remaining time based on server clock
+    const durationMs = e.duration_minutes * 60000;
+    const elapsed = Date.now() - new Date(startedAt).getTime();
+    const remainingSeconds = Math.max(0, Math.floor((durationMs - elapsed) / 1000));
+
+    // Auto-submit if time ran out while they were away
+    if (remainingSeconds === 0) {
+      const qs = await db.execute({ sql: 'SELECT id, correct_option, marks FROM exam_questions WHERE exam_id = ?', args: [examId] });
+      let score = 0, total = 0;
+      qs.rows.forEach(q => {
+        total += q.marks;
+        if (answers[q.id] === q.correct_option) score += q.marks;
+      });
+      await db.execute({
+        sql: "UPDATE exam_attempts SET submitted_at = CURRENT_TIMESTAMP, score = ?, total_marks = ?, status = 'submitted' WHERE id = ?",
+        args: [score, total, attemptId],
+      });
+      return res.status(403).json({ error: 'Time expired. Exam auto-submitted.', score, total });
+    }
+
+    // Fetch questions without correct answers
+    const questions = await db.execute({
+      sql: 'SELECT id, question_text, option_a, option_b, option_c, option_d, marks FROM exam_questions WHERE exam_id = ? ORDER BY id',
+      args: [examId],
+    });
+
+    res.json({
+      attempt_id: attemptId,
+      remaining_seconds: remainingSeconds,
+      exam: { id: e.id, title: e.title, description: e.description, duration_minutes: e.duration_minutes, total_marks: e.total_marks, code: e.code },
+      questions: questions.rows,
+      saved_answers: answers,
+    });
+  } catch (err) {
+    console.error('Exam start error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ─── STUDENT: Save answers (autosave) ───
+app.post('/api/student/exams/:attemptId/save', authStudent, async (req, res) => {
+  const { answers } = req.body;
+  try {
+    const check = await db.execute({
+      sql: "SELECT * FROM exam_attempts WHERE id = ? AND student_id = ? AND status = 'in_progress'",
+      args: [req.params.attemptId, req.user.id],
+    });
+    if (!check.rows.length) return res.status(403).json({ error: 'Invalid or already submitted' });
+
+    await db.execute({
+      sql: 'UPDATE exam_attempts SET answers_json = ? WHERE id = ?',
+      args: [JSON.stringify(answers || {}), req.params.attemptId],
+    });
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ─── STUDENT: Submit exam ───
+app.post('/api/student/exams/:attemptId/submit', authStudent, async (req, res) => {
+  const attemptId = req.params.attemptId;
+  const { answers } = req.body;
+
+  try {
+    const attempt = await db.execute({
+      sql: 'SELECT * FROM exam_attempts WHERE id = ? AND student_id = ?',
+      args: [attemptId, req.user.id],
+    });
+    if (!attempt.rows.length || attempt.rows[0].status === 'submitted') {
+      return res.status(400).json({ error: 'Invalid attempt or already submitted.' });
+    }
+
+    const att = attempt.rows[0];
+    const examId = att.exam_id;
+
+    // Enforce server-side time limit
+    const exam = await db.execute({ sql: 'SELECT duration_minutes FROM exams WHERE id = ?', args: [examId] });
+    const durationMs = exam.rows[0].duration_minutes * 60000;
+    const elapsed = Date.now() - new Date(att.started_at).getTime();
+    const isLate = elapsed > durationMs + 60000; // allow 60s grace for network
+
+    // Grade
+    const questions = await db.execute({
+      sql: 'SELECT id, correct_option, marks FROM exam_questions WHERE exam_id = ?',
+      args: [examId],
+    });
+    let score = 0, total = 0;
+    questions.rows.forEach(q => {
+      total += q.marks;
+      if (answers && answers[q.id] === q.correct_option) score += q.marks;
+    });
+
+    await db.execute({
+      sql: "UPDATE exam_attempts SET submitted_at = CURRENT_TIMESTAMP, score = ?, total_marks = ?, status = 'submitted', answers_json = ? WHERE id = ?",
+      args: [score, total, JSON.stringify(answers || {}), attemptId],
+    });
+
+    // Sync to results table so it appears on transcripts
+    const examMeta = await db.execute({ sql: 'SELECT course_id, title FROM exams WHERE id = ?', args: [examId] });
+    if (examMeta.rows.length) {
+      const { course_id, title } = examMeta.rows[0];
+      const percentage = total > 0 ? Math.round((score / total) * 100) : 0;
+      await db.execute({
+        sql: 'INSERT INTO results (student_id, course_id, marks, grade, term) VALUES (?, ?, ?, ?, ?)',
+        args: [req.user.id, course_id, percentage, calcGrade(percentage), `Exam: ${title}`],
+      });
+    }
+
+    res.json({
+      ok: true,
+      score,
+      total,
+      percentage: total > 0 ? Math.round((score / total) * 100) : 0,
+      late: isLate,
+    });
+  } catch (err) {
+    console.error('Exam submit error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ─── ADMIN: List questions for an exam ───
+app.get('/api/admin/exams/:id/questions', authAdmin, async (req, res) => {
+  try {
+    const r = await db.execute({
+      sql: 'SELECT * FROM exam_questions WHERE exam_id = ? ORDER BY id',
+      args: [req.params.id],
+    });
+    res.json(r.rows);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ─── ADMIN: Delete a single question ───
+app.delete('/api/admin/exams/:examId/questions/:questionId', authAdmin, async (req, res) => {
+  try {
+    await db.execute({
+      sql: 'DELETE FROM exam_questions WHERE id = ? AND exam_id = ?',
+      args: [req.params.questionId, req.params.examId],
+    });
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ─── LECTURER: List questions for own exam ───
+app.get('/api/lecturer/exams/:id/questions', authLecturer, async (req, res) => {
+  try {
+    const check = await db.execute({
+      sql: `SELECT 1 FROM exams e JOIN lecturer_courses lc ON lc.course_id = e.course_id
+            WHERE e.id = ? AND lc.lecturer_id = ?`,
+      args: [req.params.id, req.lecturer.id],
+    });
+    if (!check.rows.length) return res.status(403).json({ error: 'Not your exam' });
+
+    const r = await db.execute({
+      sql: 'SELECT * FROM exam_questions WHERE exam_id = ? ORDER BY id',
+      args: [req.params.id],
+    });
+    res.json(r.rows);
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// ─── LECTURER: Add questions to own exam ───
+app.post('/api/lecturer/exams/:id/questions', authLecturer, async (req, res) => {
+  const examId = req.params.id;
+  const { questions } = req.body;
+  if (!Array.isArray(questions) || !questions.length) return res.status(400).json({ error: 'questions[] required' });
+
+  try {
+    const check = await db.execute({
+      sql: `SELECT 1 FROM exams e JOIN lecturer_courses lc ON lc.course_id = e.course_id
+            WHERE e.id = ? AND lc.lecturer_id = ?`,
+      args: [examId, req.lecturer.id],
+    });
+    if (!check.rows.length) return res.status(403).json({ error: 'Not your exam' });
+
+    for (const q of questions) {
+      if (!q.question_text || !q.option_a || !q.option_b || !q.option_c || !q.option_d || !q.correct_option) {
+        return res.status(400).json({ error: 'All question fields required' });
+      }
+      await db.execute({
+        sql: `INSERT INTO exam_questions (exam_id, question_text, option_a, option_b, option_c, option_d, correct_option, marks)
+              VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+        args: [examId, q.question_text, q.option_a, q.option_b, q.option_c, q.option_d,
+               q.correct_option.toUpperCase(), Number(q.marks) || 1],
+      });
+    }
+    res.json({ ok: true, added: questions.length });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
 // ---------- SEO: dynamic sitemap ----------
 app.get('/sitemap.xml', async (req, res) => {
   const base = 'https://heraldtrainer.co.ke';
@@ -2042,3 +2462,106 @@ app.get('/api/health', (req, res) => {
   });
 });
 app.listen(PORT, () => console.log(`Herald Portal running on http://localhost:${PORT}`));
+
+app.get('/api/student/exams', authStudent, async (req, res) => {
+  try {
+    const r = await db.execute({
+      sql: `SELECT e.*, c.code, c.title AS course_title,
+              (SELECT id FROM exam_attempts WHERE exam_id = e.id AND student_id = ? AND status = 'submitted') as submitted_attempt
+            FROM exams e 
+            JOIN courses c ON c.id = e.course_id
+            JOIN enrollments en ON en.course_id = e.course_id AND en.student_id = ?
+            WHERE e.is_active = 1`,
+      args: [req.user.id, req.user.id]
+    });
+    res.json(r.rows);
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.post('/api/student/exams/:id/start', authStudent, async (req, res) => {
+  const examId = req.params.id;
+  try {
+    const exam = await db.execute({ sql: 'SELECT * FROM exams WHERE id = ?', args: [examId] });
+    if (!exam.rows.length) return res.status(404).json({ error: 'Exam not found' });
+    
+    const existing = await db.execute({
+      sql: "SELECT * FROM exam_attempts WHERE exam_id = ? AND student_id = ? AND status = 'in_progress'",
+      args: [examId, req.user.id]
+    });
+
+    let attemptId, startedAt;
+    if (existing.rows.length) {
+      attemptId = existing.rows[0].id;
+      startedAt = existing.rows[0].started_at;
+    } else {
+      // Check if they already submitted
+      const submitted = await db.execute({
+        sql: "SELECT id FROM exam_attempts WHERE exam_id = ? AND student_id = ? AND status = 'submitted'",
+        args: [examId, req.user.id]
+      });
+      if (submitted.rows.length) return res.status(403).json({ error: 'You have already taken this exam.' });
+
+      startedAt = new Date().toISOString();
+      const ins = await db.execute({
+        sql: 'INSERT INTO exam_attempts (exam_id, student_id, started_at) VALUES (?, ?, ?)',
+        args: [examId, req.user.id, startedAt]
+      });
+      attemptId = ins.lastInsertRowid;
+    }
+
+    // Calculate remaining time (in seconds)
+    const durationMs = exam.rows[0].duration_minutes * 60000;
+    const elapsed = Date.now() - new Date(startedAt).getTime();
+    const remainingSeconds = Math.max(0, Math.floor((durationMs - elapsed) / 1000));
+
+    // Fetch questions WITHOUT the correct answers
+    const questions = await db.execute({
+      sql: 'SELECT id, question_text, option_a, option_b, option_c, option_d, marks FROM exam_questions WHERE exam_id = ?',
+      args: [examId]
+    });
+
+    res.json({
+      attempt_id: attemptId,
+      remaining_seconds: remainingSeconds,
+      exam: exam.rows[0],
+      questions: questions.rows
+    });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.post('/api/student/exams/:attemptId/submit', authStudent, async (req, res) => {
+  const attemptId = req.params.attemptId;
+  const { answers } = req.body; // { questionId: 'A' }
+
+  try {
+    const attempt = await db.execute({
+      sql: 'SELECT * FROM exam_attempts WHERE id = ? AND student_id = ?',
+      args: [attemptId, req.user.id]
+    });
+    if (!attempt.rows.length || attempt.rows[0].status === 'submitted') {
+      return res.status(400).json({ error: 'Invalid attempt or already submitted.' });
+    }
+
+    const examId = attempt.rows[0].exam_id;
+    const questions = await db.execute({ sql: 'SELECT id, correct_option, marks FROM exam_questions WHERE exam_id = ?', args: [examId] });
+    
+    let score = 0;
+    questions.rows.forEach(q => {
+      if (answers[q.id] === q.correct_option) score += q.marks;
+    });
+
+    await db.execute({
+      sql: "UPDATE exam_attempts SET submitted_at = CURRENT_TIMESTAMP, score = ?, status = 'submitted', answers_json = ? WHERE id = ?",
+      args: [score, JSON.stringify(answers), attemptId]
+    });
+
+    // Automatically sync this score to the main results table so it shows on transcripts
+    const examMeta = await db.execute({ sql: 'SELECT course_id, title FROM exams WHERE id = ?', args: [examId] });
+    await db.execute({
+      sql: 'INSERT INTO results (student_id, course_id, marks, grade, term) VALUES (?, ?, ?, ?, ?)',
+      args: [req.user.id, examMeta.rows[0].course_id, score, calcGrade(score), `Exam: ${examMeta.rows[0].title}`]
+    });
+
+    res.json({ ok: true, score, total: questions.rows.reduce((a, b) => a + b.marks, 0) });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});

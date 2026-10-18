@@ -19,7 +19,61 @@
       } catch (e) {}
     })();
   </script>
-  <style>.dark-preload body { background: #0b1220; }</style>
+  <style>
+    .dark-preload body { background: #0b1220; }
+    
+    /* Exam card styles */
+    .exam-card-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+      padding: 14px 16px;
+      border-bottom: 1px solid #e6e9ed;
+      flex-wrap: wrap;
+    }
+    .exam-card-item:last-child { border-bottom: 0; }
+    .exam-info { flex: 1 1 200px; min-width: 0; }
+    .exam-info .exam-title { font-weight: 700; color: #10243a; font-size: 14px; margin-bottom: 3px; }
+    .exam-info .exam-meta { font-size: 11.5px; color: #647386; }
+    .exam-badge {
+      display: inline-block;
+      padding: 3px 9px;
+      border-radius: 999px;
+      font-size: 10px;
+      font-weight: 800;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      margin-right: 6px;
+    }
+    .exam-badge-pending { background: #fef3c7; color: #92400e; }
+    .exam-badge-progress { background: #dbeafe; color: #1e40af; }
+    .exam-badge-done { background: #eaf3ef; color: #2d6d59; }
+    .exam-btn {
+      display: inline-block;
+      padding: 8px 16px;
+      background: #10243a;
+      color: #fff;
+      border-radius: 7px;
+      text-decoration: none;
+      font-size: 12px;
+      font-weight: 700;
+      white-space: nowrap;
+      transition: background 0.15s;
+    }
+    .exam-btn:hover { background: #1d405e; }
+    .exam-btn.done {
+      background: #eaf3ef;
+      color: #2d6d59;
+      cursor: default;
+    }
+    .exam-empty {
+      padding: 20px;
+      color: #647386;
+      font-size: 13px;
+      text-align: center;
+    }
+  </style>
 </head>
 <body>
   <header class="topbar">
@@ -61,6 +115,15 @@
 </section>
 
     <div class="grid">
+      <!-- ═══ NEW: Exams section ═══ -->
+      <section class="card wide">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+          <h3 style="margin:0;">📝 My Exams</h3>
+          <a href="student-exams.html" style="font-size:12px; color:#b77b16; font-weight:700; text-decoration:none;">View all →</a>
+        </div>
+        <div id="examsList"><div class="exam-empty">Loading exams...</div></div>
+      </section>
+
       <section class="card">
         <h3>Announcements</h3>
         <ul id="announcements" class="list"></ul>
@@ -118,6 +181,58 @@
   </main>
 
   <div id="toastWrap" class="toast-wrap"></div>
+
+  <!-- Exam loading script (additive — app.js handles the rest) -->
+  <script>
+    (async function loadExams() {
+      const wrap = document.getElementById('examsList');
+      if (!wrap) return;
+
+      try {
+        const res = await fetch('/api/student/exams', { credentials: 'same-origin' });
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        const exams = await res.json();
+
+        if (!exams.length) {
+          wrap.innerHTML = '<div class="exam-empty">No exams available yet. Check back later.</div>';
+          return;
+        }
+
+        wrap.innerHTML = exams.map(e => {
+          let badge, action;
+          if (e.submitted_attempt) {
+            badge = '<span class="exam-badge exam-badge-done">Completed</span>';
+            action = '<span class="exam-btn done">Done</span>';
+          } else if (e.in_progress) {
+            badge = '<span class="exam-badge exam-badge-progress">In Progress</span>';
+            action = `<a href="exam.html?id=${e.id}" class="exam-btn">Resume →</a>`;
+          } else {
+            badge = '<span class="exam-badge exam-badge-pending">Not Started</span>';
+            action = `<a href="exam.html?id=${e.id}" class="exam-btn">Start →</a>`;
+          }
+
+          return `
+            <div class="exam-card-item">
+              <div class="exam-info">
+                <div class="exam-title">${escapeHtml(e.title)}</div>
+                <div class="exam-meta">
+                  ${escapeHtml(e.code || '')} · ${e.duration_minutes} min · ${e.total_marks} marks
+                </div>
+              </div>
+              <div>${badge}${action}</div>
+            </div>
+          `;
+        }).join('');
+      } catch (err) {
+        wrap.innerHTML = '<div class="exam-empty">Could not load exams. ' + escapeHtml(err.message) + '</div>';
+      }
+
+      function escapeHtml(s) {
+        return String(s || '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+      }
+    })();
+  </script>
+
   <script src="app.js"></script>
   <script src="home-button.js"></script>
 </body>

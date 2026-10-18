@@ -18,6 +18,7 @@ console.log(`📁 Database: Turso (${TURSO_URL.split('//')[1]?.split('.')[0] || 
 
 async function initSchema() {
   const statements = [
+    // ─── Core ───
     `CREATE TABLE IF NOT EXISTS students (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       reg_no TEXT UNIQUE NOT NULL,
@@ -156,19 +157,48 @@ async function initSchema() {
       student_id INTEGER NOT NULL,
       viewed_at DATETIME DEFAULT CURRENT_TIMESTAMP
     )`,
-        `CREATE TABLE IF NOT EXISTS lecturer_courses (
+    // ─── Lecturer-Course assignments (defined ONCE) ───
+    `CREATE TABLE IF NOT EXISTS lecturer_courses (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       lecturer_id INTEGER NOT NULL,
       course_id INTEGER NOT NULL,
       assigned_at DATETIME DEFAULT CURRENT_TIMESTAMP,
       UNIQUE(lecturer_id, course_id)
     )`,
-        `CREATE TABLE IF NOT EXISTS lecturer_courses (
+
+    // ─── EXAM SYSTEM ───
+    `CREATE TABLE IF NOT EXISTS exams (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
-      lecturer_id INTEGER NOT NULL,
       course_id INTEGER NOT NULL,
-      assigned_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-      UNIQUE(lecturer_id, course_id)
+      title TEXT NOT NULL,
+      description TEXT,
+      duration_minutes INTEGER NOT NULL DEFAULT 60,
+      total_marks INTEGER NOT NULL DEFAULT 100,
+      is_active INTEGER DEFAULT 1,
+      created_by INTEGER,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    )`,
+    `CREATE TABLE IF NOT EXISTS exam_questions (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      exam_id INTEGER NOT NULL,
+      question_text TEXT NOT NULL,
+      option_a TEXT NOT NULL,
+      option_b TEXT NOT NULL,
+      option_c TEXT NOT NULL,
+      option_d TEXT NOT NULL,
+      correct_option TEXT NOT NULL,
+      marks INTEGER DEFAULT 1
+    )`,
+    `CREATE TABLE IF NOT EXISTS exam_attempts (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      exam_id INTEGER NOT NULL,
+      student_id INTEGER NOT NULL,
+      started_at DATETIME NOT NULL,
+      submitted_at DATETIME,
+      score INTEGER,
+      total_marks INTEGER,
+      status TEXT DEFAULT 'in_progress',
+      answers_json TEXT
     )`,
   ];
 
@@ -181,7 +211,7 @@ async function initSchema() {
 async function seed() {
   const courseCount = await client.execute('SELECT COUNT(*) AS c FROM courses');
   if (courseCount.rows[0].c === 0) {
-        const courses = [
+    const courses = [
       // Short courses
       ['SC001', 'Digital Marketing & Social Media Marketing', 'Unassigned', '2-4 weeks', 'Short'],
       ['SC002', 'AI for Business & Productivity', 'Unassigned', '1-2 weeks', 'Short'],
@@ -225,7 +255,7 @@ async function seed() {
     for (const c of courses) {
       await client.execute({
         sql: 'INSERT OR IGNORE INTO courses (code, title, trainer, description) VALUES (?, ?, ?, ?)',
-        args: [c[0], c[1], c[2], c[4]],  // code, title, trainer, category as description
+        args: [c[0], c[1], c[2], c[4]],
       });
     }
 
