@@ -10,6 +10,7 @@ const path = require('path');
 const fs = require('fs');
 const multer = require('multer');
 const db = require('./database');
+const PDFDocument = require('pdfkit');
 const { sendSMS } = require('./sms');
 
 // ---------- Global BigInt JSON fix ----------
