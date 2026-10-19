@@ -642,7 +642,8 @@ app.get('/api/my-transcript', authStudent, async (req, res) => {
   });
 });
 
-const PDFDocument = require('pdfkit');
+
+// ---------- Download PDF Transcript ----------
 
 // ---------- Download PDF Transcript ----------
 app.get('/api/student/transcript/pdf', authStudent, async (req, res) => {
@@ -665,7 +666,7 @@ app.get('/api/student/transcript/pdf', authStudent, async (req, res) => {
     const results = rRes.rows;
 
     // 3. Create the PDF
-    const doc = new PDFDocument({ margin: 50 });
+    const doc = new PDFDocument({ margin: 50, size: 'A4' });
 
     // Set response headers to trigger a file download
     res.setHeader('Content-Type', 'application/pdf');
@@ -674,71 +675,103 @@ app.get('/api/student/transcript/pdf', authStudent, async (req, res) => {
     // Pipe the PDF directly to the response
     doc.pipe(res);
 
-    // --- Header ---
-    doc.fontSize(20).font('Helvetica-Bold').text('HERALD TRAINER AND CONSULTANT', { align: 'center' });
-    doc.fontSize(10).font('Helvetica').text('Mombasa, Kenya | info@heraldtrainer.co.ke | +254 107 004 000', { align: 'center' });
+    // --- 1. BACKGROUND COLOR (Light Brown / Parchment) ---
+    doc.rect(0, 0, doc.page.width, doc.page.height).fill('#fcf8f2');
+    
+    // Draw a thin border
+    doc.rect(20, 20, doc.page.width - 40, doc.page.height - 40).lineWidth(2).stroke('#d4c4b7');
+    doc.rect(25, 25, doc.page.width - 50, doc.page.height - 50).lineWidth(1).stroke('#d4c4b7');
+
+    // --- 2. LOGO & HEADER ---
+    // Note: Ensure the path to the logo is correct for your server
+    const logoPath = path.join(__dirname, 'public', 'images', 'herald-logo.png');
+    try {
+      doc.image(logoPath, doc.page.width / 2 - 30, 60, { width: 60 });
+    } catch (e) {
+      console.log('Logo not found for PDF, skipping image.');
+    }
+
+    doc.fontSize(22).font('Helvetica-Bold').fillColor('#10243a').text('HERALD TRAINER AND CONSULTANT', { align: 'center' });
+    doc.fontSize(10).font('Helvetica').fillColor('#555555').text('Mombasa, Kenya | info@heraldtrainer.co.ke | +254 107 004 000', { align: 'center' });
+    doc.moveDown(1.5);
+
+    doc.fontSize(16).font('Helvetica-Bold').fillColor('#10243a').text('OFFICIAL ACADEMIC TRANSCRIPT', { align: 'center', underline: true });
     doc.moveDown(2);
 
-    doc.fontSize(16).font('Helvetica-Bold').text('OFFICIAL ACADEMIC TRANSCRIPT', { align: 'center', underline: true });
-    doc.moveDown(2);
-
-    // --- Student Info ---
-    doc.fontSize(12).font('Helvetica-Bold').text('Student Information:');
-    doc.font('Helvetica').fontSize(11);
+    // --- 3. STUDENT INFO ---
+    doc.fontSize(12).font('Helvetica-Bold').fillColor('#10243a').text('Student Information:');
+    doc.font('Helvetica').fontSize(11).fillColor('#333333');
     doc.text(`Name: ${student.name}`);
     doc.text(`Registration Number: ${student.reg_no}`);
     doc.text(`Program: ${student.course}`);
     doc.text(`Email: ${student.email}`);
-    doc.text(`Date Generated: ${new Date().toLocaleDateString('en-KE')}`);
     doc.moveDown(2);
 
-        // --- Results Table ---
-    doc.fontSize(12).font('Helvetica-Bold').text('Academic Results:');
+    // --- 4. RESULTS TABLE ---
+    doc.fontSize(12).font('Helvetica-Bold').fillColor('#10243a').text('Academic Results:');
     doc.moveDown(0.5);
 
-    // Define column X positions
     const colCode = 50;
     const colTitle = 100;
     const colTerm = 320;
     const colMarks = 460;
     const colGrade = 510;
 
-    // Table header
     const tableTop = doc.y;
-    doc.fontSize(10).font('Helvetica-Bold');
+    doc.fontSize(10).font('Helvetica-Bold').fillColor('#333333');
     doc.text('Code', colCode, tableTop);
     doc.text('Course Title', colTitle, tableTop);
     doc.text('Term', colTerm, tableTop);
     doc.text('Marks', colMarks, tableTop);
     doc.text('Grade', colGrade, tableTop);
 
-    // Draw a line
-    doc.moveTo(50, tableTop + 15).lineTo(550, tableTop + 15).stroke();
+    doc.moveTo(50, tableTop + 15).lineTo(550, tableTop + 15).strokeColor('#d4c4b7').lineWidth(1).stroke();
 
-    // Table rows
     let y = tableTop + 25;
-    doc.font('Helvetica').fontSize(10);
+    doc.font('Helvetica').fontSize(10).fillColor('#000000');
     
     results.forEach(r => {
       doc.text(r.course_code, colCode, y);
-      // width: 210 prevents the title from bleeding into the Term column
       doc.text(r.course_title, colTitle, y, { width: 210 }); 
-      // width: 130 prevents the term from bleeding into the Marks column
       doc.text(r.term, colTerm, y, { width: 130 });
       doc.text(r.marks.toString(), colMarks, y);
       doc.text(r.grade, colGrade, y);
-      
-      // Move down for next row. Use Math.max in case the title wrapped to a second line
       y = Math.max(y + 20, doc.y + 20); 
     });
 
-    doc.moveDown(2);
+    doc.moveDown(4);
     
-    // --- Footer (Reset X position to 50 so it spans full width) ---
-    doc.fontSize(10).font('Helvetica-Oblique').text(
+    // --- 5. OFFICIAL DATED STAMP ---
+    const stampX = 420;
+    const stampY = doc.y + 20;
+    const stampRadius = 45;
+
+    // Draw the stamp (Double circle + text)
+    doc.save();
+    doc.translate(stampX, stampY);
+    doc.rotate(-15); // Slight tilt for a physical stamp effect
+    
+    // Outer circle
+    doc.circle(0, 0, stampRadius).lineWidth(2).strokeColor('#b91c1c').stroke();
+    // Inner circle
+    doc.circle(0, 0, stampRadius - 4).lineWidth(1).strokeColor('#b91c1c').stroke();
+    
+    // Stamp Text
+    doc.fontSize(8).font('Helvetica-Bold').fillColor('#b91c1c').text('HERALD TRAINER', -40, -20, { width: 80, align: 'center' });
+    doc.text('AND CONSULTANT', -40, -10, { width: 80, align: 'center' });
+    
+    // The Date inside the stamp
+    const dateStr = new Date().toLocaleDateString('en-GB').replace(/\//g, ' . ');
+    doc.fontSize(10).text(dateStr, -40, 5, { width: 80, align: 'center' });
+    
+    doc.text('VERIFIED', -40, 20, { width: 80, align: 'center' });
+    doc.restore();
+
+    // --- 6. SIGNATURE & FOOTER ---
+    doc.fontSize(10).font('Helvetica-Oblique').fillColor('#555555').text(
       'This is a computer-generated transcript and does not require a physical signature.', 
       50, 
-      doc.y, 
+      doc.page.height - 80, 
       { align: 'center', width: 500 }
     );
     
@@ -747,7 +780,6 @@ app.get('/api/student/transcript/pdf', authStudent, async (req, res) => {
 
   } catch (err) {
     console.error('PDF Generation Error:', err);
-    // If headers haven't been sent yet, send an error
     if (!res.headersSent) {
       res.status(500).json({ error: 'Could not generate PDF transcript.' });
     }
