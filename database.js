@@ -37,7 +37,7 @@ async function initSchema() {
       role TEXT DEFAULT 'trainer',
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP
     )`,
-    `CREATE TABLE IF NOT EXISTS lecturers (
+        `CREATE TABLE IF NOT EXISTS lecturers (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       staff_no TEXT UNIQUE NOT NULL,
       name TEXT NOT NULL,
@@ -51,7 +51,10 @@ async function initSchema() {
       status TEXT DEFAULT 'pending',
       approved INTEGER DEFAULT 0,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-      approved_at DATETIME
+      approved_at DATETIME,
+      cv_url TEXT,
+      cover_letter_url TEXT,
+      testimonials_url TEXT
     )`,
     `CREATE TABLE IF NOT EXISTS courses (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
