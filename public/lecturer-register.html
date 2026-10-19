@@ -98,7 +98,7 @@
         <p>Join the Herald teaching team</p>
       </div>
       <div class="body">
-        <form id="lecturerRegForm">
+        <form id="lecturerRegForm" enctype="multipart/form-data"></form>
           <div class="form-group">
             <label for="name">Full Name</label>
             <input id="name" name="name" required />
@@ -129,6 +129,21 @@
           <div class="form-group">
             <label for="bio">Short Bio</label>
             <textarea id="bio" name="bio" placeholder="Tell us about your teaching experience..."></textarea>
+          </div>
+
+                    <div class="form-group">
+            <label for="cv">Upload CV (PDF, DOCX)</label>
+            <input id="cv" name="cv" type="file" accept=".pdf,.doc,.docx" />
+          </div>
+
+          <div class="form-group">
+            <label for="cover_letter">Upload Cover Letter (PDF, DOCX)</label>
+            <input id="cover_letter" name="cover_letter" type="file" accept=".pdf,.doc,.docx" />
+          </div>
+
+          <div class="form-group">
+            <label for="testimonials">Upload Testimonials / Certificates (PDF, Image)</label>
+            <input id="testimonials" name="testimonials" type="file" accept=".pdf,.jpg,.jpeg,.png" />
           </div>
 
           <div class="form-group">
@@ -178,7 +193,7 @@
   <script>
     const $ = (s) => document.querySelector(s);
 
-    $('#lecturerRegForm').addEventListener('submit', async (e) => {
+        $('#lecturerRegForm').addEventListener('submit', async (e) => {
       e.preventDefault();
       const form = e.target;
       const btn = $('#submitBtn');
@@ -189,21 +204,24 @@
       btn.disabled = true;
       btn.textContent = 'Submitting...';
 
-      const data = {
-        name: form.name.value.trim(),
-        email: form.email.value.trim().toLowerCase(),
-        phone: form.phone.value.trim(),
-        qualification: form.qualification.value.trim(),
-        specialization: form.specialization.value.trim(),
-        bio: form.bio.value.trim(),
-        password: form.password.value,
-      };
+      // Use FormData for file uploads
+      const formData = new FormData();
+      formData.append('name', form.name.value.trim());
+      formData.append('email', form.email.value.trim().toLowerCase());
+      formData.append('phone', form.phone.value.trim());
+      formData.append('qualification', form.qualification.value.trim());
+      formData.append('specialization', form.specialization.value.trim());
+      formData.append('bio', form.bio.value.trim());
+      formData.append('password', form.password.value);
+
+      if (form.cv.files[0]) formData.append('cv', form.cv.files[0]);
+      if (form.cover_letter.files[0]) formData.append('cover_letter', form.cover_letter.files[0]);
+      if (form.testimonials.files[0]) formData.append('testimonials', form.testimonials.files[0]);
 
       try {
         const res = await fetch('/api/lecturer/register', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(data),
+          body: formData, // Do NOT set Content-Type header, browser sets it automatically with boundary
         });
         const json = await res.json();
 
