@@ -98,7 +98,7 @@
         <p>Join the Herald teaching team</p>
       </div>
       <div class="body">
-        <form id="lecturerRegForm" enctype="multipart/form-data"></form>
+        <form id="lecturerRegForm" enctype="multipart/form-data">
           <div class="form-group">
             <label for="name">Full Name</label>
             <input id="name" name="name" required />
@@ -190,70 +190,83 @@
     </div>
   </div>
 
-    <script>
-    const $ = (s) => document.querySelector(s);
-
-    document.getElementById('lecturerRegForm').addEventListener('submit', async (e) => {
-      e.preventDefault();
-      
-      const form = e.target;
+      <script>
+    document.addEventListener('DOMContentLoaded', () => {
+      const form = document.getElementById('lecturerRegForm');
       const btn = document.getElementById('submitBtn');
       const msg = document.getElementById('formMsg');
 
-      msg.className = 'msg';
-      msg.textContent = '';
-      btn.disabled = true;
-      btn.textContent = 'Submitting...';
+      if (!form) {
+        console.error("❌ Could not find form with id 'lecturerRegForm'");
+        return;
+      }
 
-      // Build FormData for multipart upload
-      const formData = new FormData();
-      
-      // Append all text fields
-      formData.append('name', form.name.value.trim());
-      formData.append('email', form.email.value.trim().toLowerCase());
-      formData.append('phone', form.phone.value.trim());
-      formData.append('qualification', form.qualification.value.trim());
-      formData.append('specialization', form.specialization.value.trim());
-      formData.append('bio', form.bio.value.trim());
-      formData.append('password', form.password.value);
+      form.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        console.log("🔘 Submit button clicked! Gathering data...");
 
-      // Append files if they exist
-      const cvInput = document.getElementById('cv');
-      const coverInput = document.getElementById('cover_letter');
-      const testInput = document.getElementById('testimonials');
+        msg.className = 'msg';
+        msg.textContent = '';
+        btn.disabled = true;
+        btn.textContent = 'Submitting...';
 
-      if (cvInput && cvInput.files[0]) formData.append('cv', cvInput.files[0]);
-      if (coverInput && coverInput.files[0]) formData.append('cover_letter', coverInput.files[0]);
-      if (testInput && testInput.files[0]) formData.append('testimonials', testInput.files[0]);
+        try {
+          const formData = new FormData();
+          
+          // Helper function to safely get values
+          const getVal = (id) => document.getElementById(id)?.value?.trim() || '';
+          
+          formData.append('name', getVal('name'));
+          formData.append('email', getVal('email'));
+          formData.append('phone', getVal('phone'));
+          formData.append('qualification', getVal('qualification'));
+          formData.append('specialization', getVal('specialization'));
+          formData.append('bio', getVal('bio'));
+          formData.append('password', getVal('password'));
 
-      try {
-        const res = await fetch('/api/lecturer/register', {
-          method: 'POST',
-          body: formData, // Do NOT set Content-Type header
-        });
-        
-        let json = {};
-        try { json = await res.json(); } catch (_) {}
+          // Append files safely
+          const cvInput = document.getElementById('cv');
+          const coverInput = document.getElementById('cover_letter');
+          const testInput = document.getElementById('testimonials');
 
-        if (res.ok) {
-          // Show success view
-          document.getElementById('staffNoDisplay').textContent = json.staff_no || '—';
-          document.getElementById('formView').style.display = 'none';
-          document.getElementById('successView').style.display = 'block';
-          window.scrollTo({ top: 0, behavior: 'smooth' });
-        } else {
+          if (cvInput?.files[0]) formData.append('cv', cvInput.files[0]);
+          if (coverInput?.files[0]) formData.append('cover_letter', coverInput.files[0]);
+          if (testInput?.files[0]) formData.append('testimonials', testInput.files[0]);
+
+          console.log("📦 FormData built. Sending to /api/lecturer/register...");
+
+          const res = await fetch('/api/lecturer/register', {
+            method: 'POST',
+            body: formData,
+            credentials: 'same-origin'
+          });
+          
+          console.log("📡 Response received:", res.status);
+          
+          let json = {};
+          try { json = await res.json(); } catch (err) { console.warn("No JSON response"); }
+
+          if (res.ok) {
+            console.log("✅ Registration successful!");
+            document.getElementById('staffNoDisplay').textContent = json.staff_no || '—';
+            document.getElementById('formView').style.display = 'none';
+            document.getElementById('successView').style.display = 'block';
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+          } else {
+            console.error("❌ Server returned error:", json);
+            msg.className = 'msg error';
+            msg.textContent = json.error || 'Registration failed.';
+            btn.disabled = false;
+            btn.textContent = 'Apply to Teach';
+          }
+        } catch (err) {
+          console.error("🚨 Network/Fetch Error:", err);
           msg.className = 'msg error';
-          msg.textContent = json.error || 'Registration failed. Check your inputs.';
+          msg.textContent = 'Network error: ' + err.message;
           btn.disabled = false;
           btn.textContent = 'Apply to Teach';
         }
-      } catch (err) {
-        console.error('Fetch error:', err);
-        msg.className = 'msg error';
-        msg.textContent = 'Network error. Please check your connection.';
-        btn.disabled = false;
-        btn.textContent = 'Apply to Teach';
-      }
+      });
     });
   </script>
   <script src="home-button.js"></script>

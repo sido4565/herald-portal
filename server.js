@@ -810,34 +810,47 @@ app.post('/api/lecturer/register', materialUpload.fields([
   { name: 'cover_letter', maxCount: 1 },
   { name: 'testimonials', maxCount: 1 }
 ]), async (req, res) => {
-  // ... validation ...
+  const { name, email, phone, password, qualification, specialization, bio } = req.body;
+  
+  if (!name || !email || !password) {
+    return res.status(400).json({ error: 'Name, email, and password are required.' });
+  }
+
   try {
+    const staff_no = await generateStaffNo();
+    const hash = bcrypt.hashSync(password, 10);
+
     let cv_url = null, cover_letter_url = null, testimonials_url = null;
 
+    // 1. Safely upload files
     if (req.files) {
-      if (req.files.cv && req.files.cv[0]) {
-        const saved = await saveFile(req.files.cv[0]);
-        cv_url = saved.file_path;
-      }
-      if (req.files.cover_letter && req.files.cover_letter[0]) {
-        const saved = await saveFile(req.files.cover_letter[0]);
-        cover_letter_url = saved.file_path;
-      }
-      if (req.files.testimonials && req.files.testimonials[0]) {
-        const saved = await saveFile(req.files.testimonials[0]);
-        testimonials_url = saved.file_path;
+      try {
+        if (req.files.cv && req.files.cv[0]) {
+          const saved = await saveFile(req.files.cv[0]);
+          cv_url = saved.file_path;
+        }
+        if (req.files.cover_letter && req.files.cover_letter[0]) {
+          const saved = await saveFile(req.files.cover_letter[0]);
+          cover_letter_url = saved.file_path;
+        }
+        if (req.files.testimonials && req.files.testimonials[0]) {
+          const saved = await saveFile(req.files.testimonials[0]);
+          testimonials_url = saved.file_path;
+        }
+      } catch (uploadErr) {
+        console.error('❌ FILE UPLOAD FAILED:', uploadErr);
+        return res.status(500).json({ error: 'File upload failed. ' + uploadErr.message });
       }
     }
 
+    // 2. Save to Database
     await db.execute({
       sql: `INSERT INTO lecturers (staff_no, name, email, phone, password, qualification, specialization, bio, cv_url, cover_letter_url, testimonials_url)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       args: [staff_no, name.trim(), email.trim().toLowerCase(), phone || '', hash, qualification || '', specialization || '', bio || '', cv_url, cover_letter_url, testimonials_url],
     });
 
-    // ... rest of email notification logic ...
-
-    // Send notification email to admin
+    // 3. Send email notification
     try {
       if (mailer && mailer.ENABLED && mailer.sendMail) {
         mailer.sendMail({
@@ -862,12 +875,13 @@ app.post('/api/lecturer/register', materialUpload.fields([
       status: 'pending',
       message: `Your staff number is ${staff_no}. Await admin approval to log in.`,
     });
+
   } catch (err) {
     if (String(err.message).includes('UNIQUE')) {
       return res.status(400).json({ error: 'This email is already registered.' });
     }
-    console.error('Lecturer registration error:', err);
-    res.status(500).json({ error: 'Registration failed. Please try again.' });
+    console.error('❌ LECTURER REGISTRATION CRASH:', err);
+    res.status(500).json({ error: 'Server error: ' + err.message });
   }
 });
 
