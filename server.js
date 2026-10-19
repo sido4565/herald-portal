@@ -805,21 +805,39 @@ app.get('/api/student/transcript/pdf', authStudent, async (req, res) => {
 });
 
 // ==================== LECTURER ROUTES ====================
-app.post('/api/lecturer/register', async (req, res) => {
-  const { name, email, phone, password, qualification, specialization, bio } = req.body;
-  if (!name || !email || !password) return res.status(400).json({ error: 'Name, email, and password are required.' });
-  if (password.length < 6) return res.status(400).json({ error: 'Password must be at least 6 characters.' });
-  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return res.status(400).json({ error: 'Please enter a valid email address.' });
-
+app.post('/api/lecturer/register', materialUpload.fields([
+  { name: 'cv', maxCount: 1 },
+  { name: 'cover_letter', maxCount: 1 },
+  { name: 'testimonials', maxCount: 1 }
+]), async (req, res) => {
+  // ... validation ...
   try {
-    const staff_no = await generateStaffNo();
-    const hash = bcrypt.hashSync(password, 10);
+    let cv_url = null, cover_letter_url = null, testimonials_url = null;
+
+    if (req.files) {
+      if (req.files.cv && req.files.cv[0]) {
+        const saved = await saveFile(req.files.cv[0]);
+        cv_url = saved.file_path;
+      }
+      if (req.files.cover_letter && req.files.cover_letter[0]) {
+        const saved = await saveFile(req.files.cover_letter[0]);
+        cover_letter_url = saved.file_path;
+      }
+      if (req.files.testimonials && req.files.testimonials[0]) {
+        const saved = await saveFile(req.files.testimonials[0]);
+        testimonials_url = saved.file_path;
+      }
+    }
+
     await db.execute({
-      sql: `INSERT INTO lecturers (staff_no, name, email, phone, password, qualification, specialization, bio)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-      args: [staff_no, name.trim(), email.trim().toLowerCase(), phone || '', hash, qualification || '', specialization || '', bio || ''],
+      sql: `INSERT INTO lecturers (staff_no, name, email, phone, password, qualification, specialization, bio, cv_url, cover_letter_url, testimonials_url)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      args: [staff_no, name.trim(), email.trim().toLowerCase(), phone || '', hash, qualification || '', specialization || '', bio || '', cv_url, cover_letter_url, testimonials_url],
     });
 
+    // ... rest of email notification logic ...
+
+    // Send notification email to admin
     try {
       if (mailer && mailer.ENABLED && mailer.sendMail) {
         mailer.sendMail({
@@ -831,6 +849,7 @@ app.post('/api/lecturer/register', async (req, res) => {
                    <div><strong>Staff No:</strong> ${staff_no}</div>
                    <div><strong>Email:</strong> ${email}</div>
                    <div><strong>Phone:</strong> ${phone || '—'}</div>
+                   <div><strong>CV:</strong> ${cv_url ? 'Uploaded ✅' : 'Not provided'}</div>
                  </div>`,
         }).catch(err => console.error('Lecturer notification failed:', err.message));
       }

@@ -190,22 +190,25 @@
     </div>
   </div>
 
-  <script>
+    <script>
     const $ = (s) => document.querySelector(s);
 
-        $('#lecturerRegForm').addEventListener('submit', async (e) => {
+    document.getElementById('lecturerRegForm').addEventListener('submit', async (e) => {
       e.preventDefault();
+      
       const form = e.target;
-      const btn = $('#submitBtn');
-      const msg = $('#formMsg');
+      const btn = document.getElementById('submitBtn');
+      const msg = document.getElementById('formMsg');
 
       msg.className = 'msg';
       msg.textContent = '';
       btn.disabled = true;
       btn.textContent = 'Submitting...';
 
-      // Use FormData for file uploads
+      // Build FormData for multipart upload
       const formData = new FormData();
+      
+      // Append all text fields
       formData.append('name', form.name.value.trim());
       formData.append('email', form.email.value.trim().toLowerCase());
       formData.append('phone', form.phone.value.trim());
@@ -214,31 +217,40 @@
       formData.append('bio', form.bio.value.trim());
       formData.append('password', form.password.value);
 
-      if (form.cv.files[0]) formData.append('cv', form.cv.files[0]);
-      if (form.cover_letter.files[0]) formData.append('cover_letter', form.cover_letter.files[0]);
-      if (form.testimonials.files[0]) formData.append('testimonials', form.testimonials.files[0]);
+      // Append files if they exist
+      const cvInput = document.getElementById('cv');
+      const coverInput = document.getElementById('cover_letter');
+      const testInput = document.getElementById('testimonials');
+
+      if (cvInput && cvInput.files[0]) formData.append('cv', cvInput.files[0]);
+      if (coverInput && coverInput.files[0]) formData.append('cover_letter', coverInput.files[0]);
+      if (testInput && testInput.files[0]) formData.append('testimonials', testInput.files[0]);
 
       try {
         const res = await fetch('/api/lecturer/register', {
           method: 'POST',
-          body: formData, // Do NOT set Content-Type header, browser sets it automatically with boundary
+          body: formData, // Do NOT set Content-Type header
         });
-        const json = await res.json();
+        
+        let json = {};
+        try { json = await res.json(); } catch (_) {}
 
         if (res.ok) {
-          $('#staffNoDisplay').textContent = json.staff_no;
-          $('#formView').style.display = 'none';
-          $('#successView').style.display = 'block';
+          // Show success view
+          document.getElementById('staffNoDisplay').textContent = json.staff_no || '—';
+          document.getElementById('formView').style.display = 'none';
+          document.getElementById('successView').style.display = 'block';
           window.scrollTo({ top: 0, behavior: 'smooth' });
         } else {
           msg.className = 'msg error';
-          msg.textContent = json.error || 'Registration failed';
+          msg.textContent = json.error || 'Registration failed. Check your inputs.';
           btn.disabled = false;
           btn.textContent = 'Apply to Teach';
         }
       } catch (err) {
+        console.error('Fetch error:', err);
         msg.className = 'msg error';
-        msg.textContent = 'Network error. Please try again.';
+        msg.textContent = 'Network error. Please check your connection.';
         btn.disabled = false;
         btn.textContent = 'Apply to Teach';
       }
