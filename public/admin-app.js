@@ -179,13 +179,19 @@ if ($('#adminName')) {
       <td>${esc(l.name)}</td>
       <td>${esc(l.email)}</td>
       <td>${esc(l.specialization || '—')}</td>
+      <td>
+        ${l.cv_url ? `<a href="${l.cv_url}" target="_blank" class="btn-xs" style="margin-right:4px; text-decoration:none;">CV</a>` : ''}
+        ${l.cover_letter_url ? `<a href="${l.cover_letter_url}" target="_blank" class="btn-xs" style="margin-right:4px; text-decoration:none;">Cover</a>` : ''}
+        ${l.testimonials_url ? `<a href="${l.testimonials_url}" target="_blank" class="btn-xs" style="text-decoration:none;">Testimonials</a>` : ''}
+        ${(!l.cv_url && !l.cover_letter_url && !l.testimonials_url) ? '<span style="color:var(--muted); font-size:12px;">None</span>' : ''}
+      </td>
       <td>${new Date(l.created_at).toLocaleDateString()}</td>
       <td>
         <button class="btn-xs" data-act="approve-lect" data-id="${l.id}" type="button">Approve</button>
         <button class="btn-xs danger" data-act="reject-lect" data-id="${l.id}" type="button">Reject</button>
       </td>
     </tr>
-  `).join('') || '<tr><td colspan="6" class="empty">No pending applications.</td></tr>';
+  `).join('') || '<tr><td colspan="7" class="empty">No pending applications.</td></tr>';
 
   $('#lecturersTable tbody').innerHTML = all.map(l => `
     <tr>
