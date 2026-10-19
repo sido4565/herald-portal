@@ -683,15 +683,32 @@ app.get('/api/student/transcript/pdf', authStudent, async (req, res) => {
     doc.rect(20, 20, doc.page.width - 40, doc.page.height - 40).lineWidth(2).stroke('#d4c4b7');
     doc.rect(25, 25, doc.page.width - 50, doc.page.height - 50).lineWidth(1).stroke('#d4c4b7');
 
-    // --- 2. LOGO & HEADER ---
-    // Note: Ensure the path to the logo is correct for your server
+        // --- 2. LOGO & HEADER ---
     const logoPath = path.join(__dirname, 'public', 'images', 'herald-logo.png');
     try {
-      doc.image(logoPath, doc.page.width / 2 - 30, 60, { width: 60 });
-    } catch (e) {
-      console.log('Logo not found for PDF, skipping image.');
+      if (fs.existsSync(logoPath)) {
+        // --- WATERMARK LOGO (Big & Translucent) ---
+        // Save the current graphics state
+        doc.save();
+        
+        // Set opacity to 15% (0.15)
+        doc.opacity(0.15);
+        
+        // Draw the logo in the center of the page (A4 is 595 x 842 points)
+        // width: 350 makes it much bigger
+        doc.image(logoPath, doc.page.width / 2 - 175, doc.page.height / 2 - 175, { width: 350 });
+        
+        // Restore the graphics state so the next text is fully opaque
+        doc.restore();
+      } else {
+        console.log('Logo not found at:', logoPath);
+      }
+    } catch (imgErr) {
+      console.error('Error loading logo into PDF:', imgErr);
     }
 
+    // --- HEADER TEXT ---
+    // We keep the header text at the top
     doc.fontSize(22).font('Helvetica-Bold').fillColor('#10243a').text('HERALD TRAINER AND CONSULTANT', { align: 'center' });
     doc.fontSize(10).font('Helvetica').fillColor('#555555').text('Mombasa, Kenya | info@heraldtrainer.co.ke | +254 107 004 000', { align: 'center' });
     doc.moveDown(1.5);
