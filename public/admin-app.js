@@ -176,14 +176,22 @@ if ($('#adminName')) {
   $('#pendingLecturersTable tbody').innerHTML = pending.map(l => `
     <tr>
       <td>${esc(l.staff_no)}</td>
-      <td>${esc(l.name)}</td>
-      <td>${esc(l.email)}</td>
-      <td>${esc(l.specialization || '—')}</td>
+      <td>
+        <strong>${esc(l.name)}</strong><br>
+        <span style="font-size:11px; color:var(--muted);">ID: ${esc(l.id_number || '—')}</span>
+      </td>
+      <td>
+        ${esc(l.email)}<br>
+        <span style="font-size:11px; color:var(--muted);">${esc(l.phone || '—')}</span>
+      </td>
+      <td>
+        ${esc(l.location || '—')}<br>
+        <span style="font-size:11px; color:var(--muted);">${esc(l.address || '—')}</span>
+      </td>
       <td>
         ${l.cv_url ? `<a href="${l.cv_url}" target="_blank" class="btn-xs" style="margin-right:4px; text-decoration:none;">CV</a>` : ''}
         ${l.cover_letter_url ? `<a href="${l.cover_letter_url}" target="_blank" class="btn-xs" style="margin-right:4px; text-decoration:none;">Cover</a>` : ''}
-        ${l.testimonials_url ? `<a href="${l.testimonials_url}" target="_blank" class="btn-xs" style="text-decoration:none;">Testimonials</a>` : ''}
-        ${(!l.cv_url && !l.cover_letter_url && !l.testimonials_url) ? '<span style="color:var(--muted); font-size:12px;">None</span>' : ''}
+        ${l.testimonials_url ? `<a href="${l.testimonials_url}" target="_blank" class="btn-xs" style="text-decoration:none;">Docs</a>` : ''}
       </td>
       <td>${new Date(l.created_at).toLocaleDateString()}</td>
       <td>

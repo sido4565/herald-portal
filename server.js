@@ -810,7 +810,7 @@ app.post('/api/lecturer/register', materialUpload.fields([
   { name: 'cover_letter', maxCount: 1 },
   { name: 'testimonials', maxCount: 1 }
 ]), async (req, res) => {
-  const { name, email, phone, password, qualification, specialization, bio } = req.body;
+  const { name, email, phone, password, qualification, specialization, bio, id_number, location, address } = req.body;
   
   if (!name || !email || !password) {
     return res.status(400).json({ error: 'Name, email, and password are required.' });
@@ -888,6 +888,7 @@ app.post('/api/lecturer/register', materialUpload.fields([
 app.post('/api/lecturer/login', async (req, res) => {
   const { staff_no, email, password } = req.body;
   if (!password || (!staff_no && !email)) return res.status(400).json({ error: 'Missing credentials' });
+  
 
   const r = staff_no
     ? await db.execute({ sql: 'SELECT * FROM lecturers WHERE staff_no = ?', args: [staff_no] })
@@ -1441,10 +1442,10 @@ app.post('/api/admin/lecturers', authAdmin, async (req, res) => {
   try {
     const staff_no = await generateStaffNo();
     const hash = bcrypt.hashSync(password, 10);
-    await db.execute({
-      sql: `INSERT INTO lecturers (staff_no, name, email, phone, password, qualification, specialization, bio, approved, status, approved_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1, 'active', CURRENT_TIMESTAMP)`,
-      args: [staff_no, name, email.toLowerCase(), phone || '', hash, qualification || '', specialization || '', bio || ''],
+        await db.execute({
+      sql: `INSERT INTO lecturers (staff_no, name, email, phone, password, qualification, specialization, bio, id_number, location, address, cv_url, cover_letter_url, testimonials_url)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      args: [staff_no, name.trim(), email.trim().toLowerCase(), phone || '', hash, qualification || '', specialization || '', bio || '', id_number || '', location || '', address || '', cv_url, cover_letter_url, testimonials_url],
     });
     res.json({ ok: true, staff_no });
   } catch (err) {

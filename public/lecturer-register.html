@@ -115,6 +115,22 @@
             </div>
           </div>
 
+                    <div class="form-row">
+            <div class="form-group">
+              <label for="id_number">ID / Passport Number</label>
+              <input id="id_number" name="id_number" required />
+            </div>
+            <div class="form-group">
+              <label for="location">Current Location (City/Town)</label>
+              <input id="location" name="location" placeholder="e.g. Mombasa" required />
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label for="address">Physical Address</label>
+            <input id="address" name="address" placeholder="e.g. P.O Box 1234, Mombasa" />
+          </div>
+
           <div class="form-row">
             <div class="form-group">
               <label for="qualification">Highest Qualification</label>
@@ -216,13 +232,18 @@
           // Helper function to safely get values
           const getVal = (id) => document.getElementById(id)?.value?.trim() || '';
           
-          formData.append('name', getVal('name'));
+                    formData.append('name', getVal('name'));
           formData.append('email', getVal('email'));
           formData.append('phone', getVal('phone'));
           formData.append('qualification', getVal('qualification'));
           formData.append('specialization', getVal('specialization'));
           formData.append('bio', getVal('bio'));
           formData.append('password', getVal('password'));
+          
+          // NEW FIELDS
+          formData.append('id_number', getVal('id_number'));
+          formData.append('location', getVal('location'));
+          formData.append('address', getVal('address'));
 
           // Append files safely
           const cvInput = document.getElementById('cv');
