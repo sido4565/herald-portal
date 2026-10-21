@@ -101,6 +101,16 @@
   <h2 style="margin: 0 0 8px; font-size: 26px;">Welcome, <span id="welcomeName"></span></h2>
   <p style="margin: 0; opacity: 0.92;">Reg No <strong id="regNo"></strong> &middot; <span id="studentCourse"></span></p>
 </section>
+
+    <!-- Enrollment Reminder Banner -->
+    <div id="enrollmentReminder" style="display: none; background: #fef2f2; border: 1px solid #fecaca; border-left: 4px solid #b91c1c; border-radius: 8px; padding: 20px; margin-bottom: 24px; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 16px;">
+      <div>
+        <h3 style="margin: 0 0 4px; color: #b91c1c; font-size: 16px;">You haven't enrolled in any courses yet!</h3>
+        <p style="margin: 0; color: #7f1d1d; font-size: 13px;">Browse our catalog and select a course to begin your learning journey.</p>
+      </div>
+      <a href="courses.html" class="btn-primary" style="text-decoration: none; padding: 10px 20px; background: #b91c1c; color: white; border-radius: 6px; font-weight: 700; white-space: nowrap;">Browse Courses →</a>
+    </div>
+
     <section class="card wide" style="padding:0; overflow:hidden; margin-bottom:20px;">
   <video
     controls
@@ -129,7 +139,7 @@
         <ul id="announcements" class="list"></ul>
       </section>
 
-            <section class="card">
+      <section class="card">
         <h3>Fee Statement</h3>
         <div id="feesSummary" class="fees-summary"></div>
         <ul id="feesList" class="list"></ul>
@@ -170,8 +180,6 @@
       </section>
 
       <section class="card wide">
-        <h3>Academic Results</h3>
-              <section class="card wide">
         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
           <h3 style="margin:0;">Academic Results</h3>
           <a href="/api/student/transcript/pdf" class="btn-primary" style="text-decoration:none; padding: 8px 16px; font-size: 12px; border-radius: 6px;">
@@ -187,20 +195,11 @@
           </table>
         </div>
       </section>
-        <div class="table-wrap">
-          <table id="resultsTable">
-            <thead>
-              <tr><th>Code</th><th>Course</th><th>Term</th><th>Marks</th><th>Grade</th></tr>
-            </thead>
-            <tbody></tbody>
-          </table>
-        </div>
-      </section>
 
       <section class="card wide">
-  <h3>📚 Study Materials</h3>
-  <ul id="materialsList" class="list"></ul>
-</section>
+        <h3>📚 Study Materials</h3>
+        <ul id="materialsList" class="list"></ul>
+      </section>
 
       <section class="card wide">
         <h3>Assignments</h3>
@@ -211,7 +210,7 @@
 
   <div id="toastWrap" class="toast-wrap"></div>
 
-  <!-- Exam loading script (additive — app.js handles the rest) -->
+  <!-- Exam loading script -->
   <script>
     (async function loadExams() {
       const wrap = document.getElementById('examsList');
@@ -265,7 +264,7 @@
   <script src="app.js"></script>
   <script src="home-button.js"></script>
 
-    <script>
+  <script>
     // M-Pesa Payment Handler
     document.getElementById('payMpesaBtn')?.addEventListener('click', async () => {
       const phone = document.getElementById('mpesaPhone').value.trim();
@@ -307,6 +306,24 @@
         btn.textContent = 'Pay with M-Pesa';
       }
     });
+
+    // Check if student has enrolled in any courses
+    (async function checkEnrollmentStatus() {
+      try {
+        const res = await fetch('/api/courses', { credentials: 'same-origin' });
+        if (!res.ok) return;
+        
+        const courses = await res.json();
+        const hasEnrolled = courses.some(c => c.enrolled);
+        
+        if (!hasEnrolled) {
+          const banner = document.getElementById('enrollmentReminder');
+          if (banner) banner.style.display = 'flex';
+        }
+      } catch (err) {
+        console.error('Could not check enrollment status:', err);
+      }
+    })();
   </script>
 </body>
 </html>

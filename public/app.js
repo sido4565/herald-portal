@@ -1000,3 +1000,27 @@ function generateTranscriptHTML(data) {
   );
   reset();
 })();
+
+// Check if student has enrolled in any courses
+(async function checkEnrollmentStatus() {
+  try {
+    // Fetch the student's currently enrolled courses
+    const res = await fetch('/api/courses', { credentials: 'same-origin' });
+    if (!res.ok) return; // If not logged in, do nothing
+    
+    const courses = await res.json();
+    
+    // Check if any course has 'enrolled: true'
+    const hasEnrolled = courses.some(c => c.enrolled);
+    
+    // If they haven't enrolled in anything, show the banner
+    if (!hasEnrolled) {
+      const banner = document.getElementById('enrollmentReminder');
+      if (banner) {
+        banner.style.display = 'flex'; // Show the banner
+      }
+    }
+  } catch (err) {
+    console.error('Could not check enrollment status:', err);
+  }
+})();
