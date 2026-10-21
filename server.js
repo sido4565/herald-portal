@@ -2761,3 +2761,92 @@ app.post('/api/student/exams/:attemptId/submit', authStudent, async (req, res) =
     res.json({ ok: true, score, total: questions.rows.reduce((a, b) => a + b.marks, 0) });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
+
+const { Mpesa, isStkCallbackSuccess, getCallbackValue } = require('pesafy');
+
+// Initialize the client (place this near the top with other imports)
+const mpesa = new Mpesa({
+  consumerKey: process.env.MPESA_CONSUMER_KEY,
+  consumerSecret: process.env.MPESA_CONSUMER_SECRET,
+  environment: process.env.MPESA_ENV || 'sandbox',
+  lipaNaMpesaShortCode: process.env.MPESA_SHORTCODE,
+  lipaNaMpesaPassKey: process.env.MPESA_PASSKEY,
+});
+
+// 1. Trigger the STK Push (Student clicks "Pay with M-Pesa")
+app.post('/api/mpesa/stk-push', authStudent, async (req, res) => {
+  try {
+    const { phoneNumber, amount } = req.body;
+    
+    // pesafy handles the 2547... format automatically
+    const push = await mpesa.stkPush({
+      amount: Number(amount), // Must be whole numbers, e.g., 100
+      phoneNumber: phoneNumber, // e.g., "0712345678"
+      callbackUrl: 'https://heraldtrainer.co.ke/api/mpesa/callback', // MUST be your live HTTPS domain
+      accountReference: 'HERALD FEE', // Max 12 chars
+      transactionDesc: 'Fee Payment', // Max 13 chars
+    });
+
+    // Save push.CheckoutRequestID to your DB if you want to track it
+    res.json({ 
+        ok: true, 
+        message: 'Check your phone for the M-Pesa prompt',
+        checkoutRequestId: push.CheckoutRequestID 
+    });
+  } catch (err) {
+    console.error('M-Pesa STK Error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// 2. The Callback (Safaricom sends the result here)
+// IMPORTANT: This route must NOT have authStudent middleware, because Safaricom is the one calling it.
+// 2. The Callback (Safaricom sends the result here)
+app.post('/api/mpesa/callback', async (req, res) => {
+  try {
+    const callback = req.body;
+    
+    if (isStkCallbackSuccess(callback.Body.stkCallback)) {
+      const receipt = getCallbackValue(callback, 'MpesaReceiptNumber');
+      const amount = getCallbackValue(callback, 'Amount');
+      const phone = getCallbackValue(callback, 'PhoneNumber');
+      
+      console.log(`✅ M-Pesa Success: ${receipt} for KES ${amount} from ${phone}`);
+      
+      // --- SAVE TO DATABASE ---
+      // Format the phone number to match your DB format (e.g., +254703379980)
+      const formattedPhone = `+${phone}`;
+      
+      // Find the student by phone (assuming your students table has a phone column, 
+      // or you can look up the pending payment by CheckoutRequestID)
+      const studentRes = await db.execute({
+        sql: 'SELECT id FROM students WHERE phone = ?',
+        args: [formattedPhone]
+      });
+
+      if (studentRes.rows.length) {
+        const studentId = studentRes.rows[0].id;
+        
+        // Add the payment to the fees table
+        await db.execute({
+          sql: `INSERT INTO fees (student_id, term, amount_due, amount_paid, status, paid_at) 
+                VALUES (?, 'M-Pesa Payment', ?, ?, 'paid', CURRENT_TIMESTAMP)`,
+          args: [studentId, amount, amount]
+        });
+        
+        console.log(`💰 Updated fees for student ID ${studentId}`);
+      } else {
+        console.log(`⚠️ Student not found for phone ${formattedPhone}`);
+      }
+
+    } else {
+      console.log('❌ M-Pesa Failed:', callback.Body.stkCallback.ResultDesc);
+    }
+
+    // ALWAYS respond to Safaricom with this exact JSON
+    res.json({ ResultCode: 0, ResultDesc: 'Accepted' });
+  } catch (err) {
+    console.error('Callback Error:', err);
+    res.status(500).send('Error');
+  }
+});
