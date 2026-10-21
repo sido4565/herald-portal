@@ -1658,3 +1658,30 @@ async function openBulkAssignModal() {
     } catch (e) { toast(e.message, 'error'); }
   }
 }
+
+async function loadAdmissions() {
+  const r = await api('/api/admin/students');
+  const pending = r.filter(s => s.status === 'pending');
+  
+  $('#admissionsTable tbody').innerHTML = pending.map(s => `
+    <tr>
+      <td>${esc(s.reg_no)}</td>
+      <td>${esc(s.name)}</td>
+      <td>${esc(s.course)}</td>
+      <td>${new Date(s.created_at).toLocaleDateString()}</td>
+      <td>
+        <button class="btn-xs" data-act="approve-student" data-id="${s.id}">Approve</button>
+        <button class="btn-xs danger" data-act="reject-student" data-id="${s.id}">Reject</button>
+      </td>
+    </tr>
+  `).join('') || '<tr><td colspan="5" class="empty">No pending applications.</td></tr>';
+
+  // Wire buttons
+  $('#admissionsTable').querySelectorAll('[data-act="approve-student"]').forEach(btn => {
+    btn.onclick = async () => {
+      await api(`/api/admin/students/${btn.dataset.id}/approve`, { method: 'POST' });
+      toast('Student approved');
+      loadAdmissions();
+    };
+  });
+}

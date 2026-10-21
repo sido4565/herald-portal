@@ -275,12 +275,16 @@ function calcGrade(m) {
 // ==================== STUDENT ROUTES ====================
 app.post('/api/login', async (req, res) => {
   const { reg_no, password } = req.body;
-  if (!reg_no || !password) return res.status(400).json({ error: 'Missing credentials' });
-  const result = await db.execute({ sql: 'SELECT * FROM students WHERE reg_no = ?', args: [reg_no] });
+  // ... fetch student ...
   const s = result.rows[0];
   if (!s || !bcrypt.compareSync(password, s.password))
     return res.status(401).json({ error: 'Invalid registration number or password' });
+
+  // NEW: Check approval status
+  if (s.status === 'pending') return res.status(403).json({ error: 'Your application is pending admin approval.' });
+  if (s.status === 'rejected') return res.status(403).json({ error: 'Your application was rejected. Contact admin.' });
   if (!s.active) return res.status(403).json({ error: 'Account deactivated. Contact admin.' });
+
   res.cookie('token', signStudent(s), { httpOnly: true, sameSite: 'lax' });
   res.json({ ok: true, name: s.name });
 });
@@ -295,18 +299,38 @@ app.post('/api/register', async (req, res) => {
     const hash = bcrypt.hashSync(password, 10);
     const reg_no = await generateRegNo();
 
+    // 1. Insert the student (Status defaults to 'pending' in the database)
     const info = await db.execute({
-      sql: 'INSERT INTO students (reg_no, name, email, password, course) VALUES (?, ?, ?, ?, ?)',
-      args: [reg_no, name.trim(), email.trim().toLowerCase(), hash, course],
+      sql: 'INSERT INTO students (reg_no, name, email, password, course, status) VALUES (?, ?, ?, ?, ?, ?)',
+      args: [reg_no, name.trim(), email.trim().toLowerCase(), hash, course, 'pending'],
     });
 
+    const studentId = info.lastInsertRowid;
+
+    // 2. Fetch the newly created student to sign the token
     const sRes = await db.execute({
       sql: 'SELECT * FROM students WHERE id = ?',
-      args: [info.lastInsertRowid],
+      args: [studentId],
     });
     const s = sRes.rows[0];
+    
+    // 3. Set the cookie (so they are technically logged in, but restricted by status)
     res.cookie('token', signStudent(s), { httpOnly: true, sameSite: 'lax' });
 
+    // 4. Auto-enroll in the selected course
+    const courseRes = await db.execute({
+      sql: 'SELECT id FROM courses WHERE title = ? OR code = ? LIMIT 1',
+      args: [course, course]
+    });
+    
+    if (courseRes.rows.length) {
+      await db.execute({
+        sql: 'INSERT INTO enrollments (student_id, course_id) VALUES (?, ?)',
+        args: [studentId, courseRes.rows[0].id]
+      });
+    }
+
+    // 5. Send the welcome email
     sendMailSafe('sendWelcomeEmail', {
       to: s.email,
       studentName: s.name,
@@ -314,7 +338,14 @@ app.post('/api/register', async (req, res) => {
       course: s.course,
     });
 
-    res.json({ ok: true, reg_no: s.reg_no, name: s.name, message: `Your registration number is ${s.reg_no}` });
+    // 6. Return success with the pending message
+    res.json({ 
+      ok: true, 
+      reg_no: s.reg_no, 
+      name: s.name, 
+      message: `Application received! Your registration number is ${s.reg_no}. Await admin approval to log in.` 
+    });
+    
   } catch (err) {
     if (String(err.message).includes('UNIQUE')) {
       return res.status(400).json({ error: 'This email is already registered.' });
@@ -1331,6 +1362,18 @@ app.post('/api/admin/login', async (req, res) => {
     return res.status(401).json({ error: 'Invalid username or password' });
   res.cookie('admin_token', signAdmin(a), { httpOnly: true, sameSite: 'lax' });
   res.json({ ok: true, name: a.name, role: a.role });
+});
+
+// Approve a student
+app.post('/api/admin/students/:id/approve', authAdmin, async (req, res) => {
+  await db.execute({ sql: "UPDATE students SET status = 'active' WHERE id = ?", args: [req.params.id] });
+  res.json({ ok: true });
+});
+
+// Reject a student
+app.post('/api/admin/students/:id/reject', authAdmin, async (req, res) => {
+  await db.execute({ sql: "UPDATE students SET status = 'rejected' WHERE id = ?", args: [req.params.id] });
+  res.json({ ok: true });
 });
 
 app.post('/api/admin/logout', (req, res) => { res.clearCookie('admin_token'); res.json({ ok: true }); });
