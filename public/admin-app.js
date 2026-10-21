@@ -157,6 +157,7 @@ if ($('#adminName')) {
       case 'overview':      return loadOverview();
       case 'lecturers':     return loadLecturers();
       case 'students':      return loadStudents();
+      case 'admissions':    return loadAdmissions(); // <-- NEW
       case 'courses':       return loadCourses();
       case 'announcements': return loadAnnouncements();
       case 'results':       return loadResults();
@@ -169,168 +170,166 @@ if ($('#adminName')) {
   }
 
   async function loadLecturers() {
-  const lecturers = await api('/api/admin/lecturers');
-  const pending = lecturers.filter(l => !l.approved && l.status !== 'rejected');
-  const all = lecturers.filter(l => l.approved);
+    const lecturers = await api('/api/admin/lecturers');
+    const pending = lecturers.filter(l => !l.approved && l.status !== 'rejected');
+    const all = lecturers.filter(l => l.approved);
 
-  $('#pendingLecturersTable tbody').innerHTML = pending.map(l => `
-    <tr>
-      <td>${esc(l.staff_no)}</td>
-      <td>
-        <strong>${esc(l.name)}</strong><br>
-        <span style="font-size:11px; color:var(--muted);">ID: ${esc(l.id_number || '—')}</span>
-      </td>
-      <td>
-        ${esc(l.email)}<br>
-        <span style="font-size:11px; color:var(--muted);">${esc(l.phone || '—')}</span>
-      </td>
-      <td>
-        ${esc(l.location || '—')}<br>
-        <span style="font-size:11px; color:var(--muted);">${esc(l.address || '—')}</span>
-      </td>
-      <td>
-        ${l.cv_url ? `<a href="${l.cv_url}" target="_blank" class="btn-xs" style="margin-right:4px; text-decoration:none;">CV</a>` : ''}
-        ${l.cover_letter_url ? `<a href="${l.cover_letter_url}" target="_blank" class="btn-xs" style="margin-right:4px; text-decoration:none;">Cover</a>` : ''}
-        ${l.testimonials_url ? `<a href="${l.testimonials_url}" target="_blank" class="btn-xs" style="text-decoration:none;">Docs</a>` : ''}
-      </td>
-      <td>${new Date(l.created_at).toLocaleDateString()}</td>
-      <td>
-        <button class="btn-xs" data-act="approve-lect" data-id="${l.id}" type="button">Approve</button>
-        <button class="btn-xs danger" data-act="reject-lect" data-id="${l.id}" type="button">Reject</button>
-      </td>
-    </tr>
-  `).join('') || '<tr><td colspan="7" class="empty">No pending applications.</td></tr>';
+    $('#pendingLecturersTable tbody').innerHTML = pending.map(l => `
+      <tr>
+        <td>${esc(l.staff_no)}</td>
+        <td>
+          <strong>${esc(l.name)}</strong><br>
+          <span style="font-size:11px; color:var(--muted);">ID: ${esc(l.id_number || '—')}</span>
+        </td>
+        <td>
+          ${esc(l.email)}<br>
+          <span style="font-size:11px; color:var(--muted);">${esc(l.phone || '—')}</span>
+        </td>
+        <td>
+          ${esc(l.location || '—')}<br>
+          <span style="font-size:11px; color:var(--muted);">${esc(l.address || '—')}</span>
+        </td>
+        <td>
+          ${l.cv_url ? `<a href="${l.cv_url}" target="_blank" class="btn-xs" style="margin-right:4px; text-decoration:none;">CV</a>` : ''}
+          ${l.cover_letter_url ? `<a href="${l.cover_letter_url}" target="_blank" class="btn-xs" style="margin-right:4px; text-decoration:none;">Cover</a>` : ''}
+          ${l.testimonials_url ? `<a href="${l.testimonials_url}" target="_blank" class="btn-xs" style="text-decoration:none;">Docs</a>` : ''}
+        </td>
+        <td>${new Date(l.created_at).toLocaleDateString()}</td>
+        <td>
+          <button class="btn-xs" data-act="approve-lect" data-id="${l.id}" type="button">Approve</button>
+          <button class="btn-xs danger" data-act="reject-lect" data-id="${l.id}" type="button">Reject</button>
+        </td>
+      </tr>
+    `).join('') || '<tr><td colspan="7" class="empty">No pending applications.</td></tr>';
 
-  $('#lecturersTable tbody').innerHTML = all.map(l => `
-    <tr>
-      <td>${esc(l.staff_no)}</td>
-      <td>${esc(l.name)}</td>
-      <td>${esc(l.email)}</td>
-      <td>${esc(l.qualification || '—')}</td>
-      <td><span class="pill ${l.status === 'active' ? 'pill-green' : l.status === 'suspended' ? 'pill-red' : 'pill-amber'}">${esc(l.status)}</span></td>
-      <td>
-        <button class="btn-xs" data-act="assign-courses" data-id="${l.id}" data-name="${esc(l.name)}" type="button">📚 Assign Courses</button>
-        ${l.status === 'active'
-          ? `<button class="btn-xs danger" data-act="suspend-lect" data-id="${l.id}" type="button">Suspend</button>`
-          : `<button class="btn-xs" data-act="reactivate-lect" data-id="${l.id}" type="button">Reactivate</button>`}
-        <button class="btn-xs danger" data-act="delete-lect" data-id="${l.id}" type="button">Delete</button>
-      </td>
-    </tr>
-  `).join('') || '<tr><td colspan="6" class="empty">No approved lecturers.</td></tr>';
+    $('#lecturersTable tbody').innerHTML = all.map(l => `
+      <tr>
+        <td>${esc(l.staff_no)}</td>
+        <td>${esc(l.name)}</td>
+        <td>${esc(l.email)}</td>
+        <td>${esc(l.qualification || '—')}</td>
+        <td><span class="pill ${l.status === 'active' ? 'pill-green' : l.status === 'suspended' ? 'pill-red' : 'pill-amber'}">${esc(l.status)}</span></td>
+        <td>
+          <button class="btn-xs" data-act="assign-courses" data-id="${l.id}" data-name="${esc(l.name)}" type="button">📚 Assign Courses</button>
+          ${l.status === 'active'
+            ? `<button class="btn-xs danger" data-act="suspend-lect" data-id="${l.id}" type="button">Suspend</button>`
+            : `<button class="btn-xs" data-act="reactivate-lect" data-id="${l.id}" type="button">Reactivate</button>`}
+          <button class="btn-xs danger" data-act="delete-lect" data-id="${l.id}" type="button">Delete</button>
+        </td>
+      </tr>
+    `).join('') || '<tr><td colspan="6" class="empty">No approved lecturers.</td></tr>';
 
-  wireLecturerActions();
-}
-
-// ---------- Assign Courses to Lecturer Modal ----------
-async function openAssignCoursesModal(lecturerId, lecturerName) {
-  try {
-    // Fetch all courses and currently-assigned courses in parallel
-    const [allCourses, assigned] = await Promise.all([
-      api('/api/admin/courses'),
-      api(`/api/admin/lecturers/${lecturerId}/courses`),
-    ]);
-
-    const assignedIds = new Set(assigned.map(c => c.id));
-
-    const overlay = document.createElement('div');
-    overlay.className = 'modal-overlay';
-    overlay.innerHTML = `
-      <div class="modal" style="max-width: 640px;">
-        <h3>Assign Courses — ${esc(lecturerName)}</h3>
-        <p style="color: var(--muted); font-size: 13px; margin-bottom: 20px;">
-          Check the courses this lecturer teaches. The lecturer will only see these courses in their dashboard.
-        </p>
-        <div id="assignList" style="max-height: 55vh; overflow-y: auto; border: 1px solid var(--border); border-radius: var(--radius); padding: 12px;">
-          ${allCourses.map(c => `
-            <label style="display: flex; align-items: center; gap: 12px; padding: 10px; border-radius: 6px; cursor: pointer; transition: background 0.15s;"
-                   onmouseover="this.style.background='var(--bg-alt)'"
-                   onmouseout="this.style.background='transparent'">
-              <input type="checkbox" class="course-checkbox" data-course-id="${c.id}" ${assignedIds.has(c.id) ? 'checked' : ''}
-                     style="width: 18px; height: 18px; cursor: pointer;" />
-              <div style="flex: 1;">
-                <div style="font-family: monospace; font-size: 11px; color: var(--gold-500); font-weight: 700; letter-spacing: 0.05em;">${esc(c.code)}</div>
-                <div style="font-weight: 600; font-size: 14px; margin: 2px 0;">${esc(c.title)}</div>
-                <div style="font-size: 12px; color: var(--muted);">Trainer label: ${esc(c.trainer)} · ${c.enrolled_count} enrolled</div>
-              </div>
-            </label>
-          `).join('')}
-        </div>
-        <div class="modal-actions">
-          <button class="btn-ghost dark" type="button" data-close>Cancel</button>
-          <button class="btn-primary" id="saveAssignmentsBtn" type="button">Save Assignments</button>
-        </div>
-      </div>`;
-    document.body.appendChild(overlay);
-
-    overlay.addEventListener('click', e => {
-      if (e.target === overlay || e.target.closest('[data-close]')) overlay.remove();
-    });
-
-    overlay.querySelector('#saveAssignmentsBtn').addEventListener('click', async (e) => {
-      const btn = e.target;
-      btn.disabled = true;
-      btn.textContent = 'Saving...';
-
-      try {
-        const checkboxes = overlay.querySelectorAll('.course-checkbox');
-        const toAssign = [];
-        const toRemove = [];
-
-        checkboxes.forEach(cb => {
-          const cid = Number(cb.dataset.courseId);
-          const wasAssigned = assignedIds.has(cid);
-          const isChecked = cb.checked;
-
-          if (isChecked && !wasAssigned) toAssign.push(cid);
-          if (!isChecked && wasAssigned) toRemove.push(cid);
-        });
-
-        // Apply changes
-        for (const cid of toAssign) {
-          await api(`/api/admin/lecturers/${lecturerId}/courses`, {
-            method: 'POST',
-            body: { course_id: cid },
-          });
-        }
-        for (const cid of toRemove) {
-          await api(`/api/admin/lecturers/${lecturerId}/courses/${cid}`, {
-            method: 'DELETE',
-          });
-        }
-
-        overlay.remove();
-        toast(`Assignments saved (${toAssign.length} added, ${toRemove.length} removed)`);
-        await loadLecturers();
-      } catch (err) {
-        toast(err.message, 'error');
-        btn.disabled = false;
-        btn.textContent = 'Save Assignments';
-      }
-    });
-  } catch (err) {
-    toast('Could not open assignments: ' + err.message, 'error');
+    wireLecturerActions();
   }
-}
 
-function wireLecturerActions() {
-  const handle = async (e) => {
-    const btn = e.target.closest('button[data-act]');
-    if (!btn) return;
-    const id = btn.dataset.id;
-    const act = btn.dataset.act;
+  // ---------- Assign Courses to Lecturer Modal ----------
+  async function openAssignCoursesModal(lecturerId, lecturerName) {
     try {
-      if (act === 'approve-lect')    { await api(`/api/admin/lecturers/${id}/approve`, { method: 'POST' }); toast('Lecturer approved'); }
-      if (act === 'reject-lect')     { if (!confirm('Reject?')) return; await api(`/api/admin/lecturers/${id}/reject`, { method: 'POST' }); toast('Lecturer rejected'); }
-      if (act === 'suspend-lect')    { if (!confirm('Suspend this lecturer?')) return; await api(`/api/admin/lecturers/${id}/suspend`, { method: 'POST' }); toast('Lecturer suspended'); }
-      if (act === 'reactivate-lect') { await api(`/api/admin/lecturers/${id}/reactivate`, { method: 'POST' }); toast('Lecturer reactivated'); }
-      if (act === 'delete-lect')     { if (!confirm('Delete permanently?')) return; await api(`/api/admin/lecturers/${id}`, { method: 'DELETE' }); toast('Lecturer deleted'); }
-      if (act === 'assign-courses')  { return openAssignCoursesModal(id, btn.dataset.name); }
-      await loadLecturers();
-    } catch (err) { toast(err.message, 'error'); }
-  };
-  document.querySelector('#pendingLecturersTable').addEventListener('click', handle);
-  document.querySelector('#lecturersTable').addEventListener('click', handle);
-}
+      const [allCourses, assigned] = await Promise.all([
+        api('/api/admin/courses'),
+        api(`/api/admin/lecturers/${lecturerId}/courses`),
+      ]);
+
+      const assignedIds = new Set(assigned.map(c => c.id));
+
+      const overlay = document.createElement('div');
+      overlay.className = 'modal-overlay';
+      overlay.innerHTML = `
+        <div class="modal" style="max-width: 640px;">
+          <h3>Assign Courses — ${esc(lecturerName)}</h3>
+          <p style="color: var(--muted); font-size: 13px; margin-bottom: 20px;">
+            Check the courses this lecturer teaches. The lecturer will only see these courses in their dashboard.
+          </p>
+          <div id="assignList" style="max-height: 55vh; overflow-y: auto; border: 1px solid var(--border); border-radius: var(--radius); padding: 12px;">
+            ${allCourses.map(c => `
+              <label style="display: flex; align-items: center; gap: 12px; padding: 10px; border-radius: 6px; cursor: pointer; transition: background 0.15s;"
+                     onmouseover="this.style.background='var(--bg-alt)'"
+                     onmouseout="this.style.background='transparent'">
+                <input type="checkbox" class="course-checkbox" data-course-id="${c.id}" ${assignedIds.has(c.id) ? 'checked' : ''}
+                       style="width: 18px; height: 18px; cursor: pointer;" />
+                <div style="flex: 1;">
+                  <div style="font-family: monospace; font-size: 11px; color: var(--gold-500); font-weight: 700; letter-spacing: 0.05em;">${esc(c.code)}</div>
+                  <div style="font-weight: 600; font-size: 14px; margin: 2px 0;">${esc(c.title)}</div>
+                  <div style="font-size: 12px; color: var(--muted);">Trainer label: ${esc(c.trainer)} · ${c.enrolled_count} enrolled</div>
+                </div>
+              </label>
+            `).join('')}
+          </div>
+          <div class="modal-actions">
+            <button class="btn-ghost dark" type="button" data-close>Cancel</button>
+            <button class="btn-primary" id="saveAssignmentsBtn" type="button">Save Assignments</button>
+          </div>
+        </div>`;
+      document.body.appendChild(overlay);
+
+      overlay.addEventListener('click', e => {
+        if (e.target === overlay || e.target.closest('[data-close]')) overlay.remove();
+      });
+
+      overlay.querySelector('#saveAssignmentsBtn').addEventListener('click', async (e) => {
+        const btn = e.target;
+        btn.disabled = true;
+        btn.textContent = 'Saving...';
+
+        try {
+          const checkboxes = overlay.querySelectorAll('.course-checkbox');
+          const toAssign = [];
+          const toRemove = [];
+
+          checkboxes.forEach(cb => {
+            const cid = Number(cb.dataset.courseId);
+            const wasAssigned = assignedIds.has(cid);
+            const isChecked = cb.checked;
+
+            if (isChecked && !wasAssigned) toAssign.push(cid);
+            if (!isChecked && wasAssigned) toRemove.push(cid);
+          });
+
+          for (const cid of toAssign) {
+            await api(`/api/admin/lecturers/${lecturerId}/courses`, {
+              method: 'POST',
+              body: { course_id: cid },
+            });
+          }
+          for (const cid of toRemove) {
+            await api(`/api/admin/lecturers/${lecturerId}/courses/${cid}`, {
+              method: 'DELETE',
+            });
+          }
+
+          overlay.remove();
+          toast(`Assignments saved (${toAssign.length} added, ${toRemove.length} removed)`);
+          await loadLecturers();
+        } catch (err) {
+          toast(err.message, 'error');
+          btn.disabled = false;
+          btn.textContent = 'Save Assignments';
+        }
+      });
+    } catch (err) {
+      toast('Could not open assignments: ' + err.message, 'error');
+    }
+  }
+
+  function wireLecturerActions() {
+    const handle = async (e) => {
+      const btn = e.target.closest('button[data-act]');
+      if (!btn) return;
+      const id = btn.dataset.id;
+      const act = btn.dataset.act;
+      try {
+        if (act === 'approve-lect')    { await api(`/api/admin/lecturers/${id}/approve`, { method: 'POST' }); toast('Lecturer approved'); }
+        if (act === 'reject-lect')     { if (!confirm('Reject?')) return; await api(`/api/admin/lecturers/${id}/reject`, { method: 'POST' }); toast('Lecturer rejected'); }
+        if (act === 'suspend-lect')    { if (!confirm('Suspend this lecturer?')) return; await api(`/api/admin/lecturers/${id}/suspend`, { method: 'POST' }); toast('Lecturer suspended'); }
+        if (act === 'reactivate-lect') { await api(`/api/admin/lecturers/${id}/reactivate`, { method: 'POST' }); toast('Lecturer reactivated'); }
+        if (act === 'delete-lect')     { if (!confirm('Delete permanently?')) return; await api(`/api/admin/lecturers/${id}`, { method: 'DELETE' }); toast('Lecturer deleted'); }
+        if (act === 'assign-courses')  { return openAssignCoursesModal(id, btn.dataset.name); }
+        await loadLecturers();
+      } catch (err) { toast(err.message, 'error'); }
+    };
+    document.querySelector('#pendingLecturersTable').addEventListener('click', handle);
+    document.querySelector('#lecturersTable').addEventListener('click', handle);
+  }
 
   async function refreshCaches() {
     coursesCache = await api('/api/admin/courses');
@@ -347,6 +346,51 @@ function wireLecturerActions() {
     $('#statCourses').textContent       = s.courses;
     $('#statEnrollments').textContent   = s.enrollments;
     $('#statAnnouncements').textContent = s.announcements;
+  }
+
+  // ---------- NEW: Admissions ----------
+  async function loadAdmissions() {
+    try {
+      const r = await api('/api/admin/students');
+      const pending = r.filter(s => s.status === 'pending');
+      
+      $('#admissionsTable tbody').innerHTML = pending.map(s => `
+        <tr>
+          <td>${esc(s.reg_no)}</td>
+          <td>${esc(s.name)}</td>
+          <td>${esc(s.course)}</td>
+          <td>${new Date(s.created_at).toLocaleDateString()}</td>
+          <td>
+            <button class="btn-xs" data-act="approve-student" data-id="${s.id}">Approve</button>
+            <button class="btn-xs danger" data-act="reject-student" data-id="${s.id}">Reject</button>
+          </td>
+        </tr>
+      `).join('') || '<tr><td colspan="5" class="empty">No pending applications.</td></tr>';
+
+      // Wire buttons for the admissions table
+      const tbody = $('#admissionsTable tbody');
+      tbody.addEventListener('click', async (e) => {
+        const btn = e.target.closest('button[data-act]');
+        if (!btn) return;
+        const id = btn.dataset.id;
+        const act = btn.dataset.act;
+        
+        try {
+          if (act === 'approve-student') {
+            await api(`/api/admin/students/${id}/approve`, { method: 'POST' });
+            toast('Student approved ✅');
+          }
+          if (act === 'reject-student') {
+            if (!confirm('Reject this student?')) return;
+            await api(`/api/admin/students/${id}/reject`, { method: 'POST' });
+            toast('Student rejected', 'error');
+          }
+          await loadAdmissions();
+        } catch (err) { toast(err.message, 'error'); }
+      }, { once: true }); // Use once:true to prevent duplicate listeners if reloaded
+    } catch (err) {
+      toast('Could not load admissions: ' + err.message, 'error');
+    }
   }
 
   let currentSubmit = null;
@@ -431,7 +475,7 @@ if (bulkBtn) bulkBtn.addEventListener('click', openBulkAssignModal);
     $('#addCourseBtn').addEventListener('click', async () => {
   let lecturers = [];
   try {
-    lecturers = await api('/api/admin/lecturers/approved');
+    lecturers = await api('/api/admin/lecturers');
   } catch (_) {}
 
   openModal('Add Course', [
@@ -444,7 +488,6 @@ if (bulkBtn) bulkBtn.addEventListener('click', openBulkAssignModal);
       ) },
     { name: 'description', label: 'Description', type: 'textarea' }
   ], async d => {
-    // Create course first
     const payload = {
       code: d.code,
       title: d.title,
@@ -453,7 +496,6 @@ if (bulkBtn) bulkBtn.addEventListener('click', openBulkAssignModal);
     };
     await api('/api/admin/courses', { method: 'POST', body: payload });
 
-    // If a lecturer was chosen, we need the new course's ID → reload and assign
     if (d.lecturer_id) {
       coursesCache = [];
       const refreshed = await api('/api/admin/courses');
@@ -757,7 +799,6 @@ if (addLectBtn) {
   const rows = await api('/api/admin/courses-full');
   coursesCache = rows;
 
-  // Search bar
   const panel = document.querySelector('#panel-courses');
   let searchWrap = panel.querySelector('.courses-search');
   if (!searchWrap) {
@@ -814,7 +855,6 @@ if (addLectBtn) {
 
   renderCourseRows();
 
-  // Rebind search
   const searchInput = document.getElementById('courseSearchInput');
   searchInput.value = '';
   searchInput.oninput = () => renderCourseRows(searchInput.value);
@@ -998,10 +1038,9 @@ async function openBulkAssignModal() {
   const course = coursesCache.find(c => c.id === courseId);
   if (!course) return;
 
-  // Fetch approved lecturers
   let lecturers = [];
   try {
-    lecturers = await api('/api/admin/lecturers/approved');
+    lecturers = await api('/api/admin/lecturers');
   } catch (e) {
     return toast('Could not load lecturers: ' + e.message, 'error');
   }
@@ -1010,7 +1049,6 @@ async function openBulkAssignModal() {
     return toast('No approved lecturers yet. Approve a lecturer first.', 'error');
   }
 
-  // Build a custom modal
   const overlay = document.createElement('div');
   overlay.className = 'modal-overlay';
   overlay.innerHTML = `
@@ -1657,31 +1695,4 @@ async function openBulkAssignModal() {
       toast('Live class deleted.');
     } catch (e) { toast(e.message, 'error'); }
   }
-}
-
-async function loadAdmissions() {
-  const r = await api('/api/admin/students');
-  const pending = r.filter(s => s.status === 'pending');
-  
-  $('#admissionsTable tbody').innerHTML = pending.map(s => `
-    <tr>
-      <td>${esc(s.reg_no)}</td>
-      <td>${esc(s.name)}</td>
-      <td>${esc(s.course)}</td>
-      <td>${new Date(s.created_at).toLocaleDateString()}</td>
-      <td>
-        <button class="btn-xs" data-act="approve-student" data-id="${s.id}">Approve</button>
-        <button class="btn-xs danger" data-act="reject-student" data-id="${s.id}">Reject</button>
-      </td>
-    </tr>
-  `).join('') || '<tr><td colspan="5" class="empty">No pending applications.</td></tr>';
-
-  // Wire buttons
-  $('#admissionsTable').querySelectorAll('[data-act="approve-student"]').forEach(btn => {
-    btn.onclick = async () => {
-      await api(`/api/admin/students/${btn.dataset.id}/approve`, { method: 'POST' });
-      toast('Student approved');
-      loadAdmissions();
-    };
-  });
 }
