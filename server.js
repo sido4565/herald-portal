@@ -2765,17 +2765,31 @@ app.post('/api/student/exams/:attemptId/submit', authStudent, async (req, res) =
 const { Mpesa, isStkCallbackSuccess, getCallbackValue } = require('pesafy');
 
 // Initialize the client (place this near the top with other imports)
-const mpesa = new Mpesa({
-  consumerKey: process.env.MPESA_CONSUMER_KEY,
-  consumerSecret: process.env.MPESA_CONSUMER_SECRET,
-  environment: process.env.MPESA_ENV || 'sandbox',
-  lipaNaMpesaShortCode: process.env.MPESA_SHORTCODE,
-  lipaNaMpesaPassKey: process.env.MPESA_PASSKEY,
-});
+// Safer initialization
+let mpesa = null;
+try {
+  if (process.env.MPESA_CONSUMER_KEY && process.env.MPESA_CONSUMER_SECRET) {
+    mpesa = new Mpesa({
+      consumerKey: process.env.MPESA_CONSUMER_KEY,
+      consumerSecret: process.env.MPESA_CONSUMER_SECRET,
+      environment: process.env.MPESA_ENV || 'sandbox',
+      lipaNaMpesaShortCode: process.env.MPESA_SHORTCODE,
+      lipaNaMpesaPassKey: process.env.MPESA_PASSKEY,
+    });
+    console.log('📱 M-Pesa configured');
+  } else {
+    console.warn('⚠️ M-Pesa keys missing. M-Pesa routes disabled.');
+  }
+} catch (err) {
+  console.error('⚠️ M-Pesa initialization failed:', err.message);
+}
 
 // 1. Trigger the STK Push (Student clicks "Pay with M-Pesa")
 app.post('/api/mpesa/stk-push', authStudent, async (req, res) => {
+  if (!mpesa) return res.status(503).json({ error: 'M-Pesa is not configured on this server.' });
+  
   try {
+    // ... rest of the route
     const { phoneNumber, amount } = req.body;
     
     // pesafy handles the 2547... format automatically
