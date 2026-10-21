@@ -129,10 +129,23 @@
         <ul id="announcements" class="list"></ul>
       </section>
 
-      <section class="card">
+            <section class="card">
         <h3>Fee Statement</h3>
         <div id="feesSummary" class="fees-summary"></div>
         <ul id="feesList" class="list"></ul>
+        
+        <!-- M-Pesa Payment Form -->
+        <div style="margin-top: 20px; padding-top: 20px; border-top: 1px solid #e6e9ed;">
+          <h4 style="margin: 0 0 12px; font-size: 14px; color: #10243a;">💳 Pay via M-Pesa</h4>
+          <div style="display: flex; gap: 8px;">
+            <input type="tel" id="mpesaPhone" placeholder="0712345678" style="flex: 1; padding: 10px; border: 1px solid #dfe4e9; border-radius: 8px; font-size: 14px;" />
+            <input type="number" id="mpesaAmount" placeholder="Amount" style="width: 100px; padding: 10px; border: 1px solid #dfe4e9; border-radius: 8px; font-size: 14px;" />
+          </div>
+          <button id="payMpesaBtn" style="width: 100%; margin-top: 10px; padding: 12px; background: #10b981; color: white; border: none; border-radius: 8px; font-weight: 700; cursor: pointer;">
+            Pay with M-Pesa
+          </button>
+          <p id="mpesaMsg" style="font-size: 12px; margin-top: 8px; text-align: center;"></p>
+        </div>
       </section>
 
       <section class="card">
@@ -251,5 +264,49 @@
 
   <script src="app.js"></script>
   <script src="home-button.js"></script>
+
+    <script>
+    // M-Pesa Payment Handler
+    document.getElementById('payMpesaBtn')?.addEventListener('click', async () => {
+      const phone = document.getElementById('mpesaPhone').value.trim();
+      const amount = document.getElementById('mpesaAmount').value.trim();
+      const msg = document.getElementById('mpesaMsg');
+      const btn = document.getElementById('payMpesaBtn');
+
+      if (!phone || !amount) {
+        msg.textContent = 'Please enter both phone number and amount.';
+        msg.style.color = '#dc2626';
+        return;
+      }
+
+      btn.disabled = true;
+      btn.textContent = 'Sending prompt...';
+      msg.textContent = '';
+      
+      try {
+        const res = await fetch('/api/mpesa/stk-push', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'same-origin',
+          body: JSON.stringify({ phoneNumber: phone, amount: amount })
+        });
+        const data = await res.json();
+
+        if (res.ok) {
+          msg.textContent = '📱 Check your phone for the M-Pesa prompt!';
+          msg.style.color = '#16a34a';
+        } else {
+          msg.textContent = data.error || 'Payment failed.';
+          msg.style.color = '#dc2626';
+        }
+      } catch (err) {
+        msg.textContent = 'Network error. Please try again.';
+        msg.style.color = '#dc2626';
+      } finally {
+        btn.disabled = false;
+        btn.textContent = 'Pay with M-Pesa';
+      }
+    });
+  </script>
 </body>
 </html>
