@@ -1665,7 +1665,7 @@ app.post('/api/admin/lecturers/bulk-assign', authAdmin, async (req, res) => {
 
 // ---------- Students (admin) ----------
 app.get('/api/admin/students', authAdmin, async (req, res) => {
-  const r = await db.execute('SELECT id, reg_no, name, email, course, active, created_at FROM students ORDER BY id DESC');
+  const r = await db.execute('SELECT id, reg_no, name, email, course, active, status, created_at FROM students ORDER BY id DESC');
   res.json(r.rows);
 });
 
