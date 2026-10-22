@@ -709,9 +709,10 @@ if (addLectBtn) {
   }
 
   // ---------------- Students ----------------
-  async function loadStudents() {
+    async function loadStudents() {
     const allRows = await api('/api/admin/students');
-    // Only show students who are active/approved in the main students tab
+    
+    // Only show approved/active students in this tab
     const rows = allRows.filter(s => s.status === 'active' || s.status === null || s.status === undefined);
     studentsCache = rows;
     

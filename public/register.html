@@ -313,34 +313,29 @@
       </div>
     </div>
 
-    <!-- Success View -->
+        <!-- Success View -->
     <div id="successView" style="display:none;">
       <div class="register-head">
         <img src="images/herald-logo.png" alt="Herald" />
-        <h1>Application Pending</h1>
+        <h1>Application Submitted ✅</h1>
         <p>Awaiting Admin Approval</p>
       </div>
       <div class="register-body">
         <div class="success-panel">
-          <h3>Application received! Your admission is pending admin approval. We will email you once approved.</h3>
-          <p class="welcome-msg" id="welcomeName"></p>
-
-          <div class="reg-no-box">
-            <div class="reg-no-label">Your Registration Number</div>
-            <!-- Registration number is hidden until approved -->
-          </div>
-
-          <p class="success-note">
-            We've emailed this to you.<br>
-            <strong>Save this number — you'll need it every time you log in.</strong>
+          <h3>Your application is pending review</h3>
+          <p style="color:#4a5260; font-size:14px; margin-bottom: 24px;">
+            You'll receive an email with your registration number once your account is approved.
           </p>
 
-          <a href="login.html" class="btn-submit" style="display:block; text-decoration:none; text-align:center;">
-            Continue to Login →
+          <p class="welcome-msg" id="welcomeName" style="font-weight: 700; color: #0b1a33;"></p>
+
+          <a href="login.html" class="btn-submit" style="display:block; text-decoration:none; text-align:center; margin-top:24px;">
+            Go to Login →
           </a>
         </div>
       </div>
     </div>
+    
 
   </div>
 
@@ -524,7 +519,6 @@
 
         if (res.ok) {
           // Show success view
-          $('#regNoDisplay').textContent = json.reg_no || 'HRL-XXXX-XXXX';
           $('#welcomeName').textContent = `Welcome, ${json.name || data.name}!`;
           $('#formView').style.display = 'none';
           $('#successView').style.display = 'block';
