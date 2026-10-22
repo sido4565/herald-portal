@@ -302,7 +302,7 @@ app.post('/api/register', async (req, res) => {
     const hash = bcrypt.hashSync(password, 10);
     const reg_no = await generateRegNo();
 
-    // 1. Insert the student (Status defaults to 'pending' in the database)
+    // 1. Insert the student (FORCE Status to 'pending')
     const info = await db.execute({
       sql: 'INSERT INTO students (reg_no, name, email, password, course, status) VALUES (?, ?, ?, ?, ?, ?)',
       args: [reg_no, name.trim(), email.trim().toLowerCase(), hash, course, 'pending'],

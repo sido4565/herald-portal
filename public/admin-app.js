@@ -709,12 +709,13 @@ if (addLectBtn) {
   }
 
   // ---------------- Students ----------------
-    async function loadStudents() {
+  async function loadStudents() {
     const allRows = await api('/api/admin/students');
     
-    // Only show approved/active students in this tab
-    const rows = allRows.filter(s => s.status === 'active' || s.status === null || s.status === undefined);
+    // STRICT FILTER: Only show students explicitly marked as 'active'
+    const rows = allRows.filter(s => s.status === 'active');
     studentsCache = rows;
+    
     
     const tb = $('#studentsTable tbody');
     tb.innerHTML = rows.map(s => `
