@@ -321,16 +321,27 @@ app.post('/api/register', async (req, res) => {
     res.cookie('token', signStudent(s), { httpOnly: true, sameSite: 'lax' });
 
     // 4. Auto-enroll in the selected course
-    const courseRes = await db.execute({
-      sql: 'SELECT id FROM courses WHERE title = ? OR code = ? LIMIT 1',
-      args: [course, course]
-    });
-    
-    if (courseRes.rows.length) {
-      await db.execute({
-        sql: 'INSERT INTO enrollments (student_id, course_id) VALUES (?, ?)',
-        args: [studentId, courseRes.rows[0].id]
+        // 4. Auto-enroll in the selected course (with detailed logging)
+    try {
+      const trimmedCourse = String(course || '').trim();
+      
+      const courseRes = await db.execute({
+        sql: 'SELECT id FROM courses WHERE LOWER(title) = LOWER(?) OR LOWER(code) = LOWER(?) LIMIT 1',
+        args: [trimmedCourse, trimmedCourse]
       });
+      
+      if (courseRes.rows.length) {
+        const courseId = Number(courseRes.rows[0].id);
+        await db.execute({
+          sql: 'INSERT OR IGNORE INTO enrollments (student_id, course_id) VALUES (?, ?)',
+          args: [studentId, courseId]
+        });
+        console.log(`✅ Auto-enrolled student ${studentId} in course ${courseId} (${trimmedCourse})`);
+      } else {
+        console.warn(`⚠️  Course not found for auto-enrollment: "${trimmedCourse}"`);
+      }
+    } catch (enrollErr) {
+      console.error('❌ Auto-enrollment error:', enrollErr.message);
     }
 
     // 6. Return success with the pending message
@@ -408,13 +419,29 @@ app.get('/api/public/courses', async (req, res) => {
 });
 
 app.get('/api/courses', authStudent, async (req, res) => {
-  const courses = await db.execute('SELECT * FROM courses');
-  const enrolled = await db.execute({
-    sql: 'SELECT course_id FROM enrollments WHERE student_id = ?',
-    args: [req.user.id],
-  });
-  const enrolledIds = enrolled.rows.map(r => r.course_id);
-  res.json(courses.rows.map(c => ({ ...c, enrolled: enrolledIds.includes(c.id) })));
+  try {
+    const courses = await db.execute('SELECT * FROM courses');
+    
+    // Fetch enrollments for this student
+    const enrolled = await db.execute({
+      sql: 'SELECT course_id FROM enrollments WHERE student_id = ?',
+      args: [req.user.id],
+    });
+    
+    // Ensure IDs are treated as standard numbers to prevent BigInt mismatch
+    const enrolledIds = enrolled.rows.map(r => Number(r.course_id));
+
+    res.json(courses.rows.map(c => {
+      const cid = Number(c.id);
+      return {
+        ...c,
+        id: cid,
+        enrolled: enrolledIds.includes(cid)
+      };
+    }));
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 app.post('/api/enroll/:courseId', authStudent, async (req, res) => {
