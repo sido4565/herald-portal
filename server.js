@@ -275,16 +275,19 @@ function calcGrade(m) {
 // ==================== STUDENT ROUTES ====================
 app.post('/api/login', async (req, res) => {
   const { reg_no, password } = req.body;
-  // ... fetch student ...
+  if (!reg_no || !password) return res.status(400).json({ error: 'Missing credentials' });
+  const result = await db.execute({ sql: 'SELECT * FROM students WHERE reg_no = ?', args: [reg_no] });
   const s = result.rows[0];
+  
   if (!s || !bcrypt.compareSync(password, s.password))
     return res.status(401).json({ error: 'Invalid registration number or password' });
-
+    
   // NEW: Check approval status
   if (s.status === 'pending') return res.status(403).json({ error: 'Your application is pending admin approval.' });
   if (s.status === 'rejected') return res.status(403).json({ error: 'Your application was rejected. Contact admin.' });
+  
   if (!s.active) return res.status(403).json({ error: 'Account deactivated. Contact admin.' });
-
+  
   res.cookie('token', signStudent(s), { httpOnly: true, sameSite: 'lax' });
   res.json({ ok: true, name: s.name });
 });
