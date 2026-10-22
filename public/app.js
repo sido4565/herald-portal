@@ -264,45 +264,34 @@ async function loadDashboard() {
       : '<li style="color:var(--muted);">No announcements at this time.</li>';
   } catch (e) { console.error(e); }
 
-  // ─── Courses ───
+  // ─── My Enrolled Courses (Updated) ───
   try {
     const courseRes = await fetch('/api/courses');
     const courses = await courseRes.json();
 
-    const courseImageMap = {
-      'WD101':  'web.jpg',
-      'DB201':  'db.jpg',
-      'JS301':  'js.jpg',
-      'PY101':  'python.jpg',
-      'NET210': 'networking.jpg',
-    };
+    // Filter to only show courses the student is enrolled in
+    const myCourses = courses.filter(c => c.enrolled);
 
-    document.getElementById('courses').innerHTML = courses.map(c => {
-      const img = courseImageMap[c.code] || 'web.jpg';
-      return `
-        <li style="display: flex; gap: 16px; align-items: center; padding: 14px 0;">
-          <img
-            src="images/courses/${img}"
-            alt="${esc(c.title)}"
-            style="width: 84px; height: 84px; object-fit: cover; border-radius: 10px; flex-shrink: 0; border: 1px solid var(--border-soft);"
-            onerror="this.style.display='none'"
-          />
-          <div style="flex: 1; min-width: 0;">
-            <strong style="display: block; margin-bottom: 4px;">${esc(c.code)} — ${esc(c.title)}</strong>
-            <p style="margin: 0 0 6px; font-size: 12px; color: var(--muted);">Trainer: ${esc(c.trainer)}</p>
-            ${c.enrolled
-              ? '<button class="btn-enroll" disabled>Enrolled ✓</button>'
-              : `<button class="btn-enroll" data-id="${c.id}">Enroll</button>`}
-          </div>
-        </li>`;
-    }).join('');
-
-    document.querySelectorAll('.btn-enroll[data-id]').forEach(btn => {
-      btn.addEventListener('click', async () => {
-        await fetch(`/api/enroll/${btn.dataset.id}`, { method: 'POST' });
-        loadDashboard();
-      });
-    });
+    if (!myCourses.length) {
+      document.getElementById('courses').innerHTML = '<li style="color:var(--muted);">You are not enrolled in any courses yet.</li>';
+    } else {
+      document.getElementById('courses').innerHTML = myCourses.map(c => {
+        return `
+          <li style="display: flex; gap: 16px; align-items: center; padding: 14px 0;">
+            <img
+              src="images/courses/placeholder.svg"
+              alt="${esc(c.title)}"
+              style="width: 84px; height: 84px; object-fit: cover; border-radius: 10px; flex-shrink: 0; border: 1px solid var(--border-soft);"
+              onerror="this.style.display='none'"
+            />
+            <div style="flex: 1; min-width: 0;">
+              <strong style="display: block; margin-bottom: 4px;">${esc(c.code)} — ${esc(c.title)}</strong>
+              <p style="margin: 0 0 6px; font-size: 12px; color: var(--muted);">Trainer: ${esc(c.trainer)}</p>
+              <span class="pill pill-green" style="font-size: 10px;">✅ Auto-Enrolled</span>
+            </div>
+          </li>`;
+      }).join('');
+    }
   } catch (e) { console.error(e); }
 
   // ─── Results ───
@@ -999,28 +988,4 @@ function generateTranscriptHTML(data) {
     document.addEventListener(ev, reset, { passive: true })
   );
   reset();
-})();
-
-// Check if student has enrolled in any courses
-(async function checkEnrollmentStatus() {
-  try {
-    // Fetch the student's currently enrolled courses
-    const res = await fetch('/api/courses', { credentials: 'same-origin' });
-    if (!res.ok) return; // If not logged in, do nothing
-    
-    const courses = await res.json();
-    
-    // Check if any course has 'enrolled: true'
-    const hasEnrolled = courses.some(c => c.enrolled);
-    
-    // If they haven't enrolled in anything, show the banner
-    if (!hasEnrolled) {
-      const banner = document.getElementById('enrollmentReminder');
-      if (banner) {
-        banner.style.display = 'flex'; // Show the banner
-      }
-    }
-  } catch (err) {
-    console.error('Could not check enrollment status:', err);
-  }
 })();
