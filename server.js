@@ -333,14 +333,6 @@ app.post('/api/register', async (req, res) => {
       });
     }
 
-    // 5. Send the welcome email
-    sendMailSafe('sendWelcomeEmail', {
-      to: s.email,
-      studentName: s.name,
-      regNo: s.reg_no,
-      course: s.course,
-    });
-
     // 6. Return success with the pending message
     res.json({ 
       ok: true, 
@@ -1368,9 +1360,36 @@ app.post('/api/admin/login', async (req, res) => {
 });
 
 // Approve a student
+// Approve a student
 app.post('/api/admin/students/:id/approve', authAdmin, async (req, res) => {
-  await db.execute({ sql: "UPDATE students SET status = 'active' WHERE id = ?", args: [req.params.id] });
-  res.json({ ok: true });
+  try {
+    // 1. Update status to active
+    await db.execute({ 
+      sql: "UPDATE students SET status = 'active' WHERE id = ?", 
+      args: [req.params.id] 
+    });
+
+    // 2. Fetch student details
+    const sRes = await db.execute({
+      sql: 'SELECT name, email, reg_no, course FROM students WHERE id = ?',
+      args: [req.params.id]
+    });
+    const student = sRes.rows[0];
+
+    // 3. Send the welcome email with their new Reg No
+    if (student) {
+      sendMailSafe('sendWelcomeEmail', {
+        to: student.email,
+        studentName: student.name,
+        regNo: student.reg_no,
+        course: student.course,
+      });
+    }
+
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 // Reject a student
