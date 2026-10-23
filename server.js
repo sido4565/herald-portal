@@ -302,19 +302,14 @@ app.post('/api/register', materialUpload.fields([
 ]), async (req, res) => {
   const { name, email, password, course, id_number } = req.body;
 
-  if (!name || !email || !password || !course || !id_number) {
-    return res.status(400).json({ error: 'All fields are required (including ID Number).' });
-  }
-  if (password.length < 6) return res.status(400).json({ error: 'Password must be at least 6 characters.' });
-  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return res.status(400).json({ error: 'Please enter a valid email address.' });
+  // ... validation ...
 
   try {
-    const hash = bcrypt.hashSync(password, 10);
-    const reg_no = await generateRegNo();
-
-    // 1. Upload files to R2
+    // ... generate reg_no ...
     let kcse_url = null, completion_url = null;
     
+    console.log('FILES RECEIVED:', req.files); // <-- ADD THIS LINE TO DEBUG
+
     if (req.files) {
       if (req.files.kcse_certificate && req.files.kcse_certificate[0]) {
         const saved = await saveFile(req.files.kcse_certificate[0]);
@@ -325,6 +320,8 @@ app.post('/api/register', materialUpload.fields([
         completion_url = saved.file_path;
       }
     }
+
+    // ... insert into DB ...
 
     // 2. Insert Student (Status = pending)
     const info = await db.execute({
@@ -1725,8 +1722,13 @@ app.post('/api/admin/students', authAdmin, async (req, res) => {
   let { reg_no, name, email, password, course } = req.body;
   if (!name || !email || !password || !course) return res.status(400).json({ error: 'Name, email, password, and course are required.' });
   if (!reg_no) reg_no = await generateRegNo();
-  try {
+    try {
     const hash = bcrypt.hashSync(password, 10);
+    const reg_no = await generateRegNo(); // <-- ADD THIS
+
+    // 1. Upload files to R2
+    let kcse_url = null, completion_url = null;
+    // ... rest of the code
     await db.execute({
       sql: 'INSERT INTO students (reg_no, name, email, password, course) VALUES (?, ?, ?, ?, ?)',
       args: [reg_no, name, email.trim().toLowerCase(), hash, course],
