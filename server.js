@@ -321,13 +321,21 @@ app.post('/api/register', materialUpload.fields([
       }
     }
 
-    // ... insert into DB ...
-
-    // 2. Insert Student (Status = pending)
+       // 2. Insert Student (Status = pending)
     const info = await db.execute({
       sql: `INSERT INTO students (reg_no, name, email, password, course, status, id_number, kcse_url, completion_url) 
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      args: [reg_no, name.trim(), email.trim().toLowerCase(), hash, course, 'pending', id_number.trim(), kcse_url, completion_url],
+      args: [
+        reg_no, 
+        name.trim(), 
+        email.trim().toLowerCase(), 
+        hash, 
+        course, 
+        'pending', 
+        id_number ? id_number.trim() : null, // <-- Prevent undefined
+        kcse_url || null,                    // <-- Prevent undefined
+        completion_url || null               // <-- Prevent undefined
+      ],
     });
 
     const studentId = info.lastInsertRowid;
