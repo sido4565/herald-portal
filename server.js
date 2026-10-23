@@ -2,6 +2,10 @@
 if (require('fs').existsSync(require('path').join(__dirname, '.env'))) {
   require('dotenv').config();
 }
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('Unhandled Rejection at:', promise, 'reason:', reason);
+  // Do not exit the process
+});
 const express = require('express');
 const cookieParser = require('cookie-parser');
 const bcrypt = require('bcryptjs');
