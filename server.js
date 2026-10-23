@@ -1471,7 +1471,8 @@ app.get('/api/admin/lecturers', authAdmin, async (req, res) => {
   try {
     const r = await db.execute(`
       SELECT id, staff_no, name, email, phone, qualification, specialization,
-             status, approved, created_at, approved_at
+             status, approved, created_at, approved_at,
+             id_number, cv_url, cover_letter_url, testimonials_url, location, address
       FROM lecturers ORDER BY approved ASC, created_at DESC
     `);
     res.json(r.rows);
