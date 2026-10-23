@@ -302,73 +302,88 @@ app.post('/api/register', materialUpload.fields([
 ]), async (req, res) => {
   const { name, email, password, course, id_number } = req.body;
 
-  // ... validation ...
+  if (!name || !email || !password || !course || !id_number) {
+    return res.status(400).json({ error: 'All fields are required (including ID Number).' });
+  }
+  if (password.length < 6) return res.status(400).json({ error: 'Password must be at least 6 characters.' });
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return res.status(400).json({ error: 'Please enter a valid email address.' });
 
   try {
-    // ... generate reg_no ...
+    const hash = bcrypt.hashSync(password, 10);
+    const reg_no = await generateRegNo();
+
+    // 1. Upload files to R2 (safe)
     let kcse_url = null, completion_url = null;
-    
-    console.log('FILES RECEIVED:', req.files); // <-- ADD THIS LINE TO DEBUG
 
     if (req.files) {
-      if (req.files.kcse_certificate && req.files.kcse_certificate[0]) {
-        const saved = await saveFile(req.files.kcse_certificate[0]);
-        kcse_url = saved.file_path;
-      }
-      if (req.files.completion_letter && req.files.completion_letter[0]) {
-        const saved = await saveFile(req.files.completion_letter[0]);
-        completion_url = saved.file_path;
+      try {
+        if (req.files.kcse_certificate && req.files.kcse_certificate[0]) {
+          const saved = await saveFile(req.files.kcse_certificate[0]);
+          kcse_url = saved.file_path;
+        }
+        if (req.files.completion_letter && req.files.completion_letter[0]) {
+          const saved = await saveFile(req.files.completion_letter[0]);
+          completion_url = saved.file_path;
+        }
+      } catch (uploadErr) {
+        console.error('❌ File upload failed:', uploadErr);
+        return res.status(500).json({ error: 'File upload failed. ' + uploadErr.message });
       }
     }
 
-       // 2. Insert Student (Status = pending)
+    // 2. Insert Student (safe — no undefined values)
     const info = await db.execute({
-      sql: `INSERT INTO students (reg_no, name, email, password, course, status, id_number, kcse_url, completion_url) 
+      sql: `INSERT INTO students (reg_no, name, email, password, course, status, id_number, kcse_url, completion_url)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       args: [
-        reg_no, 
-        name.trim(), 
-        email.trim().toLowerCase(), 
-        hash, 
-        course, 
-        'pending', 
-        id_number ? id_number.trim() : null, // <-- Prevent undefined
-        kcse_url || null,                    // <-- Prevent undefined
-        completion_url || null               // <-- Prevent undefined
+        reg_no,
+        String(name).trim(),
+        String(email).trim().toLowerCase(),
+        hash,
+        String(course),
+        'pending',
+        id_number ? String(id_number).trim() : null,
+        kcse_url || null,
+        completion_url || null,
       ],
     });
 
-    const studentId = info.lastInsertRowid;
+    const studentId = Number(info.lastInsertRowid);
 
-    // 3. Auto-enroll
+    // 3. Auto-enroll (safe)
     try {
       const trimmedCourse = String(course || '').trim();
-      let courseRes = await db.execute({
+      const courseRes = await db.execute({
         sql: 'SELECT id FROM courses WHERE LOWER(title) = LOWER(?) OR LOWER(code) = LOWER(?) LIMIT 1',
-        args: [trimmedCourse, trimmedCourse]
+        args: [trimmedCourse, trimmedCourse],
       });
-      
       if (courseRes.rows.length) {
         await db.execute({
           sql: 'INSERT OR IGNORE INTO enrollments (student_id, course_id) VALUES (?, ?)',
-          args: [studentId, courseRes.rows[0].id]
+          args: [studentId, Number(courseRes.rows[0].id)],
         });
+        console.log(`✅ Auto-enrolled student ${studentId} in course ${courseRes.rows[0].id}`);
+      } else {
+        console.warn(`⚠️  Course not found: "${trimmedCourse}"`);
       }
-    } catch (e) { console.error('Auto-enroll error:', e.message); }
+    } catch (e) {
+      console.error('Auto-enroll error:', e.message);
+    }
 
-    res.json({ 
-      ok: true, 
-      reg_no: reg_no, 
-      name: name.trim(), 
-      message: `Application received! Your registration number is ${reg_no}. Await admin approval to log in.` 
+    // 4. Return success
+    res.json({
+      ok: true,
+      reg_no,
+      name: String(name).trim(),
+      message: `Application received! Your registration number is ${reg_no}. Await admin approval to log in.`,
     });
-    
+
   } catch (err) {
     if (String(err.message).includes('UNIQUE')) {
       return res.status(400).json({ error: 'This email is already registered.' });
     }
-    console.error('Registration error:', err);
-    res.status(500).json({ error: 'Registration failed. Please try again.' });
+    console.error('❌ Registration error:', err);
+    res.status(500).json({ error: 'Registration failed: ' + err.message });
   }
 });
 
