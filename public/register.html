@@ -271,7 +271,7 @@
         <p>Herald Trainer and Consultant — Student Portal</p>
       </div>
       <div class="register-body">
-        <form id="registerPageForm" autocomplete="off">
+        <form id="registerPageForm" autocomplete="off" enctype="multipart/form-data">
           <div class="form-group">
             <label for="name">Full Name</label>
             <input id="name" name="name" required />
@@ -301,6 +301,21 @@
               <div class="course-picker-dropdown hidden" id="courseDropdown"></div>
             </div>
           </div>
+
+          <div class="form-group">
+           <label for="id_number">ID / Passport Number</label>
+           <input id="id_number" name="id_number" required />
+          </div>
+
+         <div class="form-group">
+          <label for="kcse_certificate">KCSE Certificate (Optional)</label>
+          <input id="kcse_certificate" name="kcse_certificate" type="file" accept=".pdf,.jpg,.jpeg,.png" />
+         </div>
+
+          <div class="form-group">
+           <label for="completion_letter">Completion Letter (Optional)</label>
+           <input id="completion_letter" name="completion_letter" type="file" accept=".pdf,.jpg,.jpeg,.png" />
+         </div>
 
           <button type="submit" class="btn-submit" id="submitBtn">Apply Now</button>
 
@@ -473,7 +488,7 @@
       });
     })();
 
-    // ─── Form Submit ───
+        // ─── Form Submit ───
     $('#registerPageForm').addEventListener('submit', async (e) => {
       e.preventDefault();
       const form = e.target;
@@ -483,43 +498,42 @@
       msg.className = 'msg';
       msg.textContent = '';
       btn.disabled = true;
-      btn.textContent = 'Creating account...';
+      btn.textContent = 'Submitting application...';
 
-      const data = {
-        name: form.name.value.trim(),
-        email: form.email.value.trim().toLowerCase(),
-        password: form.password.value,
-        course: form.course.value.trim(),
-      };
+      // Build FormData instead of JSON
+      const formData = new FormData();
+      formData.append('name', form.name.value.trim());
+      formData.append('email', form.email.value.trim().toLowerCase());
+      formData.append('password', form.password.value);
+      formData.append('course', form.course.value.trim());
+      formData.append('id_number', form.id_number.value.trim());
 
-      // Basic client-side validation
-      if (!data.name || !data.email || !data.password || !data.course) {
-        msg.className = 'msg error';
-        msg.textContent = 'Please fill in all fields.';
-        btn.disabled = false;
-        btn.textContent = 'Create My Account';
-        return;
+      // Append files
+      if (form.kcse_certificate?.files[0]) {
+        formData.append('kcse_certificate', form.kcse_certificate.files[0]);
       }
-      if (data.password.length < 6) {
-        msg.className = 'msg error';
-        msg.textContent = 'Password must be at least 6 characters.';
-        btn.disabled = false;
-        btn.textContent = 'Create My Account';
-        return;
+      if (form.completion_letter?.files[0]) {
+        formData.append('completion_letter', form.completion_letter.files[0]);
       }
 
-        try {
-        btn.disabled = true; // <-- ADD THIS LINE
+      // Basic validation
+      if (!formData.get('name') || !formData.get('email') || !formData.get('password') || !formData.get('course') || !formData.get('id_number')) {
+        msg.className = 'msg error';
+        msg.textContent = 'Please fill in all required fields.';
+        btn.disabled = false;
+        btn.textContent = 'Apply Now';
+        return;
+      }
+
+      try {
         const res = await fetch('/api/register', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(data),
+          body: formData, // Send as multipart/form-data (no headers!)
         });
         const json = await res.json();
 
         if (res.ok) {
-          // Show success view
-          $('#welcomeName').textContent = `Welcome, ${json.name || data.name}!`;
+          $('#welcomeName').textContent = `Welcome, ${json.name}!`;
           $('#formView').style.display = 'none';
           $('#successView').style.display = 'block';
           window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -527,13 +541,13 @@
           msg.className = 'msg error';
           msg.textContent = json.error || 'Registration failed. Please try again.';
           btn.disabled = false;
-          btn.textContent = 'Create My Account';
+          btn.textContent = 'Apply Now';
         }
       } catch (err) {
         msg.className = 'msg error';
-        msg.textContent = 'Network error. Please check your connection and try again.';
+        msg.textContent = 'Network error. Please check your connection.';
         btn.disabled = false;
-        btn.textContent = 'Create My Account';
+        btn.textContent = 'Apply Now';
       }
     });
 

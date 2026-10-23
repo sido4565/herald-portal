@@ -292,9 +292,15 @@ app.post('/api/login', async (req, res) => {
   res.json({ ok: true, name: s.name });
 });
 
-app.post('/api/register', async (req, res) => {
-  const { name, email, password, course } = req.body;
-  if (!name || !email || !password || !course) return res.status(400).json({ error: 'All fields are required.' });
+app.post('/api/register', materialUpload.fields([
+  { name: 'kcse_certificate', maxCount: 1 },
+  { name: 'completion_letter', maxCount: 1 }
+]), async (req, res) => {
+  const { name, email, password, course, id_number } = req.body;
+
+  if (!name || !email || !password || !course || !id_number) {
+    return res.status(400).json({ error: 'All fields are required (including ID Number).' });
+  }
   if (password.length < 6) return res.status(400).json({ error: 'Password must be at least 6 characters.' });
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return res.status(400).json({ error: 'Please enter a valid email address.' });
 
@@ -302,54 +308,50 @@ app.post('/api/register', async (req, res) => {
     const hash = bcrypt.hashSync(password, 10);
     const reg_no = await generateRegNo();
 
-    // 1. Insert the student (FORCE Status to 'pending')
+    // 1. Upload files to R2
+    let kcse_url = null, completion_url = null;
+    
+    if (req.files) {
+      if (req.files.kcse_certificate && req.files.kcse_certificate[0]) {
+        const saved = await saveFile(req.files.kcse_certificate[0]);
+        kcse_url = saved.file_path;
+      }
+      if (req.files.completion_letter && req.files.completion_letter[0]) {
+        const saved = await saveFile(req.files.completion_letter[0]);
+        completion_url = saved.file_path;
+      }
+    }
+
+    // 2. Insert Student (Status = pending)
     const info = await db.execute({
-      sql: 'INSERT INTO students (reg_no, name, email, password, course, status) VALUES (?, ?, ?, ?, ?, ?)',
-      args: [reg_no, name.trim(), email.trim().toLowerCase(), hash, course, 'pending'],
+      sql: `INSERT INTO students (reg_no, name, email, password, course, status, id_number, kcse_url, completion_url) 
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      args: [reg_no, name.trim(), email.trim().toLowerCase(), hash, course, 'pending', id_number.trim(), kcse_url, completion_url],
     });
 
     const studentId = info.lastInsertRowid;
 
-    // 2. Fetch the newly created student to sign the token
-    const sRes = await db.execute({
-      sql: 'SELECT * FROM students WHERE id = ?',
-      args: [studentId],
-    });
-    const s = sRes.rows[0];
-    
-    // 3. Set the cookie (so they are technically logged in, but restricted by status)
-    res.cookie('token', signStudent(s), { httpOnly: true, sameSite: 'lax' });
-
-    // 4. Auto-enroll in the selected course
-        // 4. Auto-enroll in the selected course (with detailed logging)
+    // 3. Auto-enroll
     try {
       const trimmedCourse = String(course || '').trim();
-      
-      const courseRes = await db.execute({
+      let courseRes = await db.execute({
         sql: 'SELECT id FROM courses WHERE LOWER(title) = LOWER(?) OR LOWER(code) = LOWER(?) LIMIT 1',
         args: [trimmedCourse, trimmedCourse]
       });
       
       if (courseRes.rows.length) {
-        const courseId = Number(courseRes.rows[0].id);
         await db.execute({
           sql: 'INSERT OR IGNORE INTO enrollments (student_id, course_id) VALUES (?, ?)',
-          args: [studentId, courseId]
+          args: [studentId, courseRes.rows[0].id]
         });
-        console.log(`✅ Auto-enrolled student ${studentId} in course ${courseId} (${trimmedCourse})`);
-      } else {
-        console.warn(`⚠️  Course not found for auto-enrollment: "${trimmedCourse}"`);
       }
-    } catch (enrollErr) {
-      console.error('❌ Auto-enrollment error:', enrollErr.message);
-    }
+    } catch (e) { console.error('Auto-enroll error:', e.message); }
 
-    // 6. Return success with the pending message
     res.json({ 
       ok: true, 
-      reg_no: s.reg_no, 
-      name: s.name, 
-      message: `Application received! Your registration number is ${s.reg_no}. Await admin approval to log in.` 
+      reg_no: reg_no, 
+      name: name.trim(), 
+      message: `Application received! Your registration number is ${reg_no}. Await admin approval to log in.` 
     });
     
   } catch (err) {

@@ -354,18 +354,25 @@ if ($('#adminName')) {
       const r = await api('/api/admin/students');
       const pending = r.filter(s => s.status === 'pending');
       
-      $('#admissionsTable tbody').innerHTML = pending.map(s => `
+            $('#admissionsTable tbody').innerHTML = pending.map(s => `
         <tr>
-          <td>${esc(s.reg_no)}</td>
-          <td>${esc(s.name)}</td>
+          <td>
+            <strong>${esc(s.name)}</strong><br>
+            <span style="font-size:11px; color:var(--muted);">ID: ${esc(s.id_number || '—')}</span>
+          </td>
+          <td>${esc(s.email)}</td>
           <td>${esc(s.course)}</td>
+          <td>
+            ${s.kcse_url ? `<a href="${s.kcse_url}" target="_blank" class="btn-xs" style="margin-right:4px; text-decoration:none;">KCSE</a>` : ''}
+            ${s.completion_url ? `<a href="${s.completion_url}" target="_blank" class="btn-xs" style="text-decoration:none;">Cert</a>` : ''}
+          </td>
           <td>${new Date(s.created_at).toLocaleDateString()}</td>
           <td>
             <button class="btn-xs" data-act="approve-student" data-id="${s.id}">Approve</button>
             <button class="btn-xs danger" data-act="reject-student" data-id="${s.id}">Reject</button>
           </td>
         </tr>
-      `).join('') || '<tr><td colspan="5" class="empty">No pending applications.</td></tr>';
+      `).join('') || '<tr><td colspan="6" class="empty">No pending applications.</td></tr>';
 
       // Wire buttons for the admissions table
       const tbody = $('#admissionsTable tbody');
