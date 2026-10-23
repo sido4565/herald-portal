@@ -354,7 +354,7 @@ if ($('#adminName')) {
       const r = await api('/api/admin/students');
       const pending = r.filter(s => s.status === 'pending');
       
-            $('#admissionsTable tbody').innerHTML = pending.map(s => `
+        $('#admissionsTable tbody').innerHTML = pending.map(s => `
         <tr>
           <td>
             <strong>${esc(s.name)}</strong><br>
@@ -365,6 +365,7 @@ if ($('#adminName')) {
           <td>
             ${s.kcse_url ? `<a href="${s.kcse_url}" target="_blank" class="btn-xs" style="margin-right:4px; text-decoration:none;">KCSE</a>` : ''}
             ${s.completion_url ? `<a href="${s.completion_url}" target="_blank" class="btn-xs" style="text-decoration:none;">Cert</a>` : ''}
+            ${(!s.kcse_url && !s.completion_url) ? '<span style="color:var(--muted); font-size:12px;">None</span>' : ''}
           </td>
           <td>${new Date(s.created_at).toLocaleDateString()}</td>
           <td>
