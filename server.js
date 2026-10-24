@@ -2781,6 +2781,66 @@ app.get('/api/health', (req, res) => {
     mailTo: process.env.MAIL_TO || null,
   });
 });
+
+// ═══════════════════════════════════════════════════════════════
+// HELP BOT — Stage 1: FAQ matching only (no AI yet)
+// ═══════════════════════════════════════════════════════════════
+const { findBestFaq } = require('./help-faq');
+
+// Simple in-memory rate limit: max 30 messages / 5 minutes / IP
+const helpRateLimit = new Map(); // ip -> [timestamps]
+function helpRateLimited(ip) {
+  const now = Date.now();
+  const windowMs = 5 * 60 * 1000;
+  const max = 30;
+  const arr = (helpRateLimit.get(ip) || []).filter(t => now - t < windowMs);
+  if (arr.length >= max) return true;
+  arr.push(now);
+  helpRateLimit.set(ip, arr);
+  return false;
+}
+
+app.post('/api/help/ask', async (req, res) => {
+  try {
+    const ip = req.headers['x-forwarded-for']?.split(',')[0]?.trim() || req.ip || 'unknown';
+    if (helpRateLimited(ip)) {
+      return res.status(429).json({ error: 'Too many messages. Please wait a few minutes.' });
+    }
+
+    const message = String(req.body?.message || '').trim().slice(0, 500);
+    if (!message) return res.status(400).json({ error: 'Message required.' });
+
+    // Who is asking? (session-aware — Stage 3 will use this for AI context)
+    const who = req.session?.student ? 'student'
+              : req.session?.lecturer ? 'lecturer'
+              : req.session?.admin ? 'admin'
+              : 'visitor';
+
+    // Stage 1: FAQ match only
+    const match = findBestFaq(message);
+    if (match) {
+      return res.json({
+        source: 'faq',
+        matched_question: match.faq.question,
+        answer: match.faq.answer,
+        category: match.faq.category,
+        who,
+      });
+    }
+
+    // No FAQ match — in Stage 1 we just say so (Stage 3 adds AI here)
+    return res.json({
+      source: 'fallback',
+      answer: "I'm not sure about that one yet. I can help with: registration, fees & M-Pesa, courses, exams, transcripts & certificates, lecturer applications, and login issues. Try rephrasing your question, or email support@heraldtrainer.co.ke for a human reply.",
+      who,
+    });
+  } catch (err) {
+    console.error('Help bot error:', err);
+    res.status(500).json({ error: 'Help bot temporarily unavailable.' });
+  }
+});
+
+
 app.listen(PORT, () => console.log(`Herald Portal running on http://localhost:${PORT}`));
 
 app.get('/api/student/exams', authStudent, async (req, res) => {
