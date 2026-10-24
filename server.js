@@ -2828,12 +2828,58 @@ app.post('/api/help/ask', async (req, res) => {
       });
     }
 
-    // No FAQ match — in Stage 1 we just say so (Stage 3 adds AI here)
-    return res.json({
-      source: 'fallback',
-      answer: "I'm not sure about that one yet. I can help with: registration, fees & M-Pesa, courses, exams, transcripts & certificates, lecturer applications, and login issues. Try rephrasing your question, or email support@heraldtrainer.co.ke for a human reply.",
-      who,
-    });
+    // No FAQ match — try Groq AI
+    const groqKey = process.env.GROQ_API_KEY;
+    if (!groqKey) {
+      return res.json({
+        source: 'fallback',
+        answer: "I'm not sure about that one yet. I can help with: registration, fees & M-Pesa, courses, exams, transcripts & certificates, lecturer applications, and login issues. Try rephrasing your question, or email support@heraldtrainer.co.ke for a human reply.",
+        who,
+      });
+    }
+
+    try {
+      const groqRes = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Authorization': 'Bearer ' + groqKey,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          model: 'openai/gpt-oss-120b',
+          messages: [
+            {
+              role: 'system',
+              content: 'You are the Herald Trainer help assistant for heraldtrainer.co.ke, a training institution in Kenya. Answer questions about: registration, fees and M-Pesa payments, courses, exams, transcripts/certificates, lecturer applications, login issues, and general portal usage. Be concise (2-4 sentences). If you do not know, say so and suggest emailing support@heraldtrainer.co.ke. Never make up fee amounts or dates. The user asking is a ' + who + '.'
+            },
+            { role: 'user', content: message }
+          ],
+          temperature: 0.3,
+          max_tokens: 300,
+        }),
+      });
+
+      if (!groqRes.ok) {
+        const errText = await groqRes.text();
+        console.error('Groq API error:', groqRes.status, errText);
+        throw new Error('Groq returned ' + groqRes.status);
+      }
+
+      const groqData = await groqRes.json();
+      const aiAnswer = groqData?.choices?.[0]?.message?.content?.trim();
+
+      if (aiAnswer) {
+        return res.json({ source: 'ai', answer: aiAnswer, who });
+      }
+      throw new Error('Empty AI response');
+    } catch (groqErr) {
+      console.error('Groq fallback failed:', groqErr.message);
+      return res.json({
+        source: 'fallback',
+        answer: "I'm not sure about that one yet. I can help with: registration, fees & M-Pesa, courses, exams, transcripts & certificates, lecturer applications, and login issues. Try rephrasing your question, or email support@heraldtrainer.co.ke for a human reply.",
+        who,
+      });
+    }
   } catch (err) {
     console.error('Help bot error:', err);
     res.status(500).json({ error: 'Help bot temporarily unavailable.' });
