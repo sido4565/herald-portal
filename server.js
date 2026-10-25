@@ -19,14 +19,22 @@ const courseFeeCatalog = require('./course-fees');
 const partnerPrograms = require('./partner-programs');
 const ADMISSION_FEE = 3000;
 
-function paymentErrorMessage(err) {
-  return [err?.message, err?.errorMessage, err?.description, err?.cause?.message]
-    .find(value => typeof value === 'string' && value.trim())
-    || 'Payment request failed. Please contact the school if the problem continues.';
+function paymentErrorMessage(err, phase = 'M-Pesa request') {
+  const message = [err?.message, err?.errorMessage, err?.description, err?.cause?.message]
+    .find(value => typeof value === 'string' && value.trim());
+  if (message) return `${phase}: ${message}`;
+  const code = [err?.code, err?.errorCode, err?.name]
+    .find(value => typeof value === 'string' && value.trim());
+  if (phase === 'saving the purchase record') {
+    return `The M-Pesa prompt may have been sent, but purchase tracking failed${code ? ` (${code})` : ''}. Check your phone and contact the school before retrying.`;
+  }
+  return `M-Pesa could not start the payment prompt${code ? ` (${code})` : ''}. Please contact the school if the problem continues.`;
 }
 
-function logPaymentFailure(context, err) {
+function logPaymentFailure(context, err, phase) {
   console.error(context, {
+    phase,
+    errorType: err?.constructor?.name || typeof err,
     code: err?.code || err?.errorCode || undefined,
     status: err?.statusCode || err?.status || err?.response?.status || undefined,
     message: paymentErrorMessage(err),
@@ -577,11 +585,13 @@ app.post('/api/public/materials/:id/pay', async (req, res) => {
     args: [material.id, phoneNumber],
   });
   if (pending.rows.length) return res.status(409).json({ error: 'A payment prompt for this material is already pending. Approve it or wait for it to expire before trying again.' });
+  let paymentPhase = 'starting the M-Pesa prompt';
   try {
     const amount = Math.round(Number(material.price));
     if (!Number.isInteger(amount) || amount < 1) return res.status(400).json({ error: 'This material has an invalid price. Please contact the school.' });
     const push = await startMpesaStkPush({ amount, phoneNumber, accountReference: `BOOK${material.id}`, transactionDesc: `Resource ${material.id}` });
     if (!push.CheckoutRequestID) throw new Error('M-Pesa did not return a checkout request ID.');
+    paymentPhase = 'saving the purchase record';
     const accessToken = crypto.randomBytes(32).toString('hex');
     const tokenHash = crypto.createHash('sha256').update(accessToken).digest('hex');
     await db.execute({
@@ -591,8 +601,8 @@ app.post('/api/public/materials/:id/pay', async (req, res) => {
     });
     res.json({ ok: true, message: 'Approve the M-Pesa prompt on your phone.', checkoutRequestId: push.CheckoutRequestID, accessToken });
   } catch (err) {
-    logPaymentFailure('Guest material M-Pesa request failed:', err);
-    res.status(502).json({ error: paymentErrorMessage(err) });
+    logPaymentFailure('Guest material M-Pesa request failed:', err, paymentPhase);
+    res.status(502).json({ error: paymentErrorMessage(err, paymentPhase) });
   }
 });
 
