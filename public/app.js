@@ -287,6 +287,7 @@ async function loadDashboard() {
             <div style="flex: 1; min-width: 0;">
               <strong style="display: block; margin-bottom: 4px;">${esc(c.code)} — ${esc(c.title)}</strong>
               <p style="margin: 0 0 6px; font-size: 12px; color: var(--muted);">Trainer: ${esc(c.trainer)}</p>
+              <p style="margin: 0 0 8px; font-size: 13px; font-weight: 700; color: var(--gold, #b8860b);">${esc(c.fee_type)}: KES ${Number(c.fee || 0).toLocaleString()}</p>
               <span class="pill pill-green" style="font-size: 10px;">✅ Auto-Enrolled</span>
             </div>
           </li>`;

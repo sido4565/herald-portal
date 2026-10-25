@@ -490,6 +490,7 @@ if (bulkBtn) bulkBtn.addEventListener('click', openBulkAssignModal);
     { name: 'code',        label: 'Code', required: true },
     { name: 'title',       label: 'Title', required: true },
     { name: 'trainer',     label: 'Trainer (text, used if no lecturer assigned)' },
+    { name: 'fee',          label: 'Course fee (KES; blank uses catalog price or KES 3,000 admission fee)', type: 'number' },
     { name: 'lecturer_id', label: 'Assigned Lecturer', type: 'select',
       options: [{ value: '', label: '— None —' }].concat(
         lecturers.map(l => ({ value: l.id, label: `${l.name} — ${l.staff_no}` }))
@@ -500,6 +501,7 @@ if (bulkBtn) bulkBtn.addEventListener('click', openBulkAssignModal);
       code: d.code,
       title: d.title,
       trainer: d.trainer || 'Unassigned',
+      fee: d.fee ? Number(d.fee) : null,
       description: d.description,
     };
     await api('/api/admin/courses', { method: 'POST', body: payload });

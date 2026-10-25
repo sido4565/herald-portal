@@ -61,7 +61,8 @@ async function initSchema() {
       code TEXT UNIQUE NOT NULL,
       title TEXT NOT NULL,
       trainer TEXT NOT NULL,
-      description TEXT
+      description TEXT,
+      fee REAL
     )`,
     `CREATE TABLE IF NOT EXISTS enrollments (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -207,6 +208,10 @@ async function initSchema() {
 
   for (const sql of statements) {
     await client.execute(sql);
+  }
+  const courseColumns = await client.execute('PRAGMA table_info(courses)');
+  if (!courseColumns.rows.some(column => column.name === 'fee')) {
+    await client.execute('ALTER TABLE courses ADD COLUMN fee REAL');
   }
   console.log('✅ Schema ready');
 }

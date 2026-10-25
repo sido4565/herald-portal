@@ -14,6 +14,38 @@ const path = require('path');
 const fs = require('fs');
 const multer = require('multer');
 const db = require('./database');
+const courseFeeCatalog = require('./course-fees');
+const ADMISSION_FEE = 3000;
+
+function getCourseFee(course) {
+  const adminFee = Number(course.fee);
+  if (Number.isFinite(adminFee) && adminFee > 0) return { amount: adminFee, label: 'Course fee' };
+  const catalogCourse = courseFeeCatalog.find(item => item.code === course.code);
+  if (catalogCourse && Number(catalogCourse.fee) > 0) return { amount: Number(catalogCourse.fee), label: 'Course fee' };
+  return { amount: ADMISSION_FEE, label: 'Admission fee' };
+}
+
+async function ensureStudentCourseFees(studentId) {
+  const enrolled = await db.execute({
+    sql: `SELECT c.id, c.code, c.title, c.fee FROM courses c
+          JOIN enrollments e ON e.course_id = c.id WHERE e.student_id = ?`,
+    args: [studentId],
+  });
+  for (const course of enrolled.rows) {
+    const fee = getCourseFee(course);
+    const term = `${fee.label}: ${course.title}`;
+    const existing = await db.execute({
+      sql: 'SELECT id FROM fees WHERE student_id = ? AND term = ? LIMIT 1',
+      args: [studentId, term],
+    });
+    if (!existing.rows.length) {
+      await db.execute({
+        sql: 'INSERT INTO fees (student_id, term, amount_due, amount_paid, status) VALUES (?, ?, ?, 0, ?)',
+        args: [studentId, term, fee.amount, 'unpaid'],
+      });
+    }
+  }
+}
 const PDFDocument = require('pdfkit');
 const { sendSMS } = require('./sms');
 
@@ -354,7 +386,7 @@ app.post('/api/register', materialUpload.fields([
     try {
       const trimmedCourse = String(course || '').trim();
       const courseRes = await db.execute({
-        sql: 'SELECT id FROM courses WHERE LOWER(title) = LOWER(?) OR LOWER(code) = LOWER(?) LIMIT 1',
+        sql: 'SELECT id, code, title, fee FROM courses WHERE LOWER(title) = LOWER(?) OR LOWER(code) = LOWER(?) LIMIT 1',
         args: [trimmedCourse, trimmedCourse],
       });
       if (courseRes.rows.length) {
@@ -362,6 +394,7 @@ app.post('/api/register', materialUpload.fields([
           sql: 'INSERT OR IGNORE INTO enrollments (student_id, course_id) VALUES (?, ?)',
           args: [studentId, Number(courseRes.rows[0].id)],
         });
+        await ensureStudentCourseFees(studentId);
         console.log(`✅ Auto-enrolled student ${studentId} in course ${courseRes.rows[0].id}`);
       } else {
         console.warn(`⚠️  Course not found: "${trimmedCourse}"`);
@@ -459,9 +492,12 @@ app.get('/api/courses', authStudent, async (req, res) => {
 
     res.json(courses.rows.map(c => {
       const cid = Number(c.id);
+      const resolvedFee = getCourseFee(c);
       return {
         ...c,
         id: cid,
+        fee: resolvedFee.amount,
+        fee_type: resolvedFee.label,
         enrolled: enrolledIds.includes(cid)
       };
     }));
@@ -481,6 +517,7 @@ app.post('/api/enroll/:courseId', authStudent, async (req, res) => {
     sql: 'INSERT INTO enrollments (student_id, course_id) VALUES (?, ?)',
     args: [req.user.id, cid],
   });
+  await ensureStudentCourseFees(req.user.id);
   res.json({ ok: true });
 });
 
@@ -500,6 +537,7 @@ app.get('/api/announcements', authStudent, async (req, res) => {
 });
 
 app.get('/api/my-fees', authStudent, async (req, res) => {
+  await ensureStudentCourseFees(req.user.id);
   const r = await db.execute({
     sql: 'SELECT * FROM fees WHERE student_id = ? ORDER BY term DESC',
     args: [req.user.id],
@@ -1832,22 +1870,22 @@ app.get('/api/admin/courses', authAdmin, async (req, res) => {
 });
 
 app.post('/api/admin/courses', authAdmin, async (req, res) => {
-  const { code, title, trainer, description } = req.body;
+  const { code, title, trainer, description, fee } = req.body;
   if (!code || !title || !trainer) return res.status(400).json({ error: 'Code, title, trainer required' });
   try {
     await db.execute({
-      sql: 'INSERT INTO courses (code, title, trainer, description) VALUES (?, ?, ?, ?)',
-      args: [code, title, trainer, description || ''],
+      sql: 'INSERT INTO courses (code, title, trainer, description, fee) VALUES (?, ?, ?, ?, ?)',
+      args: [code, title, trainer, description || '', Number(fee) > 0 ? Number(fee) : null],
     });
     res.json({ ok: true });
   } catch { res.status(400).json({ error: 'Course code already exists' }); }
 });
 
 app.put('/api/admin/courses/:id', authAdmin, async (req, res) => {
-  const { code, title, trainer, description } = req.body;
+  const { code, title, trainer, description, fee } = req.body;
   await db.execute({
-    sql: 'UPDATE courses SET code = ?, title = ?, trainer = ?, description = ? WHERE id = ?',
-    args: [code, title, trainer, description || '', req.params.id],
+    sql: 'UPDATE courses SET code = ?, title = ?, trainer = ?, description = ?, fee = ? WHERE id = ?',
+    args: [code, title, trainer, description || '', Number(fee) > 0 ? Number(fee) : null, req.params.id],
   });
   res.json({ ok: true });
 });
