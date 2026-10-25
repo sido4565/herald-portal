@@ -12,6 +12,7 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const path = require('path');
 const fs = require('fs');
+const crypto = require('crypto');
 const multer = require('multer');
 const db = require('./database');
 const courseFeeCatalog = require('./course-fees');
@@ -546,6 +547,62 @@ app.get('/api/public/materials/:id/download', async (req, res) => {
   if (!m || Number(m.is_paid)) return res.status(404).json({ error: 'Free material not found.' });
   if (new Date() < new Date(m.release_date)) return res.status(423).json({ error: 'This material is not yet available.' });
   return deliverMaterialFile(m, res);
+});
+
+app.post('/api/public/materials/:id/pay', async (req, res) => {
+  if (!mpesa) return res.status(503).json({ error: 'M-Pesa is not configured on this server.' });
+  const result = await db.execute({ sql: 'SELECT * FROM materials WHERE id = ?', args: [req.params.id] });
+  const material = result.rows[0];
+  if (!material || !Number(material.is_paid)) return res.status(404).json({ error: 'Paid material not found.' });
+  if (new Date() < new Date(material.release_date)) return res.status(423).json({ error: 'This material is not yet available.' });
+  if (!material.storage_key || !material.storage_type) return res.status(400).json({ error: 'This material is not available for download yet.' });
+  const phoneNumber = String(req.body.phoneNumber || '').trim();
+  if (!phoneNumber) return res.status(400).json({ error: 'Enter your M-Pesa phone number.' });
+  const pending = await db.execute({
+    sql: "SELECT id FROM material_purchases WHERE material_id = ? AND student_id = 0 AND guest_phone = ? AND status = 'pending' LIMIT 1",
+    args: [material.id, phoneNumber],
+  });
+  if (pending.rows.length) return res.status(409).json({ error: 'A payment prompt for this material is already pending. Approve it or wait for it to expire before trying again.' });
+  try {
+    const amount = Math.round(Number(material.price));
+    if (!Number.isInteger(amount) || amount < 1) return res.status(400).json({ error: 'This material has an invalid price. Please contact the school.' });
+    const push = await mpesa.stkPush({ amount, phoneNumber, callbackUrl: 'https://heraldtrainer.co.ke/api/mpesa/callback', accountReference: `BOOK${material.id}`, transactionDesc: `Resource ${material.id}` });
+    if (!push.CheckoutRequestID) throw new Error('M-Pesa did not return a checkout request ID.');
+    const accessToken = crypto.randomBytes(32).toString('hex');
+    const tokenHash = crypto.createHash('sha256').update(accessToken).digest('hex');
+    await db.execute({
+      sql: `INSERT INTO material_purchases (student_id, material_id, amount_due, status, checkout_request_id, guest_phone, access_token_hash)
+            VALUES (0, ?, ?, 'pending', ?, ?, ?)`,
+      args: [material.id, amount, push.CheckoutRequestID, phoneNumber, tokenHash],
+    });
+    res.json({ ok: true, message: 'Approve the M-Pesa prompt on your phone.', checkoutRequestId: push.CheckoutRequestID, accessToken });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.get('/api/public/materials/:id/purchase-status/:accessToken', async (req, res) => {
+  const tokenHash = crypto.createHash('sha256').update(String(req.params.accessToken)).digest('hex');
+  const purchase = await db.execute({
+    sql: `SELECT p.status, p.amount_due, p.amount_received, p.result_description, p.mpesa_receipt
+          FROM material_purchases p JOIN materials m ON m.id = p.material_id
+          WHERE p.material_id = ? AND p.student_id = 0 AND p.access_token_hash = ? LIMIT 1`,
+    args: [req.params.id, tokenHash],
+  });
+  if (!purchase.rows.length) return res.status(404).json({ error: 'Purchase link not found.' });
+  const p = purchase.rows[0];
+  res.json({ status: p.status, owned: p.status === 'paid', amount_due: p.amount_due, result_description: p.result_description });
+});
+
+app.get('/api/public/materials/:id/purchase-download/:accessToken', async (req, res) => {
+  const tokenHash = crypto.createHash('sha256').update(String(req.params.accessToken)).digest('hex');
+  const purchase = await db.execute({
+    sql: `SELECT m.* FROM material_purchases p JOIN materials m ON m.id = p.material_id
+          WHERE p.material_id = ? AND p.student_id = 0 AND p.access_token_hash = ? AND p.status = 'paid' LIMIT 1`,
+    args: [req.params.id, tokenHash],
+  });
+  const material = purchase.rows[0];
+  if (!material) return res.status(402).json({ error: 'Confirmed payment is required before downloading.' });
+  if (new Date() < new Date(material.release_date)) return res.status(423).json({ error: 'This material is not yet available.' });
+  return deliverMaterialFile(material, res);
 });
 
 app.get('/api/courses', authStudent, async (req, res) => {

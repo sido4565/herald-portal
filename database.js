@@ -185,6 +185,8 @@ async function initSchema() {
       amount_received REAL,
       status TEXT NOT NULL DEFAULT 'pending',
       checkout_request_id TEXT UNIQUE,
+      guest_phone TEXT,
+      access_token_hash TEXT,
       mpesa_receipt TEXT,
       result_description TEXT,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
@@ -249,6 +251,12 @@ async function initSchema() {
   ]) {
     if (!materialColumns.rows.some(column => column.name === name)) {
       await client.execute(`ALTER TABLE materials ADD COLUMN ${name} ${definition}`);
+    }
+  }
+  const purchaseColumns = await client.execute('PRAGMA table_info(material_purchases)');
+  for (const [name, definition] of [['guest_phone', 'TEXT'], ['access_token_hash', 'TEXT']]) {
+    if (!purchaseColumns.rows.some(column => column.name === name)) {
+      await client.execute(`ALTER TABLE material_purchases ADD COLUMN ${name} ${definition}`);
     }
   }
   console.log('✅ Schema ready');

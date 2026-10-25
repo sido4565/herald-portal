@@ -2333,6 +2333,7 @@ renderCourses();
 const materialsGrid = document.getElementById('publicMaterialsGrid');
 let publicMaterials = [];
 let studentMaterialAccess = new Map();
+let guestMaterialPurchases = new Map();
 let signedInStudent = false;
 const materialEscape = value => { const el = document.createElement('span'); el.textContent = value ?? ''; return el.innerHTML; };
 
@@ -2351,6 +2352,13 @@ async function loadPublicMaterials() {
         studentMaterialAccess = new Map(enrolledMaterials.map(item => [Number(item.id), item]));
       }
     }
+    guestMaterialPurchases = new Map();
+    await Promise.all(publicMaterials.map(async item => {
+      const token = localStorage.getItem(`material-access-${item.id}`);
+      if (!token) return;
+      const response = await fetch(`/api/public/materials/${Number(item.id)}/purchase-status/${encodeURIComponent(token)}`);
+      if (response.ok) guestMaterialPurchases.set(Number(item.id), { token, ...(await response.json()) });
+    }));
     renderPublicMaterials();
   } catch (err) {
     materialsGrid.innerHTML = `<p class="materials-empty">${materialEscape(err.message)} Please refresh to try again.</p>`;
@@ -2373,6 +2381,7 @@ function renderPublicMaterials() {
   materialsGrid.innerHTML = filtered.map(item => {
     const paid = Number(item.is_paid) === 1;
     const access = studentMaterialAccess.get(Number(item.id));
+    const guestPurchase = guestMaterialPurchases.get(Number(item.id));
     const unlocked = new Date() >= new Date(item.release_date);
     const owned = !!access && (Number(access.owned) === 1 || access.owned === true);
     let action = '<span class="material-badge">No file attached yet</span>';
@@ -2380,14 +2389,16 @@ function renderPublicMaterials() {
       action = `<span class="material-badge">Available ${materialEscape(new Date(item.release_date).toLocaleDateString('en-KE'))}</span>`;
     } else if (!paid && Number(item.file_available)) {
       action = `<a class="btn-gold" href="/api/public/materials/${Number(item.id)}/download">Download free material</a>`;
+    } else if (paid && guestPurchase?.owned) {
+      action = `<a class="btn-gold" href="/api/public/materials/${Number(item.id)}/purchase-download/${encodeURIComponent(guestPurchase.token)}">Download purchased material</a>`;
+    } else if (paid && guestPurchase?.status === 'pending') {
+      action = `<span class="material-badge paid">Payment pending</span> <button class="btn-outline" type="button" onclick="checkPublicMaterialPayment(${Number(item.id)})">Check payment</button>`;
     } else if (paid && owned) {
       action = `<a class="btn-gold" href="/api/my-materials/${Number(item.id)}/download">Download purchased material</a>`;
     } else if (paid && signedInStudent && access?.purchase_status === 'pending') {
       action = `<span class="material-badge paid">Payment pending</span> <button class="btn-outline" type="button" onclick="checkPublicMaterialPayment(${Number(item.id)})">Check payment</button>`;
-    } else if (paid && signedInStudent && access && Number(item.file_available)) {
+    } else if (paid && Number(item.file_available)) {
       action = `<div style="display:grid;gap:8px;"><input class="material-phone" id="publicMaterialPhone-${Number(item.id)}" type="tel" placeholder="M-Pesa phone number" aria-label="M-Pesa phone number"><button class="btn-gold" type="button" onclick="payForPublicMaterial(${Number(item.id)})">Pay KES ${Number(item.price).toLocaleString()} &amp; unlock</button><small id="publicMaterialStatus-${Number(item.id)}"></small></div>`;
-    } else if (paid) {
-      action = `<a class="btn-outline" href="register.html">Enroll to access this material</a>`;
     }
     return `<article class="material-card">
       <div class="material-badges"><span class="material-badge ${paid ? 'paid' : 'free'}">${paid ? `Paid · KES ${Number(item.price).toLocaleString()}` : 'Free'}</span><span class="material-badge">${materialEscape(item.resource_category || 'resource')}</span></div>
@@ -2405,18 +2416,24 @@ window.payForPublicMaterial = async id => {
   const button = document.querySelector(`button[onclick="payForPublicMaterial(${id})"]`);
   if (button) button.disabled = true;
   try {
-    const response = await fetch(`/api/my-materials/${id}/pay`, {
+    const isEnrolled = studentMaterialAccess.has(Number(id));
+    const response = await fetch(isEnrolled ? `/api/my-materials/${id}/pay` : `/api/public/materials/${id}/pay`, {
       method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ phoneNumber }),
     });
     const result = await response.json();
     if (!response.ok) throw new Error(result.error || 'Could not start payment.');
     if (result.owned) { await loadPublicMaterials(); return; }
+    if (result.accessToken) localStorage.setItem(`material-access-${id}`, result.accessToken);
+    const guest = !!result.accessToken;
     const statusEl = document.getElementById(`publicMaterialStatus-${id}`);
     if (statusEl) statusEl.textContent = 'Approve the M-Pesa prompt on your phone. Checking payment…';
     for (let tries = 0; tries < 10; tries++) {
       await new Promise(resolve => setTimeout(resolve, 5000));
-      const check = await fetch(`/api/my-materials/${id}/purchase-status`, { credentials: 'same-origin' });
+      const token = localStorage.getItem(`material-access-${id}`);
+      const check = guest
+        ? await fetch(`/api/public/materials/${id}/purchase-status/${encodeURIComponent(token)}`)
+        : await fetch(`/api/my-materials/${id}/purchase-status`, { credentials: 'same-origin' });
       const status = await check.json();
       if (status.owned) { await loadPublicMaterials(); return; }
       if (['failed', 'review'].includes(status.status)) {
@@ -2431,7 +2448,10 @@ window.payForPublicMaterial = async id => {
 
 window.checkPublicMaterialPayment = async id => {
   try {
-    const response = await fetch(`/api/my-materials/${id}/purchase-status`, { credentials: 'same-origin' });
+    const token = localStorage.getItem(`material-access-${id}`);
+    const response = token
+      ? await fetch(`/api/public/materials/${id}/purchase-status/${encodeURIComponent(token)}`)
+      : await fetch(`/api/my-materials/${id}/purchase-status`, { credentials: 'same-origin' });
     const status = await response.json();
     if (status.owned) { await loadPublicMaterials(); return; }
     alert(status.status === 'pending' ? 'Payment is still pending. Approve the prompt on your phone.' : `Payment status: ${status.status}.`);
