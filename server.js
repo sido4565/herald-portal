@@ -20,23 +20,36 @@ const partnerPrograms = require('./partner-programs');
 const ADMISSION_FEE = 3000;
 
 function paymentErrorMessage(err, phase = 'M-Pesa request') {
-  const message = [err?.message, err?.errorMessage, err?.description, err?.cause?.message]
+  const provider = err?.response && typeof err.response === 'object' ? err.response : {};
+  const message = [
+    err?.message, err?.errorMessage, err?.description, err?.cause?.message,
+    provider.errorMessage, provider.ResponseDescription, provider.resultDesc,
+    provider.message, provider.error,
+  ]
     .find(value => typeof value === 'string' && value.trim());
   if (message) return `${phase}: ${message}`;
-  const code = [err?.code, err?.errorCode, err?.name]
+  const code = [provider.errorCode, provider.ResponseCode, err?.errorCode, err?.code, err?.name]
     .find(value => typeof value === 'string' && value.trim());
+  const status = err?.statusCode || err?.status;
+  const requestId = err?.requestId || provider.requestId || provider.RequestID;
+  const details = [code, status ? `HTTP ${status}` : '', requestId ? `request ${requestId}` : '']
+    .filter(Boolean).join(', ');
   if (phase === 'saving the purchase record') {
-    return `The M-Pesa prompt may have been sent, but purchase tracking failed${code ? ` (${code})` : ''}. Check your phone and contact the school before retrying.`;
+    return `The M-Pesa prompt may have been sent, but purchase tracking failed${details ? ` (${details})` : ''}. Check your phone and contact the school before retrying.`;
   }
-  return `M-Pesa could not start the payment prompt${code ? ` (${code})` : ''}. Please contact the school if the problem continues.`;
+  return `M-Pesa could not start the payment prompt${details ? ` (${details})` : ''}. Please contact the school if the problem continues.`;
 }
 
 function logPaymentFailure(context, err, phase) {
+  const provider = err?.response && typeof err.response === 'object' ? err.response : {};
   console.error(context, {
     phase,
     errorType: err?.constructor?.name || typeof err,
     code: err?.code || err?.errorCode || undefined,
     status: err?.statusCode || err?.status || err?.response?.status || undefined,
+    providerCode: provider.errorCode || provider.ResponseCode || undefined,
+    providerMessage: provider.errorMessage || provider.ResponseDescription || provider.resultDesc || provider.message || provider.error || undefined,
+    requestId: err?.requestId || provider.requestId || provider.RequestID || undefined,
     message: paymentErrorMessage(err),
   });
 }
