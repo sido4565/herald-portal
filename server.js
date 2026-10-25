@@ -566,7 +566,7 @@ app.post('/api/public/materials/:id/pay', async (req, res) => {
   try {
     const amount = Math.round(Number(material.price));
     if (!Number.isInteger(amount) || amount < 1) return res.status(400).json({ error: 'This material has an invalid price. Please contact the school.' });
-    const push = await mpesa.stkPush({ amount, phoneNumber, callbackUrl: 'https://heraldtrainer.co.ke/api/mpesa/callback', accountReference: `BOOK${material.id}`, transactionDesc: `Resource ${material.id}` });
+    const push = await startMpesaStkPush({ amount, phoneNumber, accountReference: `BOOK${material.id}`, transactionDesc: `Resource ${material.id}` });
     if (!push.CheckoutRequestID) throw new Error('M-Pesa did not return a checkout request ID.');
     const accessToken = crypto.randomBytes(32).toString('hex');
     const tokenHash = crypto.createHash('sha256').update(accessToken).digest('hex');
@@ -892,7 +892,7 @@ app.post('/api/my-materials/:id/pay', authStudent, async (req, res) => {
   if (!phoneNumber) return res.status(400).json({ error: 'Enter your M-Pesa phone number.' });
   try {
     const amount = Math.round(Number(material.price));
-    const push = await mpesa.stkPush({ amount, phoneNumber, callbackUrl: 'https://heraldtrainer.co.ke/api/mpesa/callback', accountReference: `BOOK${material.id}`, transactionDesc: `Resource ${material.id}` });
+    const push = await startMpesaStkPush({ amount, phoneNumber, accountReference: `BOOK${material.id}`, transactionDesc: `Resource ${material.id}` });
     if (!push.CheckoutRequestID) throw new Error('M-Pesa did not return a checkout request ID.');
     await db.execute({ sql: `INSERT INTO material_purchases (student_id, material_id, amount_due, status, checkout_request_id) VALUES (?, ?, ?, 'pending', ?)`, args: [req.user.id, material.id, amount, push.CheckoutRequestID] });
     res.json({ ok: true, message: 'Approve the M-Pesa prompt on your phone.', checkoutRequestId: push.CheckoutRequestID });
@@ -3477,6 +3477,16 @@ try {
   console.error('⚠️ M-Pesa initialization failed:', err.message);
 }
 
+const MPESA_CALLBACK_URL = 'https://heraldtrainer.co.ke/api/mpesa/callback';
+async function startMpesaStkPush({ amount, phoneNumber, accountReference, transactionDesc }) {
+  if (!mpesa) throw new Error('M-Pesa is not configured on this server.');
+  // Fee and material prompts share the same configured shortcode and credentials.
+  return mpesa.stkPush({
+    amount: Number(amount), phoneNumber, callbackUrl: MPESA_CALLBACK_URL,
+    accountReference, transactionDesc,
+  });
+}
+
 // 1. Trigger the STK Push (Student clicks "Pay with M-Pesa")
 app.post('/api/mpesa/stk-push', authStudent, async (req, res) => {
   if (!mpesa) return res.status(503).json({ error: 'M-Pesa is not configured on this server.' });
@@ -3486,13 +3496,7 @@ app.post('/api/mpesa/stk-push', authStudent, async (req, res) => {
     const { phoneNumber, amount } = req.body;
     
     // pesafy handles the 2547... format automatically
-    const push = await mpesa.stkPush({
-      amount: Number(amount), // Must be whole numbers, e.g., 100
-      phoneNumber: phoneNumber, // e.g., "0712345678"
-      callbackUrl: 'https://heraldtrainer.co.ke/api/mpesa/callback', // MUST be your live HTTPS domain
-      accountReference: 'HERALD FEE', // Max 12 chars
-      transactionDesc: 'Fee Payment', // Max 13 chars
-    });
+    const push = await startMpesaStkPush({ amount, phoneNumber, accountReference: 'HERALD FEE', transactionDesc: 'Fee Payment' });
 
     // Save push.CheckoutRequestID to your DB if you want to track it
     res.json({ 
