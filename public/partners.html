@@ -47,6 +47,8 @@
     .program-meta strong { color:var(--navy); }
     .program-meta .herald { color:var(--gold); font-weight:700; }
     .program-cta { font-size:12px; color:var(--gold); font-weight:700; align-self:flex-start; }
+    .program-monthly-fee { font-size:14px; color:var(--gold); font-weight:800; margin:8px 0; }
+    .program-monthly-fee small { display:block; color:var(--muted); font-size:10px; font-weight:500; }
     .partners-cta { background:linear-gradient(135deg,#0b1a33,#1e3a5f); border-radius:16px; padding:40px 32px; text-align:center; color:#fff; margin-top:40px; }
     .partners-cta h3 { font-size:clamp(20px,2.5vw,26px); font-weight:800; margin-bottom:12px; }
     .partners-cta h3 span { color:var(--gold-light); }
@@ -83,14 +85,14 @@
     <div class="page-breadcrumb">
       <a href="welcome.html">Home</a> <span>/</span> Partners
     </div>
-    <h1>Our <span>Partner Institutions</span></h1>
-    <p>Accredited awarding bodies and colleges that deliver the qualifications, lectures, and examinations for our partner programs — with Herald Trainer and Consultant providing enrollment and learner support.</p>
+    <h1>Our <span>Partner Programs & Exam Prep</span></h1>
+    <p>Explore qualifications from partner institutions and monthly preparation classes for selected KNEC examinations.</p>
   </div>
 </section>
 
 <section class="section">
   <div class="disclaimer">
-    <strong>How partner programs work:</strong> Herald Trainer and Consultant acts as a <strong>training and enrollment partner</strong>. Lectures are delivered by the awarding institution's faculty, and examinations are set and certified by that institution. Fees, duration, and intake dates vary by program — contact us for the latest schedule.
+    <strong>How programs work:</strong> Partner institutions set and certify their own examinations. Herald also offers KNEC exam preparation classes at KES 5,000 per month; this tuition is separate from KNEC registration and examination charges. Contact us to confirm subject availability and intake dates.
   </div>
 
   <div id="partnersWrap"></div>
@@ -274,6 +276,16 @@ const PARTNERS = [
       'IATA Tours & Travel & Business Studies Diploma',
       'IATA Diploma in Cabin Crew'
     ]
+  },
+  {
+    id: 'knec-prep', code: '08', name: 'KNEC Exam Preparation', isExamPrep: true,
+    fullName: 'Kenya National Examinations Council (KNEC)',
+    blurb: 'Prepare for selected KNEC Business and Technical examinations with structured monthly coaching. Exam registration and KNEC examination charges are separate from Herald’s tuition.',
+    programs: [
+      'Business Single & Group Examination Preparation',
+      'Business Technical Education Programme (BTEP) Preparation',
+      'Technical TVET Examination Preparation — Artisan, Craft, Diploma & Higher Diploma'
+    ]
   }
 ];
 
@@ -287,16 +299,15 @@ function renderPartners() {
         <h2>${p.name}</h2>
       </div>
       <div class="partner-fullname">${p.fullName}</div>
-      <p class="partner-blurb">${p.blurb}</p>
+      <p class="partner-blurb">${p.blurb}${p.isExamPrep ? ` <a href="https://www.knec.ac.ke/services/business-exams/" target="_blank" rel="noopener">Official KNEC Business & Technical exam information ↗</a>` : ''}</p>
       <div class="program-grid">
         ${p.programs.map(prog => `
           <div class="program-card">
             <div class="program-name">${prog}</div>
             <div class="program-meta">
-              <div>Awarded by: <strong>${p.name}</strong></div>
-              <div>Prepared by: <span class="herald">Herald Trainer and Consultant</span></div>
+              ${p.isExamPrep ? `<div>Exam body: <strong>KNEC</strong></div><div>Exam preparation by: <span class="herald">Herald Trainer and Consultant</span></div><div class="program-monthly-fee">KES 5,000 / month <small>Tuition; exam charges separate</small></div>` : `<div>Awarded by: <strong>${p.name}</strong></div><div>Prepared by: <span class="herald">Herald Trainer and Consultant</span></div>`}
             </div>
-            <a class="program-cta" href="contact.html?program=${encodeURIComponent(prog)}">Contact us for fees & duration →</a>
+            <a class="program-cta" href="contact.html?program=${encodeURIComponent(prog)}">${p.isExamPrep ? 'Enquire about exam preparation →' : 'Contact us for fees & duration →'}</a>
           </div>
         `).join('')}
       </div>
@@ -309,4 +320,3 @@ renderPartners();
   <script src="help-widget.js"></script>
 </body>
 </html>
-'@ | Set-Content -Path public\partners.html -Encoding UTF8
