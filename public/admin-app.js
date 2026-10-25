@@ -681,6 +681,17 @@ if (addLectBtn) {
     $('#lectAttSaveBtn')?.addEventListener('click', saveLecturerAttendance);
     $('#adminAddMaterialBtn')?.addEventListener('click', openAdminMaterialModal);
     $('#adminMaterialsList')?.addEventListener('click', async e => {
+      const decisionButton = e.target.closest('[data-bank-decision]');
+      if (decisionButton) {
+        const decision = decisionButton.dataset.bankDecision;
+        if (!confirm(`${decision === 'approve' ? 'Confirm this bank payment and unlock the material' : 'Reject this bank payment'}?`)) return;
+        try {
+          await api(`/api/admin/material-payments/${decisionButton.dataset.id}/review`, { method: 'POST', body: { decision } });
+          toast(decision === 'approve' ? 'Payment approved; material unlocked.' : 'Payment rejected.');
+          await loadLibrary();
+        } catch (err) { toast(err.message, 'error'); }
+        return;
+      }
       const button = e.target.closest('[data-delete-material]');
       if (!button) return;
       if (!confirm('Delete this book or study material?')) return;
@@ -1626,8 +1637,22 @@ async function openBulkAssignModal() {
   }
 
   async function loadLibrary() {
-    const rows = await api('/api/admin/materials');
-    $('#adminMaterialsList').innerHTML = rows.length ? `
+    const [rows, payments] = await Promise.all([
+      api('/api/admin/materials'), api('/api/admin/material-payments'),
+    ]);
+    $('#adminMaterialsList').innerHTML = `${payments.length ? `
+      <h3 style="margin:0 0 10px;">Bank payments awaiting verification</h3>
+      <div class="table-wrap" style="margin-bottom:24px;"><table><thead><tr><th>Buyer</th><th>Course material</th><th>Amount</th><th>Bank reference</th><th>Contact</th><th>Submitted</th><th>Review</th></tr></thead>
+      <tbody>${payments.map(p => `<tr>
+        <td>${esc(p.payer_name || p.reg_no || 'Buyer')}${p.reg_no ? `<br><small>${esc(p.reg_no)}</small>` : '<br><small>Guest</small>'}</td>
+        <td>${esc(p.code)} — ${esc(p.course_title)}<br><strong>${esc(p.material_title)}</strong></td>
+        <td>KES ${Number(p.amount_due).toLocaleString()}</td>
+        <td><strong>${esc(p.payment_reference)}</strong></td>
+        <td>${esc(p.guest_phone || '')}${p.email ? `<br><small>${esc(p.email)}</small>` : ''}</td>
+        <td>${esc(p.created_at)}</td>
+        <td><button class="btn-xs" type="button" data-bank-decision="approve" data-id="${p.id}">Approve</button> <button class="btn-xs danger" type="button" data-bank-decision="reject" data-id="${p.id}">Reject</button></td>
+      </tr>`).join('')}</tbody></table></div>` : ''}
+      <h3 style="margin:0 0 10px;">Course library</h3>${rows.length ? `
       <div class="table-wrap"><table><thead><tr><th>Course</th><th>Resource</th><th>Access</th><th>Price</th><th>Downloads</th><th>Actions</th></tr></thead>
       <tbody>${rows.map(row => `<tr>
         <td>${esc(row.code)} — ${esc(row.course_title)}</td>
@@ -1636,7 +1661,7 @@ async function openBulkAssignModal() {
         <td>${Number(row.is_paid) ? `KES ${Number(row.price).toLocaleString()}` : '—'}</td>
         <td>${Number(row.download_count || 0)}</td>
         <td><button class="btn-xs danger" type="button" data-delete-material="${row.id}">Delete</button></td>
-      </tr>`).join('')}</tbody></table></div>` : '<p class="empty">No books or study materials yet. Upload one to start the course library.</p>';
+      </tr>`).join('')}</tbody></table></div>` : '<p class="empty">No books or study materials yet. Upload one to start the course library.</p>'}`;
   }
 
   async function openAdminMaterialModal() {

@@ -187,6 +187,9 @@ async function initSchema() {
       checkout_request_id TEXT UNIQUE,
       guest_phone TEXT,
       access_token_hash TEXT,
+      payment_method TEXT DEFAULT 'mpesa',
+      payment_reference TEXT,
+      payer_name TEXT,
       mpesa_receipt TEXT,
       result_description TEXT,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
@@ -254,7 +257,10 @@ async function initSchema() {
     }
   }
   const purchaseColumns = await client.execute('PRAGMA table_info(material_purchases)');
-  for (const [name, definition] of [['guest_phone', 'TEXT'], ['access_token_hash', 'TEXT']]) {
+  for (const [name, definition] of [
+    ['guest_phone', 'TEXT'], ['access_token_hash', 'TEXT'], ['payment_method', "TEXT DEFAULT 'mpesa'"],
+    ['payment_reference', 'TEXT'], ['payer_name', 'TEXT'],
+  ]) {
     if (!purchaseColumns.rows.some(column => column.name === name)) {
       await client.execute(`ALTER TABLE material_purchases ADD COLUMN ${name} ${definition}`);
     }

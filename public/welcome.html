@@ -1670,7 +1670,7 @@ body.dark .contact-item-label { color: #94a3b8; }
   <div class="section-head">
     <span class="section-label">Learning Library</span>
     <h2>Books &amp; Study Materials</h2>
-    <p>Browse books, notes, slides, and other resources for our courses. Free resources are open to everyone; paid downloads unlock after confirmed M-Pesa payment for enrolled students.</p>
+    <p>Browse books, notes, slides, and other resources for our courses. Free resources are open to everyone. For paid resources, use Herald’s KCB payment details and submit your bank reference; downloads unlock after admin verification.</p>
   </div>
   <div class="materials-toolbar">
     <label for="materialsSearch">Search materials</label>
@@ -2391,14 +2391,25 @@ function renderPublicMaterials() {
       action = `<a class="btn-gold" href="/api/public/materials/${Number(item.id)}/download">Download free material</a>`;
     } else if (paid && guestPurchase?.owned) {
       action = `<a class="btn-gold" href="/api/public/materials/${Number(item.id)}/purchase-download/${encodeURIComponent(guestPurchase.token)}">Download purchased material</a>`;
+    } else if (paid && guestPurchase?.status === 'pending_review') {
+      action = `<span class="material-badge paid">Bank payment awaiting verification</span> <button class="btn-outline" type="button" onclick="checkPublicMaterialPayment(${Number(item.id)})">Check status</button>`;
     } else if (paid && guestPurchase?.status === 'pending') {
-      action = `<span class="material-badge paid">Payment pending</span> <button class="btn-outline" type="button" onclick="checkPublicMaterialPayment(${Number(item.id)})">Check payment</button>`;
+      action = `<span class="material-badge paid">Previous M-Pesa payment pending</span> <button class="btn-outline" type="button" onclick="checkPublicMaterialPayment(${Number(item.id)})">Check status</button>`;
     } else if (paid && owned) {
       action = `<a class="btn-gold" href="/api/my-materials/${Number(item.id)}/download">Download purchased material</a>`;
     } else if (paid && signedInStudent && access?.purchase_status === 'pending') {
       action = `<span class="material-badge paid">Payment pending</span> <button class="btn-outline" type="button" onclick="checkPublicMaterialPayment(${Number(item.id)})">Check payment</button>`;
+    } else if (paid && signedInStudent && access?.purchase_status === 'pending_review') {
+      action = `<span class="material-badge paid">Bank payment awaiting verification</span> <button class="btn-outline" type="button" onclick="checkPublicMaterialPayment(${Number(item.id)})">Check status</button>`;
     } else if (paid && Number(item.file_available)) {
-      action = `<div style="display:grid;gap:8px;"><input class="material-phone" id="publicMaterialPhone-${Number(item.id)}" type="tel" placeholder="M-Pesa phone number" aria-label="M-Pesa phone number"><button class="btn-gold" type="button" onclick="payForPublicMaterial(${Number(item.id)})">Pay KES ${Number(item.price).toLocaleString()} &amp; unlock</button><small id="publicMaterialStatus-${Number(item.id)}"></small></div>`;
+      action = `<div class="material-bank-payment" style="display:grid;gap:8px;padding:12px;background:#f6f8fb;border-radius:10px;">
+        <strong style="font-size:12px;">Herald KCB payment · KES ${Number(item.price).toLocaleString()}</strong>
+        <span style="font-size:11px;color:#475569;">Paybill 522522 · Account 1279021640<br>HERALD TRAINER AND CONSULTANT</span>
+        <input class="material-phone" id="publicMaterialPayer-${Number(item.id)}" type="text" placeholder="Name used for payment" aria-label="Name used for payment">
+        <input class="material-phone" id="publicMaterialPhone-${Number(item.id)}" type="tel" placeholder="Your contact phone" aria-label="Your contact phone">
+        <input class="material-phone" id="publicMaterialReference-${Number(item.id)}" type="text" maxlength="40" placeholder="Bank transaction reference" aria-label="Bank transaction reference">
+        <button class="btn-gold" type="button" onclick="submitPublicMaterialBankPayment(${Number(item.id)})">Submit payment for verification</button>
+        <small id="publicMaterialStatus-${Number(item.id)}"></small></div>`;
     }
     return `<article class="material-card">
       <div class="material-badges"><span class="material-badge ${paid ? 'paid' : 'free'}">${paid ? `Paid · KES ${Number(item.price).toLocaleString()}` : 'Free'}</span><span class="material-badge">${materialEscape(item.resource_category || 'resource')}</span></div>
@@ -2410,38 +2421,25 @@ function renderPublicMaterials() {
   }).join('');
 }
 
-window.payForPublicMaterial = async id => {
+window.submitPublicMaterialBankPayment = async id => {
+  const payerName = document.getElementById(`publicMaterialPayer-${id}`)?.value.trim();
   const phoneNumber = document.getElementById(`publicMaterialPhone-${id}`)?.value.trim();
-  if (!phoneNumber) return alert('Enter your M-Pesa phone number.');
-  const button = document.querySelector(`button[onclick="payForPublicMaterial(${id})"]`);
+  const reference = document.getElementById(`publicMaterialReference-${id}`)?.value.trim();
+  if (!payerName || !phoneNumber || !reference) return alert('Enter the payer name, contact phone, and bank transaction reference.');
+  const button = document.querySelector(`button[onclick="submitPublicMaterialBankPayment(${id})"]`);
   if (button) button.disabled = true;
   try {
     const isEnrolled = studentMaterialAccess.has(Number(id));
-    const response = await fetch(isEnrolled ? `/api/my-materials/${id}/pay` : `/api/public/materials/${id}/pay`, {
+    const response = await fetch(isEnrolled ? `/api/my-materials/${id}/bank-payment` : `/api/public/materials/${id}/bank-payment`, {
       method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ phoneNumber }),
+      body: JSON.stringify({ payerName, phoneNumber, reference }),
     });
     const result = await response.json();
-    if (!response.ok) throw new Error(result.error || `Payment request failed (HTTP ${response.status}). Please try again or contact the school.`);
-    if (result.owned) { await loadPublicMaterials(); return; }
+    if (!response.ok) throw new Error(result.error || `Could not submit bank details (HTTP ${response.status}).`);
     if (result.accessToken) localStorage.setItem(`material-access-${id}`, result.accessToken);
-    const guest = !!result.accessToken;
     const statusEl = document.getElementById(`publicMaterialStatus-${id}`);
-    if (statusEl) statusEl.textContent = 'Approve the M-Pesa prompt on your phone. Checking payment…';
-    for (let tries = 0; tries < 10; tries++) {
-      await new Promise(resolve => setTimeout(resolve, 5000));
-      const token = localStorage.getItem(`material-access-${id}`);
-      const check = guest
-        ? await fetch(`/api/public/materials/${id}/purchase-status/${encodeURIComponent(token)}`)
-        : await fetch(`/api/my-materials/${id}/purchase-status`, { credentials: 'same-origin' });
-      const status = await check.json();
-      if (status.owned) { await loadPublicMaterials(); return; }
-      if (['failed', 'review'].includes(status.status)) {
-        if (statusEl) statusEl.textContent = status.result_description || `Payment status: ${status.status}.`;
-        return;
-      }
-    }
-    if (statusEl) statusEl.textContent = 'Still pending. You can check again after approving the prompt.';
+    if (statusEl) statusEl.textContent = result.message;
+    await loadPublicMaterials();
   } catch (err) { alert(err.message); }
   finally { if (button) button.disabled = false; }
 };
@@ -2454,7 +2452,7 @@ window.checkPublicMaterialPayment = async id => {
       : await fetch(`/api/my-materials/${id}/purchase-status`, { credentials: 'same-origin' });
     const status = await response.json();
     if (status.owned) { await loadPublicMaterials(); return; }
-    alert(status.status === 'pending' ? 'Payment is still pending. Approve the prompt on your phone.' : `Payment status: ${status.status}.`);
+    alert(status.status === 'pending_review' ? 'Your bank payment details are awaiting verification.' : status.status === 'pending' ? 'A previous M-Pesa prompt is still pending.' : `Payment status: ${status.status}.`);
   } catch (err) { alert(err.message); }
 };
 

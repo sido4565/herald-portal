@@ -6,31 +6,22 @@ const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({
   '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
 }[c]));
 
-window.payForMaterial = async function (id) {
+window.submitMaterialBankPayment = async function (id) {
+  const payerName = document.getElementById(`materialPayer-${id}`)?.value.trim();
   const phone = document.getElementById(`materialPhone-${id}`)?.value.trim();
-  if (!phone) return toast('Enter your M-Pesa phone number.', 'error');
+  const reference = document.getElementById(`materialReference-${id}`)?.value.trim();
+  if (!payerName || !phone || !reference) return toast('Enter the payer name, contact phone, and bank reference.', 'error');
   try {
-    const response = await fetch(`/api/my-materials/${id}/pay`, {
+    const response = await fetch(`/api/my-materials/${id}/bank-payment`, {
       method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ phoneNumber: phone }),
+      body: JSON.stringify({ payerName, phoneNumber: phone, reference }),
     });
     const data = await response.json();
-    if (!response.ok) throw new Error(data.error || 'Could not start payment.');
-    if (data.owned) { toast('You already have access.'); location.reload(); return; }
-    toast(data.message || 'Approve the M-Pesa prompt on your phone.');
+    if (!response.ok) throw new Error(data.error || 'Could not submit bank payment details.');
+    toast(data.message || 'Bank payment submitted for verification.');
     const statusEl = document.getElementById(`materialStatus-${id}`);
-    if (statusEl) statusEl.textContent = 'Payment pending — approve the prompt on your phone.';
-    for (let attempt = 0; attempt < 8; attempt++) {
-      await new Promise(resolve => setTimeout(resolve, 5000));
-      const statusResponse = await fetch(`/api/my-materials/${id}/purchase-status`, { credentials: 'same-origin' });
-      const status = await statusResponse.json();
-      if (status.owned) { toast('Payment confirmed. Your material is ready to download.'); location.reload(); return; }
-      if (status.status === 'failed' || status.status === 'review') {
-        if (statusEl) statusEl.textContent = status.result_description || `Payment status: ${status.status}.`;
-        return;
-      }
-    }
-    if (statusEl) statusEl.textContent = 'Payment is still pending. Refresh this page after approving the prompt.';
+    if (statusEl) statusEl.textContent = 'Bank payment submitted — waiting for admin verification.';
+    location.reload();
   } catch (err) { toast(err.message, 'error'); }
 };
 
@@ -40,7 +31,7 @@ window.checkMaterialPayment = async function (id) {
     const status = await response.json();
     if (!response.ok) throw new Error(status.error || 'Could not check payment status.');
     if (status.owned) { toast('Payment confirmed. Your material is ready.'); location.reload(); return; }
-    toast(status.status === 'pending' ? 'Payment is still pending. Approve the prompt on your phone.' : `Payment status: ${status.status}.`, status.status === 'failed' ? 'error' : 'success');
+    toast(status.status === 'pending_review' ? 'Bank payment is awaiting admin verification.' : `Payment status: ${status.status}.`, status.status === 'failed' || status.status === 'rejected' ? 'error' : 'success');
   } catch (err) { toast(err.message, 'error'); }
 };
 
@@ -546,7 +537,11 @@ async function loadDashboard() {
             const paid = Number(m.is_paid) === 1;
             const owned = Number(m.owned) === 1 || m.owned === true;
             const action = paid && !owned
-              ? `<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;"><strong>KES ${Number(m.price).toLocaleString()}</strong>${m.purchase_status === 'pending' ? '<span>Payment pending</span>' : `<input id="materialPhone-${m.id}" type="tel" placeholder="M-Pesa number" aria-label="M-Pesa number" style="max-width:160px;padding:7px;border:1px solid var(--border);border-radius:6px;"><button class="btn-xs" type="button" onclick="payForMaterial(${m.id})">Pay &amp; Unlock</button>`}<button class="btn-xs" type="button" onclick="checkMaterialPayment(${m.id})">Check payment</button></div><small id="materialStatus-${m.id}" style="color:var(--muted);">${m.purchase_status === 'pending' ? 'Approve the M-Pesa prompt on your phone.' : ''}</small>`
+              ? m.purchase_status === 'pending_review'
+                ? `<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;"><strong>KES ${Number(m.price).toLocaleString()}</strong><span>Bank payment awaiting verification</span><button class="btn-xs" type="button" onclick="checkMaterialPayment(${m.id})">Check status</button></div>`
+                : m.purchase_status === 'pending'
+                  ? `<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;"><strong>KES ${Number(m.price).toLocaleString()}</strong><span>Previous M-Pesa payment is still pending</span><button class="btn-xs" type="button" onclick="checkMaterialPayment(${m.id})">Check status</button></div>`
+                : `<div style="display:grid;gap:8px;padding:10px;background:var(--surface);border-radius:8px;"><strong>Herald KCB payment · KES ${Number(m.price).toLocaleString()}</strong><small>KCB Bank Kenya · Paybill 522522 · Account 1279021640<br>HERALD TRAINER AND CONSULTANT</small><input id="materialPayer-${m.id}" type="text" placeholder="Name used for payment" aria-label="Name used for payment" style="padding:7px;border:1px solid var(--border);border-radius:6px;"><input id="materialPhone-${m.id}" type="tel" placeholder="Your contact phone" aria-label="Your contact phone" style="padding:7px;border:1px solid var(--border);border-radius:6px;"><input id="materialReference-${m.id}" type="text" maxlength="40" placeholder="Bank transaction reference" aria-label="Bank transaction reference" style="padding:7px;border:1px solid var(--border);border-radius:6px;"><button class="btn-xs" type="button" onclick="submitMaterialBankPayment(${m.id})">Submit for verification</button></div>`
               : m.file_available
                 ? `<a href="/api/my-materials/${m.id}/download" class="btn-xs" style="text-decoration:none;display:inline-block;">📥 ${paid ? 'Download purchased material' : 'Download / Open'}</a>`
                 : '<span style="color:var(--muted);font-size:12px;">No file or link attached yet.</span>';

@@ -598,38 +598,64 @@ app.get('/api/public/materials/:id/download', async (req, res) => {
   return deliverMaterialFile(m, res);
 });
 
-app.post('/api/public/materials/:id/pay', async (req, res) => {
-  if (!mpesa) return res.status(503).json({ error: 'M-Pesa is not configured on this server.' });
-  const result = await db.execute({ sql: 'SELECT * FROM materials WHERE id = ?', args: [req.params.id] });
-  const material = result.rows[0];
-  if (!material || !Number(material.is_paid)) return res.status(404).json({ error: 'Paid material not found.' });
-  if (new Date() < new Date(material.release_date)) return res.status(423).json({ error: 'This material is not yet available.' });
-  if (!material.storage_key || !material.storage_type) return res.status(400).json({ error: 'This material is not available for download yet.' });
-  const phoneNumber = String(req.body.phoneNumber || '').trim();
-  if (!phoneNumber) return res.status(400).json({ error: 'Enter your M-Pesa phone number.' });
-  const pending = await db.execute({
-    sql: "SELECT id FROM material_purchases WHERE material_id = ? AND student_id = 0 AND guest_phone = ? AND status = 'pending' LIMIT 1",
-    args: [material.id, phoneNumber],
+async function createBankMaterialPayment({ materialId, studentId, body, guest = false }) {
+  const materialRes = await db.execute({ sql: 'SELECT * FROM materials WHERE id = ?', args: [materialId] });
+  const material = materialRes.rows[0];
+  if (!material || !Number(material.is_paid)) return { error: 'Paid material not found.', status: 404 };
+  if (new Date() < new Date(material.release_date)) return { error: 'This material is not yet available.', status: 423 };
+  if (!material.storage_key || !material.storage_type) return { error: 'This material is not available for download yet.', status: 400 };
+  const reference = String(body.reference || '').trim().replace(/\s+/g, '').toUpperCase();
+  const payerName = String(body.payerName || '').trim().slice(0, 100);
+  const phone = String(body.phoneNumber || '').trim();
+  if (!/^[A-Z0-9-]{4,40}$/.test(reference)) return { error: 'Enter the bank transaction reference (4–40 letters or numbers).', status: 400 };
+  if (payerName.length < 2) return { error: 'Enter the name used for the bank payment.', status: 400 };
+  if (!phone) return { error: 'Enter a phone number so the payment can be verified if needed.', status: 400 };
+  const duplicateRef = await db.execute({
+    sql: "SELECT id FROM material_purchases WHERE LOWER(payment_reference) = LOWER(?) AND status IN ('pending_review','paid') LIMIT 1",
+    args: [reference],
   });
-  if (pending.rows.length) return res.status(409).json({ error: 'A payment prompt for this material is already pending. Approve it or wait for it to expire before trying again.' });
-  let paymentPhase = 'starting the M-Pesa prompt';
+  if (duplicateRef.rows.length) return { error: 'That bank transaction reference has already been submitted.', status: 409 };
+  const outstanding = guest
+    ? await db.execute({ sql: "SELECT id FROM material_purchases WHERE material_id = ? AND student_id = 0 AND guest_phone = ? AND status = 'pending_review' LIMIT 1", args: [material.id, phone] })
+    : await db.execute({ sql: "SELECT id FROM material_purchases WHERE material_id = ? AND student_id = ? AND status = 'pending_review' LIMIT 1", args: [material.id, studentId] });
+  if (outstanding.rows.length) return { error: 'A bank payment is already awaiting review for this material.', status: 409 };
+  let accessToken = null;
+  let tokenHash = null;
+  if (guest) {
+    accessToken = crypto.randomBytes(32).toString('hex');
+    tokenHash = crypto.createHash('sha256').update(accessToken).digest('hex');
+  }
+  await db.execute({
+    sql: `INSERT INTO material_purchases
+      (student_id, material_id, amount_due, status, guest_phone, access_token_hash, payment_method, payment_reference, payer_name, result_description)
+      VALUES (?, ?, ?, 'pending_review', ?, ?, 'bank', ?, ?, 'Bank payment submitted; awaiting admin verification.')`,
+    args: [guest ? 0 : studentId, material.id, Number(material.price), phone, tokenHash, reference, payerName],
+  });
+  return { ok: true, amount_due: Number(material.price), message: 'Bank payment details submitted. Downloads unlock after the school verifies the payment.', accessToken };
+}
+
+app.post('/api/public/materials/:id/bank-payment', async (req, res) => {
   try {
-    const amount = Math.round(Number(material.price));
-    if (!Number.isInteger(amount) || amount < 1) return res.status(400).json({ error: 'This material has an invalid price. Please contact the school.' });
-    const push = await startMpesaStkPush({ amount, phoneNumber, accountReference: `BOOK${material.id}`, transactionDesc: `Resource ${material.id}` });
-    if (!push.CheckoutRequestID) throw new Error('M-Pesa did not return a checkout request ID.');
-    paymentPhase = 'saving the purchase record';
-    const accessToken = crypto.randomBytes(32).toString('hex');
-    const tokenHash = crypto.createHash('sha256').update(accessToken).digest('hex');
-    await db.execute({
-      sql: `INSERT INTO material_purchases (student_id, material_id, amount_due, status, checkout_request_id, guest_phone, access_token_hash)
-            VALUES (0, ?, ?, 'pending', ?, ?, ?)`,
-      args: [material.id, amount, push.CheckoutRequestID, phoneNumber, tokenHash],
-    });
-    res.json({ ok: true, message: 'Approve the M-Pesa prompt on your phone.', checkoutRequestId: push.CheckoutRequestID, accessToken });
+    const result = await createBankMaterialPayment({ materialId: req.params.id, studentId: 0, body: req.body, guest: true });
+    res.status(result.status || 201).json(result);
   } catch (err) {
-    logPaymentFailure('Guest material M-Pesa request failed:', err, paymentPhase);
-    res.status(502).json({ error: paymentErrorMessage(err, paymentPhase) });
+    console.error('Guest bank material payment submit failed:', err.message);
+    res.status(500).json({ error: 'Could not submit bank payment details. Please try again.' });
+  }
+});
+
+app.post('/api/my-materials/:id/bank-payment', authStudent, async (req, res) => {
+  try {
+    const enrolled = await db.execute({
+      sql: `SELECT 1 FROM materials m JOIN enrollments e ON e.course_id = m.course_id
+            WHERE m.id = ? AND e.student_id = ?`, args: [req.params.id, req.user.id],
+    });
+    if (!enrolled.rows.length) return res.status(404).json({ error: 'Material not found in your enrolled courses.' });
+    const result = await createBankMaterialPayment({ materialId: req.params.id, studentId: req.user.id, body: req.body });
+    res.status(result.status || 201).json(result);
+  } catch (err) {
+    console.error('Student bank material payment submit failed:', err.message);
+    res.status(500).json({ error: 'Could not submit bank payment details. Please try again.' });
   }
 });
 
@@ -927,33 +953,6 @@ app.get('/api/my-materials/:id/purchase-status', authStudent, async (req, res) =
   if (!owned.rows.length) return res.json({ status: 'unpaid', owned: false });
   const p = owned.rows[0];
   res.json({ status: p.status, owned: p.status === 'paid', amount_due: p.amount_due, result_description: p.result_description });
-});
-
-app.post('/api/my-materials/:id/pay', authStudent, async (req, res) => {
-  if (!mpesa) return res.status(503).json({ error: 'M-Pesa is not configured on this server.' });
-  const materialRes = await db.execute({
-    sql: `SELECT m.* FROM materials m JOIN enrollments e ON e.course_id = m.course_id
-          WHERE m.id = ? AND e.student_id = ?`, args: [req.params.id, req.user.id],
-  });
-  const material = materialRes.rows[0];
-  if (!material) return res.status(404).json({ error: 'Material not found in your enrolled courses.' });
-  if (new Date() < new Date(material.release_date)) return res.status(423).json({ error: 'This material is not yet available.' });
-  if (!Number(material.is_paid)) return res.status(400).json({ error: 'This material is free.' });
-  const previous = await db.execute({ sql: 'SELECT status FROM material_purchases WHERE material_id = ? AND student_id = ? ORDER BY id DESC LIMIT 1', args: [material.id, req.user.id] });
-  if (previous.rows[0]?.status === 'paid') return res.json({ ok: true, owned: true });
-  if (previous.rows[0]?.status === 'pending') return res.status(409).json({ error: 'A payment prompt is already pending. Check your phone or refresh payment status.' });
-  const phoneNumber = String(req.body.phoneNumber || '').trim();
-  if (!phoneNumber) return res.status(400).json({ error: 'Enter your M-Pesa phone number.' });
-  try {
-    const amount = Math.round(Number(material.price));
-    const push = await startMpesaStkPush({ amount, phoneNumber, accountReference: `BOOK${material.id}`, transactionDesc: `Resource ${material.id}` });
-    if (!push.CheckoutRequestID) throw new Error('M-Pesa did not return a checkout request ID.');
-    await db.execute({ sql: `INSERT INTO material_purchases (student_id, material_id, amount_due, status, checkout_request_id) VALUES (?, ?, ?, 'pending', ?)`, args: [req.user.id, material.id, amount, push.CheckoutRequestID] });
-    res.json({ ok: true, message: 'Approve the M-Pesa prompt on your phone.', checkoutRequestId: push.CheckoutRequestID });
-  } catch (err) {
-    logPaymentFailure('Student material M-Pesa request failed:', err);
-    res.status(502).json({ error: paymentErrorMessage(err) });
-  }
 });
 
 app.get('/api/my-materials/:id/download', authStudent, async (req, res) => {
@@ -2397,6 +2396,35 @@ app.get('/api/admin/materials', authAdmin, async (req, res) => {
       (SELECT COUNT(*) FROM material_views v WHERE v.material_id = m.id) AS download_count
     FROM materials m JOIN courses c ON c.id = m.course_id ORDER BY c.title, m.title`);
   res.json(rows.rows);
+});
+
+app.get('/api/admin/material-payments', authAdmin, async (req, res) => {
+  const rows = await db.execute(`
+    SELECT p.id, p.material_id, p.student_id, p.amount_due, p.payment_reference, p.payer_name,
+      p.guest_phone, p.created_at, m.title AS material_title, c.code, c.title AS course_title,
+      s.reg_no, s.email
+    FROM material_purchases p
+    JOIN materials m ON m.id = p.material_id
+    JOIN courses c ON c.id = m.course_id
+    LEFT JOIN students s ON s.id = p.student_id AND p.student_id <> 0
+    WHERE p.payment_method = 'bank' AND p.status = 'pending_review'
+    ORDER BY p.created_at ASC`);
+  res.json(rows.rows);
+});
+
+app.post('/api/admin/material-payments/:id/review', authAdmin, async (req, res) => {
+  const decision = req.body.decision;
+  if (!['approve', 'reject'].includes(decision)) return res.status(400).json({ error: 'Choose approve or reject.' });
+  const status = decision === 'approve' ? 'paid' : 'rejected';
+  const result = await db.execute({
+    sql: `UPDATE material_purchases SET status = ?, amount_received = CASE WHEN ? = 'paid' THEN amount_due ELSE amount_received END,
+          paid_at = CASE WHEN ? = 'paid' THEN CURRENT_TIMESTAMP ELSE paid_at END,
+          result_description = ?
+          WHERE id = ? AND payment_method = 'bank' AND status = 'pending_review'`,
+    args: [status, status, status, decision === 'approve' ? 'Bank payment verified by admin.' : 'Bank payment was rejected by admin.', req.params.id],
+  });
+  if (!Number(result.rowsAffected)) return res.status(404).json({ error: 'Pending bank payment not found.' });
+  res.json({ ok: true, status });
 });
 
 app.post('/api/admin/materials/upload', authAdmin, materialUpload.single('file'), async (req, res) => {
