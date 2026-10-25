@@ -32,7 +32,8 @@ function paymentErrorMessage(err, phase = 'M-Pesa request') {
     .find(value => typeof value === 'string' && value.trim());
   const status = err?.statusCode || err?.status;
   const requestId = err?.requestId || provider.requestId || provider.RequestID;
-  const details = [code, status ? `HTTP ${status}` : '', requestId ? `request ${requestId}` : '']
+  const responseSummary = safePaymentResponse(err?.response);
+  const details = [code, status ? `HTTP ${status}` : '', requestId ? `request ${requestId}` : '', responseSummary && responseSummary !== '{}' ? `response ${responseSummary}` : '']
     .filter(Boolean).join(', ');
   if (phase === 'saving the purchase record') {
     return `The M-Pesa prompt may have been sent, but purchase tracking failed${details ? ` (${details})` : ''}. Check your phone and contact the school before retrying.`;
@@ -49,9 +50,22 @@ function logPaymentFailure(context, err, phase) {
     status: err?.statusCode || err?.status || err?.response?.status || undefined,
     providerCode: provider.errorCode || provider.ResponseCode || undefined,
     providerMessage: provider.errorMessage || provider.ResponseDescription || provider.resultDesc || provider.message || provider.error || undefined,
+    providerResponse: safePaymentResponse(err?.response),
     requestId: err?.requestId || provider.requestId || provider.RequestID || undefined,
     message: paymentErrorMessage(err),
   });
+}
+
+function safePaymentResponse(response) {
+  if (typeof response === 'string') return response.replace(/\b(?:\+?254|0)?\d{9,12}\b/g, '[number]').slice(0, 240);
+  if (!response || typeof response !== 'object') return undefined;
+  const safe = {};
+  for (const [key, value] of Object.entries(response).slice(0, 12)) {
+    if (/password|passkey|token|authorization|phone|party|secret|credential/i.test(key)) continue;
+    if (['string', 'number', 'boolean'].includes(typeof value)) safe[key] = value;
+    else if (value && typeof value === 'object') safe[key] = '[nested response]';
+  }
+  return JSON.stringify(safe).replace(/\b(?:\+?254|0)?\d{9,12}\b/g, '[number]').slice(0, 240);
 }
 
 function getCourseFee(course) {
