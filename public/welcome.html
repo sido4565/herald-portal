@@ -1485,8 +1485,27 @@ body.dark .contact-item-label { color: #94a3b8; }
     .course-body h3 { min-height: 44px; font-size: 17px; } .course-body p { min-height: 63px; margin-bottom: 18px; }
     .course-body .meta { gap: 12px; } .course-duration { white-space: nowrap; }
     .courses-toggle-wrap { margin-top: 34px; } .courses-toggle-btn { background: #fff; }
+    #materials { max-width: 1320px; }
+    .materials-toolbar { display:flex; gap:10px; align-items:center; flex-wrap:wrap; margin:0 0 24px; }
+    .materials-toolbar label { font-size:13px; font-weight:700; color:var(--navy); }
+    .materials-toolbar input, .materials-toolbar select, .material-phone { padding:10px 12px; border:1px solid #d7dee8; border-radius:9px; background:#fff; color:var(--text); font:inherit; }
+    .materials-toolbar input { flex:1; min-width:220px; }
+    .materials-grid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:20px; }
+    .material-card { display:flex; flex-direction:column; padding:22px; background:#fff; border:1px solid #e1e6ee; border-radius:16px; box-shadow:0 8px 24px rgba(11,26,51,.06); }
+    .material-card h3 { margin:12px 0 6px; color:var(--navy); font-size:17px; line-height:1.4; }
+    .material-card p { color:var(--muted); font-size:13px; margin:0 0 12px; }
+    .material-course { color:#61708a; font-size:12px; font-weight:600; }
+    .material-badges { display:flex; flex-wrap:wrap; gap:7px; align-items:center; }
+    .material-badge { display:inline-flex; padding:5px 9px; border-radius:20px; background:#edf2f7; color:#35445d; font-size:11px; font-weight:700; }
+    .material-badge.paid { background:#fff1cf; color:#795500; }
+    .material-badge.free { background:#e3f5e9; color:#176438; }
+    .material-action { margin-top:auto; padding-top:10px; }
+    .material-action .btn-gold, .material-action .btn-outline { display:inline-flex; align-items:center; justify-content:center; padding:9px 13px; border-radius:8px; font-size:12px; font-weight:700; cursor:pointer; }
+    .material-action .btn-outline { border:1px solid #d5dce6; background:#fff; color:var(--navy); }
+    .materials-empty { grid-column:1/-1; padding:30px; text-align:center; color:var(--muted); background:#fff; border-radius:14px; }
     @media (max-width: 900px) { .courses-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
-    @media (max-width: 600px) { #courses { padding-left: 18px; padding-right: 18px; } .courses-grid { grid-template-columns: 1fr; gap: 18px; } .course-img-wrap { height: 205px; } .course-body h3, .course-body p { min-height: 0; } .courses-tabs { justify-content: flex-start; overflow-x: auto; flex-wrap: nowrap; padding: 4px 3px 12px; } .course-tab { flex: 0 0 auto; } }
+    @media (max-width: 900px) { .materials-grid { grid-template-columns:repeat(2,minmax(0,1fr)); } }
+    @media (max-width: 600px) { #courses, #materials { padding-left: 18px; padding-right: 18px; } .courses-grid, .materials-grid { grid-template-columns: 1fr; gap: 18px; } .course-img-wrap { height: 205px; } .course-body h3, .course-body p { min-height: 0; } .courses-tabs { justify-content: flex-start; overflow-x: auto; flex-wrap: nowrap; padding: 4px 3px 12px; } .course-tab { flex: 0 0 auto; } .materials-toolbar input { min-width:100%; } .material-phone { width:100%; } }
     @media (prefers-reduced-motion: reduce) { .course-card, .course-img-wrap img, .course-tab { transition: none; } .course-card.newly-revealed { animation: none; } }
   </style>
 </head>
@@ -1504,6 +1523,8 @@ body.dark .contact-item-label { color: #94a3b8; }
     <li><a href="#guides">What Guides Us</a></li>
     <li><a href="#services">Services</a></li>
     <li><a href="#courses">Courses</a></li>
+    <li><a href="#materials">Books &amp; Materials</a></li>
+    <li><a href="login.html">Student Portal</a></li>
     <li><a href="partners.html">Partners</a></li>
     <li><a href="#contact">Contact</a></li>
   </ul>
@@ -1527,6 +1548,8 @@ body.dark .contact-item-label { color: #94a3b8; }
     <li><a href="#guides"><span>01</span>What Guides Us</a></li>
     <li><a href="#services"><span>02</span>Services</a></li>
     <li><a href="#courses"><span>03</span>Courses</a></li>
+    <li><a href="#materials"><span>04</span>Books &amp; Materials</a></li>
+    <li><a href="login.html"><span>05</span>Student Portal</a></li>
     <li><a href="partners.html">Partners</a></li>
     <li><a href="#contact"><span>04</span>Contact</a></li>
   </ul>
@@ -1640,6 +1663,21 @@ body.dark .contact-item-label { color: #94a3b8; }
       <span class="toggle-arrow">▼</span>
     </button>
   </div>
+</section>
+
+<!-- Books & Study Materials -->
+<section class="section" id="materials">
+  <div class="section-head">
+    <span class="section-label">Learning Library</span>
+    <h2>Books &amp; Study Materials</h2>
+    <p>Browse books, notes, slides, and other resources for our courses. Free resources are open to everyone; paid downloads unlock after confirmed M-Pesa payment for enrolled students.</p>
+  </div>
+  <div class="materials-toolbar">
+    <label for="materialsSearch">Search materials</label>
+    <input id="materialsSearch" type="search" placeholder="Search by title, course, or resource type…" />
+    <select id="materialsAccessFilter" aria-label="Filter by access"><option value="all">Free &amp; paid</option><option value="free">Free resources</option><option value="paid">Paid resources</option></select>
+  </div>
+  <div class="materials-grid" id="publicMaterialsGrid" aria-live="polite"><p class="materials-empty">Loading course materials…</p></div>
 </section>
 
 <!-- Contact -->
@@ -2288,6 +2326,121 @@ document.querySelectorAll('.nav-links a, .hero-cta a[href^="#"]').forEach(link =
 // ═══════════════════════════════════════════════════════════
 renderTabs();
 renderCourses();
+
+// ═══════════════════════════════════════════════════════════
+// PUBLIC + STUDENT COURSE MATERIALS LIBRARY
+// ═══════════════════════════════════════════════════════════
+const materialsGrid = document.getElementById('publicMaterialsGrid');
+let publicMaterials = [];
+let studentMaterialAccess = new Map();
+let signedInStudent = false;
+const materialEscape = value => { const el = document.createElement('span'); el.textContent = value ?? ''; return el.innerHTML; };
+
+async function loadPublicMaterials() {
+  try {
+    const [materialsRes, meRes] = await Promise.all([
+      fetch('/api/public/materials'), fetch('/api/me', { credentials: 'same-origin' })
+    ]);
+    if (!materialsRes.ok) throw new Error('Could not load course materials.');
+    publicMaterials = await materialsRes.json();
+    if (meRes.ok) {
+      signedInStudent = true;
+      const enrolledRes = await fetch('/api/my-materials', { credentials: 'same-origin' });
+      if (enrolledRes.ok) {
+        const enrolledMaterials = await enrolledRes.json();
+        studentMaterialAccess = new Map(enrolledMaterials.map(item => [Number(item.id), item]));
+      }
+    }
+    renderPublicMaterials();
+  } catch (err) {
+    materialsGrid.innerHTML = `<p class="materials-empty">${materialEscape(err.message)} Please refresh to try again.</p>`;
+  }
+}
+
+function renderPublicMaterials() {
+  const search = document.getElementById('materialsSearch').value.trim().toLowerCase();
+  const accessFilter = document.getElementById('materialsAccessFilter').value;
+  const filtered = publicMaterials.filter(item => {
+    const isPaid = Number(item.is_paid) === 1;
+    const matchesAccess = accessFilter === 'all' || (accessFilter === 'paid' ? isPaid : !isPaid);
+    const haystack = `${item.title} ${item.description || ''} ${item.course_title} ${item.code} ${item.resource_category}`.toLowerCase();
+    return matchesAccess && haystack.includes(search);
+  });
+  if (!filtered.length) {
+    materialsGrid.innerHTML = '<p class="materials-empty">No materials match your search yet.</p>';
+    return;
+  }
+  materialsGrid.innerHTML = filtered.map(item => {
+    const paid = Number(item.is_paid) === 1;
+    const access = studentMaterialAccess.get(Number(item.id));
+    const unlocked = new Date() >= new Date(item.release_date);
+    const owned = !!access && (Number(access.owned) === 1 || access.owned === true);
+    let action = '<span class="material-badge">No file attached yet</span>';
+    if (!unlocked) {
+      action = `<span class="material-badge">Available ${materialEscape(new Date(item.release_date).toLocaleDateString('en-KE'))}</span>`;
+    } else if (!paid && Number(item.file_available)) {
+      action = `<a class="btn-gold" href="/api/public/materials/${Number(item.id)}/download">Download free material</a>`;
+    } else if (paid && owned) {
+      action = `<a class="btn-gold" href="/api/my-materials/${Number(item.id)}/download">Download purchased material</a>`;
+    } else if (paid && signedInStudent && access?.purchase_status === 'pending') {
+      action = `<span class="material-badge paid">Payment pending</span> <button class="btn-outline" type="button" onclick="checkPublicMaterialPayment(${Number(item.id)})">Check payment</button>`;
+    } else if (paid && signedInStudent && access && Number(item.file_available)) {
+      action = `<div style="display:grid;gap:8px;"><input class="material-phone" id="publicMaterialPhone-${Number(item.id)}" type="tel" placeholder="M-Pesa phone number" aria-label="M-Pesa phone number"><button class="btn-gold" type="button" onclick="payForPublicMaterial(${Number(item.id)})">Pay KES ${Number(item.price).toLocaleString()} &amp; unlock</button><small id="publicMaterialStatus-${Number(item.id)}"></small></div>`;
+    } else if (paid) {
+      action = `<a class="btn-outline" href="register.html">Enroll to access this material</a>`;
+    }
+    return `<article class="material-card">
+      <div class="material-badges"><span class="material-badge ${paid ? 'paid' : 'free'}">${paid ? `Paid · KES ${Number(item.price).toLocaleString()}` : 'Free'}</span><span class="material-badge">${materialEscape(item.resource_category || 'resource')}</span></div>
+      <h3>${materialEscape(item.title)}</h3>
+      <div class="material-course">${materialEscape(item.code)} · ${materialEscape(item.course_title)}</div>
+      ${item.description ? `<p style="margin-top:10px;">${materialEscape(item.description)}</p>` : ''}
+      <div class="material-action">${action}</div>
+    </article>`;
+  }).join('');
+}
+
+window.payForPublicMaterial = async id => {
+  const phoneNumber = document.getElementById(`publicMaterialPhone-${id}`)?.value.trim();
+  if (!phoneNumber) return alert('Enter your M-Pesa phone number.');
+  const button = document.querySelector(`button[onclick="payForPublicMaterial(${id})"]`);
+  if (button) button.disabled = true;
+  try {
+    const response = await fetch(`/api/my-materials/${id}/pay`, {
+      method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ phoneNumber }),
+    });
+    const result = await response.json();
+    if (!response.ok) throw new Error(result.error || 'Could not start payment.');
+    if (result.owned) { await loadPublicMaterials(); return; }
+    const statusEl = document.getElementById(`publicMaterialStatus-${id}`);
+    if (statusEl) statusEl.textContent = 'Approve the M-Pesa prompt on your phone. Checking payment…';
+    for (let tries = 0; tries < 10; tries++) {
+      await new Promise(resolve => setTimeout(resolve, 5000));
+      const check = await fetch(`/api/my-materials/${id}/purchase-status`, { credentials: 'same-origin' });
+      const status = await check.json();
+      if (status.owned) { await loadPublicMaterials(); return; }
+      if (['failed', 'review'].includes(status.status)) {
+        if (statusEl) statusEl.textContent = status.result_description || `Payment status: ${status.status}.`;
+        return;
+      }
+    }
+    if (statusEl) statusEl.textContent = 'Still pending. You can check again after approving the prompt.';
+  } catch (err) { alert(err.message); }
+  finally { if (button) button.disabled = false; }
+};
+
+window.checkPublicMaterialPayment = async id => {
+  try {
+    const response = await fetch(`/api/my-materials/${id}/purchase-status`, { credentials: 'same-origin' });
+    const status = await response.json();
+    if (status.owned) { await loadPublicMaterials(); return; }
+    alert(status.status === 'pending' ? 'Payment is still pending. Approve the prompt on your phone.' : `Payment status: ${status.status}.`);
+  } catch (err) { alert(err.message); }
+};
+
+document.getElementById('materialsSearch').addEventListener('input', renderPublicMaterials);
+document.getElementById('materialsAccessFilter').addEventListener('change', renderPublicMaterials);
+loadPublicMaterials();
 
 </script>
 

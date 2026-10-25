@@ -55,12 +55,13 @@ const { sendSMS } = require('./sms');
 BigInt.prototype.toJSON = function () { return Number(this); };
 
 // ---------- R2 (Cloudflare) S3 client ----------
-const { S3Client, PutObjectCommand, DeleteObjectCommand } = require('@aws-sdk/client-s3');
+const { S3Client, PutObjectCommand, GetObjectCommand, DeleteObjectCommand } = require('@aws-sdk/client-s3');
 
 const R2_ACCOUNT_ID = process.env.R2_ACCOUNT_ID;
 const R2_ACCESS_KEY_ID = process.env.R2_ACCESS_KEY_ID;
 const R2_SECRET_ACCESS_KEY = process.env.R2_SECRET_ACCESS_KEY;
 const R2_BUCKET = process.env.R2_BUCKET || 'herald-portal-uploads';
+const R2_PRIVATE_BUCKET = process.env.R2_PRIVATE_BUCKET || '';
 const R2_PUBLIC_URL = (process.env.R2_PUBLIC_URL || '').replace(/\/$/, ''); // strip trailing slash
 
 let r2 = null;
@@ -89,6 +90,8 @@ app.use(express.static(path.join(__dirname, 'public')));
 // ---------- File uploads (R2 with local fallback) ----------
 const UPLOAD_DIR = process.env.UPLOAD_DIR || path.join(__dirname, 'uploads');
 if (!fs.existsSync(UPLOAD_DIR)) fs.mkdirSync(UPLOAD_DIR, { recursive: true });
+const PRIVATE_MATERIALS_DIR = process.env.PRIVATE_MATERIALS_DIR || path.join(__dirname, 'private-materials');
+if (!fs.existsSync(PRIVATE_MATERIALS_DIR)) fs.mkdirSync(PRIVATE_MATERIALS_DIR, { recursive: true });
 
 // Use memory storage — we'll stream the buffer to R2 (or write to disk in fallback)
 const storage = multer.memoryStorage();
@@ -121,6 +124,53 @@ async function saveFile(file) {
       storage: 'local',
     };
   }
+}
+
+async function savePrivateMaterialFile(file) {
+  const safe = file.originalname.replace(/[^a-zA-Z0-9._-]/g, '_');
+  const key = `${Date.now()}-${Math.random().toString(36).slice(2, 10)}-${safe}`;
+  if (r2 && R2_PRIVATE_BUCKET) {
+    await r2.send(new PutObjectCommand({
+      Bucket: R2_PRIVATE_BUCKET,
+      Key: key,
+      Body: file.buffer,
+      ContentType: file.mimetype,
+      ContentDisposition: `attachment; filename="${safe}"`,
+    }));
+    return { storage_key: key, storage_type: 'r2-private', file_name: file.originalname, mime_type: file.mimetype };
+  }
+  fs.writeFileSync(path.join(PRIVATE_MATERIALS_DIR, key), file.buffer, { flag: 'wx' });
+  return { storage_key: key, storage_type: 'local-private', file_name: file.originalname, mime_type: file.mimetype };
+}
+
+async function deletePrivateMaterialFile(key, storageType) {
+  if (!key) return;
+  if (storageType === 'r2-private' && r2 && R2_PRIVATE_BUCKET) {
+    await r2.send(new DeleteObjectCommand({ Bucket: R2_PRIVATE_BUCKET, Key: key }));
+  } else if (storageType === 'local-private') {
+    const fullPath = path.join(PRIVATE_MATERIALS_DIR, path.basename(key));
+    if (fs.existsSync(fullPath)) fs.unlinkSync(fullPath);
+  }
+}
+
+async function deliverMaterialFile(material, res) {
+  const filename = String(material.file_name || `${material.title}.pdf`).replace(/[\\"\r\n]/g, '_');
+  if (material.storage_type === 'r2-private' && material.storage_key && r2 && R2_PRIVATE_BUCKET) {
+    const object = await r2.send(new GetObjectCommand({ Bucket: R2_PRIVATE_BUCKET, Key: material.storage_key }));
+    res.setHeader('Content-Type', material.mime_type || 'application/octet-stream');
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    return object.Body.pipe(res);
+  }
+  if (material.storage_type === 'local-private' && material.storage_key) {
+    const localPath = path.join(PRIVATE_MATERIALS_DIR, path.basename(material.storage_key));
+    if (!fs.existsSync(localPath)) return res.status(404).json({ error: 'The resource file is missing.' });
+    res.setHeader('Content-Type', material.mime_type || 'application/octet-stream');
+    return res.download(localPath, filename);
+  }
+  if (material.external_url && /^https?:\/\//i.test(material.external_url)) return res.redirect(material.external_url);
+  if (material.file_path && /^https?:\/\//i.test(material.file_path)) return res.redirect(material.file_path);
+  if (material.file_path && material.file_path.startsWith('/uploads/')) return res.redirect(material.file_path);
+  return res.status(404).json({ error: 'No downloadable file is available.' });
 }
 
 async function deleteFile(fileKey, storageType = 'r2') {
@@ -478,6 +528,26 @@ app.get('/api/public/courses', async (req, res) => {
   res.json([...catalog, ...extraDb]);
 });
 
+app.get('/api/public/materials', async (req, res) => {
+  const rows = await db.execute(`
+    SELECT m.id, m.course_id, m.title, m.description, m.release_date, m.file_name,
+      COALESCE(m.resource_category, 'other') AS resource_category,
+      COALESCE(m.is_paid, 0) AS is_paid, COALESCE(m.price, 0) AS price,
+      CASE WHEN m.storage_key IS NOT NULL OR m.file_path IS NOT NULL OR m.external_url IS NOT NULL THEN 1 ELSE 0 END AS file_available,
+      c.code, c.title AS course_title
+    FROM materials m JOIN courses c ON c.id = m.course_id
+    ORDER BY c.title, m.release_date, m.title`);
+  res.json(rows.rows);
+});
+
+app.get('/api/public/materials/:id/download', async (req, res) => {
+  const result = await db.execute({ sql: 'SELECT * FROM materials WHERE id = ?', args: [req.params.id] });
+  const m = result.rows[0];
+  if (!m || Number(m.is_paid)) return res.status(404).json({ error: 'Free material not found.' });
+  if (new Date() < new Date(m.release_date)) return res.status(423).json({ error: 'This material is not yet available.' });
+  return deliverMaterialFile(m, res);
+});
+
 app.get('/api/courses', authStudent, async (req, res) => {
   try {
     const courses = await db.execute('SELECT * FROM courses');
@@ -679,9 +749,13 @@ app.get('/api/my-live-classes', authStudent, async (req, res) => {
 app.get('/api/my-materials', authStudent, async (req, res) => {
   const now = new Date();
   const r = await db.execute({
-    sql: `SELECT m.id, m.title, m.description, m.material_type, m.file_path, m.file_name,
-            m.external_url, m.release_date, m.created_at,
-            c.code, c.title AS course_title
+    sql: `SELECT m.id, m.title, m.description, m.material_type, m.file_name,
+            m.release_date, m.created_at, COALESCE(m.resource_category, 'other') AS resource_category,
+            COALESCE(m.is_paid, 0) AS is_paid, COALESCE(m.price, 0) AS price,
+            CASE WHEN m.storage_key IS NOT NULL OR m.file_path IS NOT NULL OR m.external_url IS NOT NULL THEN 1 ELSE 0 END AS file_available,
+            c.code, c.title AS course_title,
+            (SELECT status FROM material_purchases p WHERE p.material_id = m.id AND p.student_id = e.student_id ORDER BY p.id DESC LIMIT 1) AS purchase_status,
+            EXISTS(SELECT 1 FROM material_purchases p WHERE p.material_id = m.id AND p.student_id = e.student_id AND p.status = 'paid') AS owned
           FROM materials m
           JOIN courses c ON c.id = m.course_id
           JOIN enrollments e ON e.course_id = m.course_id
@@ -696,6 +770,7 @@ app.get('/api/my-materials', authStudent, async (req, res) => {
     return {
       ...m,
       unlocked: isUnlocked,
+      can_download: isUnlocked && (!Number(m.is_paid) || !!Number(m.owned)),
       isToday,
       release_date_formatted: releaseDate.toLocaleDateString('en-KE', {
         weekday: 'short', year: 'numeric', month: 'short', day: 'numeric',
@@ -707,7 +782,10 @@ app.get('/api/my-materials', authStudent, async (req, res) => {
 
 app.get('/api/my-materials/:id', authStudent, async (req, res) => {
   const r = await db.execute({
-    sql: `SELECT m.*, c.code, c.title AS course_title
+    sql: `SELECT m.id, m.title, m.description, m.release_date, m.file_name,
+            COALESCE(m.is_paid, 0) AS is_paid, COALESCE(m.price, 0) AS price,
+            COALESCE(m.resource_category, 'other') AS resource_category,
+            c.code, c.title AS course_title
           FROM materials m
           JOIN courses c ON c.id = m.course_id
           JOIN enrollments e ON e.course_id = m.course_id
@@ -724,6 +802,60 @@ app.get('/api/my-materials/:id', authStudent, async (req, res) => {
     args: [m.id, req.user.id],
   });
   res.json(m);
+});
+
+app.get('/api/my-materials/:id/purchase-status', authStudent, async (req, res) => {
+  const owned = await db.execute({
+    sql: `SELECT p.status, p.amount_due, p.amount_received, p.mpesa_receipt, p.result_description
+          FROM material_purchases p JOIN materials m ON m.id = p.material_id
+          JOIN enrollments e ON e.course_id = m.course_id
+          WHERE p.material_id = ? AND p.student_id = ? AND e.student_id = ?
+          ORDER BY p.id DESC LIMIT 1`,
+    args: [req.params.id, req.user.id, req.user.id],
+  });
+  if (!owned.rows.length) return res.json({ status: 'unpaid', owned: false });
+  const p = owned.rows[0];
+  res.json({ status: p.status, owned: p.status === 'paid', amount_due: p.amount_due, result_description: p.result_description });
+});
+
+app.post('/api/my-materials/:id/pay', authStudent, async (req, res) => {
+  if (!mpesa) return res.status(503).json({ error: 'M-Pesa is not configured on this server.' });
+  const materialRes = await db.execute({
+    sql: `SELECT m.* FROM materials m JOIN enrollments e ON e.course_id = m.course_id
+          WHERE m.id = ? AND e.student_id = ?`, args: [req.params.id, req.user.id],
+  });
+  const material = materialRes.rows[0];
+  if (!material) return res.status(404).json({ error: 'Material not found in your enrolled courses.' });
+  if (new Date() < new Date(material.release_date)) return res.status(423).json({ error: 'This material is not yet available.' });
+  if (!Number(material.is_paid)) return res.status(400).json({ error: 'This material is free.' });
+  const previous = await db.execute({ sql: 'SELECT status FROM material_purchases WHERE material_id = ? AND student_id = ? ORDER BY id DESC LIMIT 1', args: [material.id, req.user.id] });
+  if (previous.rows[0]?.status === 'paid') return res.json({ ok: true, owned: true });
+  if (previous.rows[0]?.status === 'pending') return res.status(409).json({ error: 'A payment prompt is already pending. Check your phone or refresh payment status.' });
+  const phoneNumber = String(req.body.phoneNumber || '').trim();
+  if (!phoneNumber) return res.status(400).json({ error: 'Enter your M-Pesa phone number.' });
+  try {
+    const amount = Math.round(Number(material.price));
+    const push = await mpesa.stkPush({ amount, phoneNumber, callbackUrl: 'https://heraldtrainer.co.ke/api/mpesa/callback', accountReference: `BOOK${material.id}`, transactionDesc: `Resource ${material.id}` });
+    if (!push.CheckoutRequestID) throw new Error('M-Pesa did not return a checkout request ID.');
+    await db.execute({ sql: `INSERT INTO material_purchases (student_id, material_id, amount_due, status, checkout_request_id) VALUES (?, ?, ?, 'pending', ?)`, args: [req.user.id, material.id, amount, push.CheckoutRequestID] });
+    res.json({ ok: true, message: 'Approve the M-Pesa prompt on your phone.', checkoutRequestId: push.CheckoutRequestID });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.get('/api/my-materials/:id/download', authStudent, async (req, res) => {
+  const result = await db.execute({
+    sql: `SELECT m.* FROM materials m JOIN enrollments e ON e.course_id = m.course_id
+          WHERE m.id = ? AND e.student_id = ?`, args: [req.params.id, req.user.id],
+  });
+  const m = result.rows[0];
+  if (!m) return res.status(404).json({ error: 'Material not found in your enrolled courses.' });
+  if (new Date() < new Date(m.release_date)) return res.status(423).json({ error: 'This material is not yet available.' });
+  if (Number(m.is_paid)) {
+    const paid = await db.execute({ sql: "SELECT id FROM material_purchases WHERE material_id = ? AND student_id = ? AND status = 'paid' LIMIT 1", args: [m.id, req.user.id] });
+    if (!paid.rows.length) return res.status(402).json({ error: 'Payment is required before downloading this material.' });
+  }
+  await db.execute({ sql: 'INSERT INTO material_views (material_id, student_id) VALUES (?, ?)', args: [m.id, req.user.id] });
+  return deliverMaterialFile(m, res);
 });
 
 app.get('/api/my-transcript', authStudent, async (req, res) => {
@@ -1269,6 +1401,20 @@ app.post('/api/lecturer/attendance', authLecturer, async (req, res) => {
   }
 
   try {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || Number.isNaN(Date.parse(`${date}T00:00:00Z`))) {
+      return res.status(400).json({ error: 'Use a valid attendance date.' });
+    }
+    const assigned = await db.execute({
+      sql: 'SELECT 1 FROM lecturer_courses WHERE lecturer_id = ? AND course_id = ?',
+      args: [req.lecturer.id, course_id],
+    });
+    if (!assigned.rows.length) return res.status(403).json({ error: 'Not assigned to this course.' });
+    const roster = await db.execute({ sql: 'SELECT student_id FROM enrollments WHERE course_id = ?', args: [course_id] });
+    const enrolledIds = new Set(roster.rows.map(row => Number(row.student_id)));
+    const validStatuses = new Set(['present', 'absent', 'late', 'excused']);
+    if (records.some(record => !enrolledIds.has(Number(record.student_id)) || !validStatuses.has(record.status))) {
+      return res.status(400).json({ error: 'Attendance records must belong to enrolled students and use a valid status.' });
+    }
     for (const r of records) {
       await db.execute({
         sql: 'DELETE FROM attendance WHERE course_id = ? AND student_id = ? AND date = ?',
@@ -2128,6 +2274,61 @@ app.put('/api/admin/submissions/:id', authAdmin, async (req, res) => {
 });
 
 // ---------- Attendance (admin) ----------
+app.get('/api/admin/materials', authAdmin, async (req, res) => {
+  const rows = await db.execute(`
+    SELECT m.id, m.title, m.description, m.file_name, m.release_date,
+      COALESCE(m.resource_category, 'other') AS resource_category,
+      COALESCE(m.is_paid, 0) AS is_paid, COALESCE(m.price, 0) AS price,
+      c.code, c.title AS course_title,
+      (SELECT COUNT(*) FROM material_views v WHERE v.material_id = m.id) AS download_count
+    FROM materials m JOIN courses c ON c.id = m.course_id ORDER BY c.title, m.title`);
+  res.json(rows.rows);
+});
+
+app.post('/api/admin/materials/upload', authAdmin, materialUpload.single('file'), async (req, res) => {
+  if (!req.file) return res.status(400).json({ error: 'Choose a file to upload.' });
+  try { res.json(await savePrivateMaterialFile(req.file)); }
+  catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.post('/api/admin/materials', authAdmin, async (req, res) => {
+  const { course_id, title, description, release_date, resource_category, is_paid, price, external_url } = req.body;
+  const paid = !!is_paid;
+  const storageKey = req.body.storage_key || null;
+  const storageType = req.body.storage_type || null;
+  const fileName = req.body.file_name || null;
+  const mimeType = req.body.mime_type || null;
+  if (!Number.isInteger(Number(course_id)) || !String(title || '').trim() || !/^\d{4}-\d{2}-\d{2}$/.test(String(release_date || '')))
+    return res.status(400).json({ error: 'Course, title and a valid release date are required.' });
+  if (paid && (!storageKey || !storageType || !Number.isInteger(Number(price)) || Number(price) < 1))
+    return res.status(400).json({ error: 'Paid materials need a private file and a whole-number price.' });
+  if (external_url) {
+    try { if (!['http:', 'https:'].includes(new URL(external_url).protocol)) throw new Error('invalid protocol'); }
+    catch (_) { return res.status(400).json({ error: 'External links must use http or https.' }); }
+  }
+  const course = await db.execute({ sql: 'SELECT id FROM courses WHERE id = ?', args: [course_id] });
+  if (!course.rows.length) return res.status(400).json({ error: 'Choose a valid course.' });
+  const info = await db.execute({
+    sql: `INSERT INTO materials (course_id, title, description, material_type, file_path, file_name, external_url, release_date,
+            resource_category, is_paid, price, storage_key, storage_type, mime_type, created_by)
+          VALUES (?, ?, ?, 'file', NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    args: [Number(course_id), String(title).trim(), String(description || '').trim(), fileName, paid ? null : (external_url || null), release_date,
+      ['book','notes','slides','video','other'].includes(resource_category) ? resource_category : 'other', paid ? 1 : 0,
+      paid ? Number(price) : 0, storageKey, storageType, mimeType, req.admin.id],
+  });
+  res.status(201).json({ ok: true, id: Number(info.lastInsertRowid) });
+});
+
+app.delete('/api/admin/materials/:id', authAdmin, async (req, res) => {
+  const row = await db.execute({ sql: 'SELECT storage_key, storage_type FROM materials WHERE id = ?', args: [req.params.id] });
+  if (!row.rows.length) return res.status(404).json({ error: 'Material not found.' });
+  await db.execute({ sql: 'DELETE FROM material_views WHERE material_id = ?', args: [req.params.id] });
+  await db.execute({ sql: 'DELETE FROM material_purchases WHERE material_id = ?', args: [req.params.id] });
+  await db.execute({ sql: 'DELETE FROM materials WHERE id = ?', args: [req.params.id] });
+  await deletePrivateMaterialFile(row.rows[0].storage_key, row.rows[0].storage_type);
+  res.json({ ok: true });
+});
+
 app.get('/api/admin/attendance/:courseId', authAdmin, async (req, res) => {
   const r = await db.execute({
     sql: `SELECT a.*, s.reg_no, s.name AS student_name
@@ -2145,6 +2346,15 @@ app.post('/api/admin/attendance', authAdmin, async (req, res) => {
   }
 
   try {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || Number.isNaN(Date.parse(`${date}T00:00:00Z`))) {
+      return res.status(400).json({ error: 'Use a valid attendance date.' });
+    }
+    const roster = await db.execute({ sql: 'SELECT student_id FROM enrollments WHERE course_id = ?', args: [course_id] });
+    const enrolledIds = new Set(roster.rows.map(row => Number(row.student_id)));
+    const validStatuses = new Set(['present', 'absent', 'late', 'excused']);
+    if (records.some(record => !enrolledIds.has(Number(record.student_id)) || !validStatuses.has(record.status))) {
+      return res.status(400).json({ error: 'Attendance records must belong to enrolled students and use a valid status.' });
+    }
     for (const r of records) {
       await db.execute({
         sql: 'DELETE FROM attendance WHERE course_id = ? AND student_id = ? AND date = ?',
@@ -2166,6 +2376,51 @@ app.post('/api/admin/attendance', authAdmin, async (req, res) => {
     console.error('Attendance save failed:', err);
     res.status(500).json({ error: err.message });
   }
+});
+
+app.get('/api/admin/lecturer-attendance', authAdmin, async (req, res) => {
+  const date = String(req.query.date || '').trim();
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || Number.isNaN(Date.parse(`${date}T00:00:00Z`))) {
+    return res.status(400).json({ error: 'A valid date=YYYY-MM-DD is required.' });
+  }
+  const rows = await db.execute({
+    sql: `SELECT l.id AS lecturer_id, l.staff_no, l.name, a.status, a.notes
+          FROM lecturers l
+          LEFT JOIN lecturer_attendance a ON a.lecturer_id = l.id AND a.date = ?
+          WHERE l.approved = 1 AND l.status <> 'rejected'
+          ORDER BY l.name`,
+    args: [date],
+  });
+  res.json(rows.rows);
+});
+
+app.post('/api/admin/lecturer-attendance', authAdmin, async (req, res) => {
+  const { date, records } = req.body;
+  if (!date || !Array.isArray(records) || !records.length) {
+    return res.status(400).json({ error: 'date and at least one lecturer record are required.' });
+  }
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || Number.isNaN(Date.parse(`${date}T00:00:00Z`))) {
+    return res.status(400).json({ error: 'Use a valid attendance date.' });
+  }
+  const validStatuses = new Set(['present', 'absent', 'late', 'excused']);
+  if (records.some(record => !Number.isInteger(Number(record.lecturer_id)) || !validStatuses.has(record.status))) {
+    return res.status(400).json({ error: 'Each record needs a lecturer and a valid attendance status.' });
+  }
+  const lecturers = await db.execute("SELECT id FROM lecturers WHERE approved = 1 AND status <> 'rejected'");
+  const lecturerIds = new Set(lecturers.rows.map(row => Number(row.id)));
+  if (records.some(record => !lecturerIds.has(Number(record.lecturer_id)))) {
+    return res.status(400).json({ error: 'Only approved lecturers can be marked.' });
+  }
+  for (const record of records) {
+    await db.execute({
+      sql: `INSERT INTO lecturer_attendance (lecturer_id, date, status, notes, marked_by)
+            VALUES (?, ?, ?, ?, ?)
+            ON CONFLICT(lecturer_id, date) DO UPDATE SET
+              status = excluded.status, notes = excluded.notes, marked_by = excluded.marked_by`,
+      args: [Number(record.lecturer_id), date, record.status, String(record.notes || '').slice(0, 500), req.admin.id],
+    });
+  }
+  res.json({ ok: true, count: records.length });
 });
 
 app.get('/api/admin/attendance-summary/:courseId', authAdmin, async (req, res) => {
@@ -3200,6 +3455,35 @@ app.post('/api/mpesa/stk-push', authStudent, async (req, res) => {
 app.post('/api/mpesa/callback', async (req, res) => {
   try {
     const callback = req.body;
+    const stk = callback?.Body?.stkCallback;
+    const checkoutId = stk?.CheckoutRequestID;
+    if (checkoutId) {
+      const purchaseRes = await db.execute({
+        sql: 'SELECT * FROM material_purchases WHERE checkout_request_id = ?', args: [checkoutId],
+      });
+      const purchase = purchaseRes.rows[0];
+      if (purchase) {
+        const success = isStkCallbackSuccess(stk);
+        if (success) {
+          const receipt = getCallbackValue(callback, 'MpesaReceiptNumber');
+          const received = Number(getCallbackValue(callback, 'Amount'));
+          const correctAmount = Number(purchase.amount_due) === received;
+          await db.execute({
+            sql: `UPDATE material_purchases SET status = ?, amount_received = ?, mpesa_receipt = ?,
+                    result_description = ?, paid_at = CASE WHEN ? = 'paid' THEN CURRENT_TIMESTAMP ELSE paid_at END
+                  WHERE id = ? AND status = 'pending'`,
+            args: [correctAmount ? 'paid' : 'review', received, receipt || null,
+              correctAmount ? 'Payment confirmed.' : `Amount mismatch: expected ${purchase.amount_due}, received ${received}.`, correctAmount ? 'paid' : 'review', purchase.id],
+          });
+        } else {
+          await db.execute({
+            sql: `UPDATE material_purchases SET status = 'failed', result_description = ? WHERE id = ? AND status = 'pending'`,
+            args: [String(stk?.ResultDesc || 'M-Pesa payment failed').slice(0, 500), purchase.id],
+          });
+        }
+        return res.json({ ResultCode: 0, ResultDesc: 'Accepted' });
+      }
+    }
     
     if (isStkCallbackSuccess(callback.Body.stkCallback)) {
       const receipt = getCallbackValue(callback, 'MpesaReceiptNumber');

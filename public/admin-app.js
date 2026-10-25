@@ -165,6 +165,8 @@ if ($('#adminName')) {
       case 'timetable':     return loadTimetable();
       case 'assignments':   return loadAssignments();
       case 'attendance':    return loadAttendance();
+      case 'lecturer-attendance': return loadLecturerAttendance();
+      case 'materials':     return loadLibrary();
       case 'liveclasses':   return loadLiveClasses();
     }
   }
@@ -673,6 +675,21 @@ if (addLectBtn) {
     if (takeAttBtn) {
       takeAttBtn.addEventListener('click', () => openTakeAttendanceModal());
     }
+
+    $('#lectAttDate')?.addEventListener('change', () => loadLecturerAttendance());
+    $('#lectAttLoadBtn')?.addEventListener('click', () => loadLecturerAttendance());
+    $('#lectAttSaveBtn')?.addEventListener('click', saveLecturerAttendance);
+    $('#adminAddMaterialBtn')?.addEventListener('click', openAdminMaterialModal);
+    $('#adminMaterialsList')?.addEventListener('click', async e => {
+      const button = e.target.closest('[data-delete-material]');
+      if (!button) return;
+      if (!confirm('Delete this book or study material?')) return;
+      try {
+        await api(`/api/admin/materials/${button.dataset.deleteMaterial}`, { method: 'DELETE' });
+        toast('Material deleted.');
+        await loadLibrary();
+      } catch (err) { toast(err.message, 'error'); }
+    });
 
     // ---- Live Classes ----
     const addLiveBtn = $('#addLiveClassBtn');
@@ -1570,6 +1587,121 @@ async function openBulkAssignModal() {
       </tr>`).join('') || '<tr><td colspan="5" class="empty">No records.</td></tr>';
 
     wireTableActions(tb);
+  }
+
+  async function loadLecturerAttendance() {
+    const dateInput = $('#lectAttDate');
+    if (!dateInput.value) dateInput.value = new Date().toISOString().slice(0, 10);
+    const rows = await api(`/api/admin/lecturer-attendance?date=${encodeURIComponent(dateInput.value)}`);
+    const counts = { present: 0, absent: 0, late: 0, excused: 0, unmarked: 0 };
+    rows.forEach(row => { counts[row.status || 'unmarked'] = (counts[row.status || 'unmarked'] || 0) + 1; });
+    $('#lectAttSummary').innerHTML = `<span class="pill pill-green">${counts.present} present</span> <span class="pill pill-red">${counts.absent} absent</span> <span class="pill pill-amber">${counts.late} late</span> <span class="pill">${counts.excused} excused</span> <span class="pill">${counts.unmarked} unmarked</span>`;
+    $('#lectAttTable tbody').innerHTML = rows.map(row => `
+      <tr>
+        <td>${esc(row.staff_no)}</td><td>${esc(row.name)}</td>
+        <td><select class="lect-att-status" data-id="${row.lecturer_id}" style="padding:7px;border:1px solid var(--border);border-radius:6px;background:var(--card);color:var(--text);">
+          <option value="">— Unmarked —</option>
+          <option value="present" ${row.status === 'present' ? 'selected' : ''}>Present</option>
+          <option value="absent" ${row.status === 'absent' ? 'selected' : ''}>Absent</option>
+          <option value="late" ${row.status === 'late' ? 'selected' : ''}>Late</option>
+          <option value="excused" ${row.status === 'excused' ? 'selected' : ''}>Excused</option>
+        </select></td>
+        <td><input class="lect-att-notes" data-id="${row.lecturer_id}" value="${esc(row.notes || '')}" maxlength="500" placeholder="Optional note" style="width:100%;min-width:150px;padding:7px;border:1px solid var(--border);border-radius:6px;background:var(--card);color:var(--text);" /></td>
+      </tr>`).join('') || '<tr><td colspan="4" class="empty">No approved lecturers to mark.</td></tr>';
+  }
+
+  async function saveLecturerAttendance() {
+    const date = $('#lectAttDate').value;
+    const records = $$('.lect-att-status').filter(select => select.value).map(select => ({
+      lecturer_id: Number(select.dataset.id),
+      status: select.value,
+      notes: $(`.lect-att-notes[data-id="${select.dataset.id}"]`)?.value || '',
+    }));
+    if (!date || !records.length) return toast('Choose a date and mark at least one lecturer.', 'error');
+    try {
+      await api('/api/admin/lecturer-attendance', { method: 'POST', body: { date, records } });
+      toast(`Saved attendance for ${records.length} lecturer(s).`);
+      await loadLecturerAttendance();
+    } catch (err) { toast(err.message, 'error'); }
+  }
+
+  async function loadLibrary() {
+    const rows = await api('/api/admin/materials');
+    $('#adminMaterialsList').innerHTML = rows.length ? `
+      <div class="table-wrap"><table><thead><tr><th>Course</th><th>Resource</th><th>Access</th><th>Price</th><th>Downloads</th><th>Actions</th></tr></thead>
+      <tbody>${rows.map(row => `<tr>
+        <td>${esc(row.code)} — ${esc(row.course_title)}</td>
+        <td><strong>${esc(row.title)}</strong><br><small>${esc(row.resource_category || 'other')} · ${esc(row.file_name || 'link/text resource')}</small></td>
+        <td>${Number(row.is_paid) ? '<span class="pill pill-amber">Paid</span>' : '<span class="pill pill-green">Free</span>'}</td>
+        <td>${Number(row.is_paid) ? `KES ${Number(row.price).toLocaleString()}` : '—'}</td>
+        <td>${Number(row.download_count || 0)}</td>
+        <td><button class="btn-xs danger" type="button" data-delete-material="${row.id}">Delete</button></td>
+      </tr>`).join('')}</tbody></table></div>` : '<p class="empty">No books or study materials yet. Upload one to start the course library.</p>';
+  }
+
+  async function openAdminMaterialModal() {
+    try { await ensureCache(); } catch (err) { return toast(err.message, 'error'); }
+    const overlay = document.createElement('div');
+    overlay.className = 'modal-overlay';
+    overlay.innerHTML = `
+      <div class="modal" style="max-width:640px;">
+        <h3>Upload Book or Study Material</h3>
+        <form id="adminMaterialForm" class="modal-form">
+          <label>Course</label><select name="course_id" required><option value="">— Select course —</option>${coursesCache.map(c => `<option value="${c.id}">${esc(c.code)} — ${esc(c.title)}</option>`).join('')}</select>
+          <label>Resource type</label><select name="resource_category"><option value="book">Book</option><option value="notes">Notes</option><option value="slides">Slides</option><option value="video">Video</option><option value="other">Other</option></select>
+          <label>Title</label><input name="title" required maxlength="160" placeholder="e.g. Introduction to Accounting" />
+          <label>Description</label><textarea name="description" rows="3" maxlength="2000"></textarea>
+          <label>Release date</label><input type="date" name="release_date" value="${new Date().toISOString().slice(0,10)}" required />
+          <label>Access</label><select name="access" id="adminMaterialAccess"><option value="free">Free</option><option value="paid">Paid</option></select>
+          <div id="adminMaterialPriceWrap" style="display:none;"><label>Price (KES)</label><input type="number" name="price" min="1" step="1" /></div>
+          <label>Book / notes file <span id="adminMaterialFileHint">(optional for free links/text)</span></label>
+          <input type="file" id="adminMaterialFile" accept=".pdf,.doc,.docx,.ppt,.pptx,.jpg,.jpeg,.png,.webp,.mp4,.webm" />
+          <div id="adminMaterialExternalWrap"><label>Free external link (optional)</label><input type="url" name="external_url" placeholder="https://..." /></div>
+          <p id="adminMaterialPaidHint" style="display:none;color:var(--danger);font-size:12px;">Paid items must be uploaded as a file. External links cannot be protected from direct sharing.</p>
+        </form>
+        <div class="modal-actions"><button class="btn-ghost dark" data-close type="button">Cancel</button><button class="btn-primary" id="adminMaterialSave" type="button">Upload</button></div>
+      </div>`;
+    document.body.appendChild(overlay);
+    overlay.addEventListener('click', e => { if (e.target === overlay || e.target.closest('[data-close]')) overlay.remove(); });
+    const access = overlay.querySelector('#adminMaterialAccess');
+    const file = overlay.querySelector('#adminMaterialFile');
+    const syncAccess = () => {
+      const paid = access.value === 'paid';
+      overlay.querySelector('#adminMaterialPriceWrap').style.display = paid ? 'block' : 'none';
+      overlay.querySelector('#adminMaterialExternalWrap').style.display = paid ? 'none' : 'block';
+      overlay.querySelector('#adminMaterialPaidHint').style.display = paid ? 'block' : 'none';
+      overlay.querySelector('#adminMaterialFileHint').textContent = paid ? '(required for paid access)' : '(optional for free links/text)';
+    };
+    access.addEventListener('change', syncAccess);
+    syncAccess();
+    overlay.querySelector('#adminMaterialSave').addEventListener('click', async () => {
+      const form = overlay.querySelector('#adminMaterialForm');
+      if (!form.reportValidity()) return;
+      const data = Object.fromEntries(new FormData(form));
+      const paid = data.access === 'paid';
+      if (paid && !file.files.length) return toast('Paid materials must be uploaded as a file.', 'error');
+      if (paid && (!Number.isInteger(Number(data.price)) || Number(data.price) < 1)) return toast('Enter a whole-number price in KES.', 'error');
+      const button = overlay.querySelector('#adminMaterialSave');
+      button.disabled = true;
+      try {
+        let uploaded = {};
+        if (file.files.length) {
+          const uploadData = new FormData(); uploadData.append('file', file.files[0]);
+          const response = await fetch('/api/admin/materials/upload', { method: 'POST', credentials: 'same-origin', body: uploadData });
+          const result = await response.json();
+          if (!response.ok) throw new Error(result.error || 'Upload failed');
+          uploaded = result;
+        }
+        await api('/api/admin/materials', { method: 'POST', body: {
+          course_id: Number(data.course_id), title: data.title, description: data.description,
+          release_date: data.release_date, resource_category: data.resource_category,
+          is_paid: paid, price: paid ? Number(data.price) : 0,
+          external_url: paid ? '' : data.external_url,
+          ...uploaded,
+        } });
+        overlay.remove(); toast('Material added to the course library.'); await loadLibrary();
+      } catch (err) { button.disabled = false; toast(err.message, 'error'); }
+    });
   }
 
   async function delAtt(id) {

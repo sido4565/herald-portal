@@ -131,6 +131,16 @@ async function initSchema() {
       notes TEXT,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP
     )`,
+    `CREATE TABLE IF NOT EXISTS lecturer_attendance (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      lecturer_id INTEGER NOT NULL,
+      date TEXT NOT NULL,
+      status TEXT NOT NULL,
+      notes TEXT,
+      marked_by INTEGER,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      UNIQUE(lecturer_id, date)
+    )`,
     `CREATE TABLE IF NOT EXISTS live_classes (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       course_id INTEGER NOT NULL,
@@ -152,6 +162,12 @@ async function initSchema() {
       file_name TEXT,
       external_url TEXT,
       release_date TEXT NOT NULL,
+      resource_category TEXT DEFAULT 'other',
+      is_paid INTEGER DEFAULT 0,
+      price REAL DEFAULT 0,
+      storage_key TEXT,
+      storage_type TEXT,
+      mime_type TEXT,
       created_by INTEGER,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP
     )`,
@@ -160,6 +176,19 @@ async function initSchema() {
       material_id INTEGER NOT NULL,
       student_id INTEGER NOT NULL,
       viewed_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    )`,
+    `CREATE TABLE IF NOT EXISTS material_purchases (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      student_id INTEGER NOT NULL,
+      material_id INTEGER NOT NULL,
+      amount_due REAL NOT NULL,
+      amount_received REAL,
+      status TEXT NOT NULL DEFAULT 'pending',
+      checkout_request_id TEXT UNIQUE,
+      mpesa_receipt TEXT,
+      result_description TEXT,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      paid_at DATETIME
     )`,
     // ─── Lecturer-Course assignments (defined ONCE) ───
     `CREATE TABLE IF NOT EXISTS lecturer_courses (
@@ -212,6 +241,15 @@ async function initSchema() {
   const courseColumns = await client.execute('PRAGMA table_info(courses)');
   if (!courseColumns.rows.some(column => column.name === 'fee')) {
     await client.execute('ALTER TABLE courses ADD COLUMN fee REAL');
+  }
+  const materialColumns = await client.execute('PRAGMA table_info(materials)');
+  for (const [name, definition] of [
+    ['resource_category', "TEXT DEFAULT 'other'"], ['is_paid', 'INTEGER DEFAULT 0'], ['price', 'REAL DEFAULT 0'],
+    ['storage_key', 'TEXT'], ['storage_type', 'TEXT'], ['mime_type', 'TEXT'],
+  ]) {
+    if (!materialColumns.rows.some(column => column.name === name)) {
+      await client.execute(`ALTER TABLE materials ADD COLUMN ${name} ${definition}`);
+    }
   }
   console.log('✅ Schema ready');
 }

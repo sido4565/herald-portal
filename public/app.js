@@ -6,6 +6,44 @@ const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({
   '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
 }[c]));
 
+window.payForMaterial = async function (id) {
+  const phone = document.getElementById(`materialPhone-${id}`)?.value.trim();
+  if (!phone) return toast('Enter your M-Pesa phone number.', 'error');
+  try {
+    const response = await fetch(`/api/my-materials/${id}/pay`, {
+      method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ phoneNumber: phone }),
+    });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error || 'Could not start payment.');
+    if (data.owned) { toast('You already have access.'); location.reload(); return; }
+    toast(data.message || 'Approve the M-Pesa prompt on your phone.');
+    const statusEl = document.getElementById(`materialStatus-${id}`);
+    if (statusEl) statusEl.textContent = 'Payment pending — approve the prompt on your phone.';
+    for (let attempt = 0; attempt < 8; attempt++) {
+      await new Promise(resolve => setTimeout(resolve, 5000));
+      const statusResponse = await fetch(`/api/my-materials/${id}/purchase-status`, { credentials: 'same-origin' });
+      const status = await statusResponse.json();
+      if (status.owned) { toast('Payment confirmed. Your material is ready to download.'); location.reload(); return; }
+      if (status.status === 'failed' || status.status === 'review') {
+        if (statusEl) statusEl.textContent = status.result_description || `Payment status: ${status.status}.`;
+        return;
+      }
+    }
+    if (statusEl) statusEl.textContent = 'Payment is still pending. Refresh this page after approving the prompt.';
+  } catch (err) { toast(err.message, 'error'); }
+};
+
+window.checkMaterialPayment = async function (id) {
+  try {
+    const response = await fetch(`/api/my-materials/${id}/purchase-status`, { credentials: 'same-origin' });
+    const status = await response.json();
+    if (!response.ok) throw new Error(status.error || 'Could not check payment status.');
+    if (status.owned) { toast('Payment confirmed. Your material is ready.'); location.reload(); return; }
+    toast(status.status === 'pending' ? 'Payment is still pending. Approve the prompt on your phone.' : `Payment status: ${status.status}.`, status.status === 'failed' ? 'error' : 'success');
+  } catch (err) { toast(err.message, 'error'); }
+};
+
 // ---------- Theme ----------
 function applyTheme() {
   const isDark = localStorage.getItem('theme') === 'dark';
@@ -479,7 +517,7 @@ async function loadDashboard() {
       : '<li style="color:var(--muted);">No assignments posted.</li>';
   } catch (e) { console.error('assignments load', e); }
 
-  // ─── Study Materials (time-locked) ───
+  // ─── Course Books & Study Materials ───
   try {
     const matRes = await fetch('/api/my-materials');
     const materials = await matRes.json();
@@ -505,9 +543,13 @@ async function loadDashboard() {
                   </div>
                 </li>`;
             }
-            const links = [];
-            if (m.file_path) links.push(`<a href="${esc(m.file_path)}" target="_blank" class="btn-xs" style="text-decoration:none; display:inline-block;">📎 Open File</a>`);
-            if (m.external_url) links.push(`<a href="${esc(m.external_url)}" target="_blank" class="btn-xs" style="text-decoration:none; display:inline-block;">🔗 Open Link</a>`);
+            const paid = Number(m.is_paid) === 1;
+            const owned = Number(m.owned) === 1 || m.owned === true;
+            const action = paid && !owned
+              ? `<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;"><strong>KES ${Number(m.price).toLocaleString()}</strong>${m.purchase_status === 'pending' ? '<span>Payment pending</span>' : `<input id="materialPhone-${m.id}" type="tel" placeholder="M-Pesa number" aria-label="M-Pesa number" style="max-width:160px;padding:7px;border:1px solid var(--border);border-radius:6px;"><button class="btn-xs" type="button" onclick="payForMaterial(${m.id})">Pay &amp; Unlock</button>`}<button class="btn-xs" type="button" onclick="checkMaterialPayment(${m.id})">Check payment</button></div><small id="materialStatus-${m.id}" style="color:var(--muted);">${m.purchase_status === 'pending' ? 'Approve the M-Pesa prompt on your phone.' : ''}</small>`
+              : m.file_available
+                ? `<a href="/api/my-materials/${m.id}/download" class="btn-xs" style="text-decoration:none;display:inline-block;">📥 ${paid ? 'Download purchased material' : 'Download / Open'}</a>`
+                : '<span style="color:var(--muted);font-size:12px;">No file or link attached yet.</span>';
 
             return `
               <li>
@@ -518,11 +560,11 @@ async function loadDashboard() {
                       ${esc(m.code)} — ${esc(m.course_title)}
                     </p>
                     ${m.description ? `<p style="color: var(--text-soft); font-size: 13px; margin-top: 6px;">${esc(m.description)}</p>` : ''}
-                    <div style="margin-top: 10px; display: flex; gap: 8px; flex-wrap: wrap;">
-                      ${links.join('')}
+                    <div style="margin-top: 10px; display: flex; gap: 8px; flex-wrap: wrap; align-items:center;">
+                      ${action}
                     </div>
                   </div>
-                  <span class="pill ${m.isToday ? 'pill-green' : 'pill-green'}">${m.isToday ? 'Today' : 'Available'}</span>
+                  <span class="pill ${paid && !owned ? 'pill-amber' : 'pill-green'}">${paid ? (owned ? 'Purchased' : 'Paid') : (m.isToday ? 'Today · Free' : 'Free')}</span>
                 </div>
               </li>`;
           }).join('')
