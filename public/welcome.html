@@ -1471,6 +1471,23 @@ body.dark .contact-item-label { color: #94a3b8; }
   .partner-item img { height: 22px; }
   .partners-track { gap: 32px; }
 }
+
+    /* Course catalog refinement */
+    #courses { max-width: 1320px; }
+    #courses .section-head { margin-bottom: 38px; }
+    .courses-tabs { gap: 10px; margin-bottom: 30px; }
+    .courses-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 24px; }
+    .course-card { border-radius: 18px; background: #fff; border: 1px solid #e1e6ee; box-shadow: 0 8px 24px rgba(11,26,51,.07); }
+    .course-card:hover { transform: translateY(-5px); border-color: rgba(184,134,11,.65); box-shadow: 0 18px 38px rgba(11,26,51,.13); }
+    .course-img-wrap { height: 190px; background: linear-gradient(135deg, #10294a, #315a76 58%, #d8a83c); }
+    .course-badge { z-index: 1; } .course-badge.priority { background: #0b1a33; }
+    .course-body { padding: 20px 22px 22px; background: #fff; }
+    .course-body h3 { min-height: 44px; font-size: 17px; } .course-body p { min-height: 63px; margin-bottom: 18px; }
+    .course-body .meta { gap: 12px; } .course-duration { white-space: nowrap; }
+    .courses-toggle-wrap { margin-top: 34px; } .courses-toggle-btn { background: #fff; }
+    @media (max-width: 900px) { .courses-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+    @media (max-width: 600px) { #courses { padding-left: 18px; padding-right: 18px; } .courses-grid { grid-template-columns: 1fr; gap: 18px; } .course-img-wrap { height: 205px; } .course-body h3, .course-body p { min-height: 0; } .courses-tabs { justify-content: flex-start; overflow-x: auto; flex-wrap: nowrap; padding: 4px 3px 12px; } .course-tab { flex: 0 0 auto; } }
+    @media (prefers-reduced-motion: reduce) { .course-card, .course-img-wrap img, .course-tab { transition: none; } .course-card.newly-revealed { animation: none; } }
   </style>
 </head>
 <body>
@@ -1931,7 +1948,7 @@ function renderTabs() {
 
 // State for expand/collapse
 let coursesExpanded = false;
-const INITIAL_COUNT = 3;
+const INITIAL_COUNT = 6;
 
 function renderCourses() {
   const list = activeCategory === 'All'
@@ -1952,7 +1969,7 @@ function renderCourses() {
     return `
       <div class="course-card${isNew ? ' newly-revealed' : ''}" data-course="${realIdx}">
         <div class="course-img-wrap">
-          <img src="${c.image}" alt="${c.title}" onerror="this.style.display='none'" />
+          <img src="${c.image}" alt="" loading="lazy" onerror="this.remove()" />
           ${c.priority ? '<span class="course-badge priority">Priority</span>' : ''}
           <span class="course-badge" style="background:var(--gold); right:12px; left:auto;">KES ${c.fee.toLocaleString()}</span>
         </div>
@@ -1962,6 +1979,7 @@ function renderCourses() {
           <p>${c.short}</p>
           <div class="meta">
             <span><strong style="color:#b8860b; font-size:15px;">KES ${c.fee.toLocaleString()}</strong></span>
+            <span class="course-duration">${c.duration}</span>
             <span class="course-learn-more">View</span>
           </div>
         </div>
