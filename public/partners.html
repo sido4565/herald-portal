@@ -3,8 +3,8 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Partner Institutions — Herald Trainer and Consultant</title>
-  <meta name="description" content="Herald Trainer and Consultant partners with KASNEB, ABE, ABMA, ICM, ICS, NITA and IATA to deliver accredited programs in Kenya." />
+  <title>Partner Programs & Exam Prep — Herald Trainer and Consultant</title>
+  <meta name="description" content="Explore KASNEB, ABE, ABMA, ICM, ICS, NITA and IATA programs, plus KNEC exam preparation at KES 5,000 per month." />
   <link rel="canonical" href="https://heraldtrainer.co.ke/partners.html" />
   <link rel="icon" type="image/svg+xml" href="favicon.svg" />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" />
@@ -92,14 +92,14 @@
 
 <section class="section">
   <div class="disclaimer">
-    <strong>How programs work:</strong> Partner institutions set and certify their own examinations. Herald also offers KNEC exam preparation classes at KES 5,000 per month; this tuition is separate from KNEC registration and examination charges. Contact us to confirm subject availability and intake dates.
+    <strong>Monthly tuition:</strong> KES 5,000 per month for every listed KASNEB, ABE, ABMA, ICM, ICS, NITA, IATA, and KNEC exam preparation program. Awarding-body and examination registration charges are separate. Contact us to confirm subject availability and intake dates.
   </div>
 
   <div id="partnersWrap"></div>
 
   <div class="partners-cta">
-    <h3>Ready to enroll in a <span>Partner Program?</span></h3>
-    <p>Talk to our team about entry requirements, intake dates, and study modes.</p>
+    <h3>Ready to start a <span>Program or Exam Prep?</span></h3>
+    <p>Talk to our team about entry requirements, intake dates, subject availability, and awarding-body charges.</p>
     <div class="cta-buttons">
       <a class="btn-gold" href="contact.html">Contact Us</a>
       <a class="btn-ghost" href="https://wa.me/254107004000" target="_blank" rel="noopener">Chat on WhatsApp</a>
@@ -305,9 +305,10 @@ function renderPartners() {
           <div class="program-card">
             <div class="program-name">${prog}</div>
             <div class="program-meta">
-              ${p.isExamPrep ? `<div>Exam body: <strong>KNEC</strong></div><div>Exam preparation by: <span class="herald">Herald Trainer and Consultant</span></div><div class="program-monthly-fee">KES 5,000 / month <small>Tuition; exam charges separate</small></div>` : `<div>Awarded by: <strong>${p.name}</strong></div><div>Prepared by: <span class="herald">Herald Trainer and Consultant</span></div>`}
+              ${p.isExamPrep ? `<div>Exam body: <strong>KNEC</strong></div><div>Exam preparation by: <span class="herald">Herald Trainer and Consultant</span></div>` : `<div>Awarded by: <strong>${p.name}</strong></div><div>Prepared by: <span class="herald">Herald Trainer and Consultant</span></div>`}
+              <div class="program-monthly-fee">KES 5,000 / month <small>Tuition; exam charges separate</small></div>
             </div>
-            <a class="program-cta" href="contact.html?program=${encodeURIComponent(prog)}">${p.isExamPrep ? 'Enquire about exam preparation →' : 'Contact us for fees & duration →'}</a>
+            <a class="program-cta" href="contact.html?program=${encodeURIComponent(prog)}">${p.isExamPrep ? 'Enquire about exam preparation →' : 'Ask about intake & exam charges →'}</a>
           </div>
         `).join('')}
       </div>

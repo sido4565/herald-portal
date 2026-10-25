@@ -9,15 +9,15 @@
   if (window.__heraldHelpLoaded) return;
   window.__heraldHelpLoaded = true;
 
-  const STORAGE_KEY = 'herald_help_chat_v1';
+  const STORAGE_KEY = 'herald_help_chat_v2';
   const API_URL = '/api/help/ask';
 
   const SUGGESTIONS = [
+    'How much is KASNEB tuition?',
+    'How much is Python course?',
+    'Which KNEC exams can I prepare for?',
     'How do I pay fees?',
-    'How do I register?',
-    'I forgot my password',
     'Exam schedule',
-    'Download transcript',
   ];
 
   // ─── Load chat history ───
@@ -105,11 +105,32 @@
     let inner = '';
     if (msg.role === 'bot' && msg.source === 'faq') {
       inner += `<span class="hh-msg-source">📖 From FAQ</span><br>`;
+    } else if (msg.role === 'bot' && msg.source === 'knowledge') {
+      inner += `<span class="hh-msg-source">✓ Herald information</span><br>`;
     } else if (msg.role === 'bot' && msg.source === 'ai') {
       inner += `<span class="hh-msg-source">✨ AI answer</span><br>`;
     }
     inner += esc(msg.text);
     el.innerHTML = inner;
+    if (msg.role === 'bot' && Array.isArray(msg.links) && msg.links.length) {
+      const linkList = document.createElement('div');
+      linkList.className = 'hh-msg-links';
+      for (const item of msg.links.slice(0, 4)) {
+        if (!item || typeof item.label !== 'string' || typeof item.url !== 'string') continue;
+        let url;
+        try { url = new URL(item.url, window.location.origin); } catch (_) { continue; }
+        if (url.origin !== window.location.origin && url.hostname !== 'www.knec.ac.ke') continue;
+        const link = document.createElement('a');
+        link.href = url.href;
+        link.textContent = item.label;
+        if (url.origin !== window.location.origin) {
+          link.target = '_blank';
+          link.rel = 'noopener noreferrer';
+        }
+        linkList.appendChild(link);
+      }
+      if (linkList.childElementCount) el.appendChild(linkList);
+    }
     container.appendChild(el);
     container.scrollTop = container.scrollHeight;
   }
@@ -190,6 +211,7 @@
         const botMsg = {
           role: 'bot',
           text: data.answer,
+          links: data.links || [],
           source: data.source || 'faq',
         };
         messages.push(botMsg);
@@ -239,7 +261,7 @@
       // First-time greeting
       const greeting = {
         role: 'bot',
-        text: "Hi! 👋 I'm the Herald help bot. I can answer questions about registration, fees, courses, exams, transcripts, and more. What can I help you with?",
+        text: "Hi! 👋 I'm the Herald help bot. Ask about courses, monthly tuition, exams, registration, or payments. I’ll include direct links to the relevant pages.",
         source: 'faq',
       };
       messages.push(greeting);

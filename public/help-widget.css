@@ -311,6 +311,26 @@ body.dark .herald-help-root {
   cursor: not-allowed;
 }
 
+.hh-msg-links {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  margin-top: 10px;
+}
+
+.hh-msg-links a {
+  display: inline-flex;
+  align-items: center;
+  color: var(--hh-accent);
+  font-size: 11.5px;
+  font-weight: 700;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.hh-msg-links a:hover { color: var(--hh-primary); }
+
 /* ─── Footer ─── */
 .hh-footer {
   padding: 6px 12px 10px;

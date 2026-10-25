@@ -15,6 +15,7 @@ const fs = require('fs');
 const multer = require('multer');
 const db = require('./database');
 const courseFeeCatalog = require('./course-fees');
+const partnerPrograms = require('./partner-programs');
 const ADMISSION_FEE = 3000;
 
 function getCourseFee(course) {
@@ -2821,7 +2822,7 @@ app.get('/api/health', (req, res) => {
 });
 
 // ═══════════════════════════════════════════════════════════════
-// HELP BOT — Stage 1: FAQ matching only (no AI yet)
+// HELP BOT — grounded fee/program answers, FAQ matching, then AI fallback
 // ═══════════════════════════════════════════════════════════════
 const { findBestFaq } = require('./help-faq');
 
@@ -2838,6 +2839,105 @@ function helpRateLimited(ip) {
   return false;
 }
 
+const HELP_PARTNERS = [
+  { name: 'KASNEB', anchor: 'kasneb' }, { name: 'ABE', anchor: 'abe' },
+  { name: 'ABMA', anchor: 'abma' }, { name: 'ICM', anchor: 'icm' },
+  { name: 'ICS', anchor: 'ics' }, { name: 'NITA', anchor: 'nita' },
+  { name: 'IATA', anchor: 'iata' }, { name: 'KNEC', anchor: 'knec-prep' },
+];
+
+function getHelpLinks(message, category) {
+  const text = String(message || '').toLowerCase();
+  const links = [];
+  const add = (label, url) => {
+    if (!links.some(link => link.url === url)) links.push({ label, url });
+  };
+  for (const partner of HELP_PARTNERS) {
+    if (new RegExp(`\\b${partner.name.toLowerCase()}\\b`).test(text)) {
+      add(`View ${partner.name} programs and tuition`, `/partners.html#${partner.anchor}`);
+      if (partner.name === 'KNEC') add('Official KNEC Business & Technical exam information', 'https://www.knec.ac.ke/services/business-exams/');
+    }
+  }
+  if (/course|catalog|program|class/.test(text) || category === 'courses') add('Browse courses', '/courses.html#courses');
+  if (/register|registration|apply|admission|enroll/.test(text) || category === 'registration') add('Register for a course', '/register.html');
+  if (/fee|fees|payment|pay|mpesa|m-pesa|balance/.test(text) || category === 'fees') {
+    add('View fee statement and payments', '/dashboard.html#fee-statement');
+    add('View course and program fees', '/courses.html#courses');
+  }
+  if (/result|marks|grade/.test(text)) add('View academic results', '/dashboard.html#academic-results');
+  if (/exam|test|timetable|schedule/.test(text) || category === 'exams') {
+    add('View student exams', '/student-exams.html');
+    if (!/knec/.test(text)) add('Browse exam preparation programs', '/courses.html#partner-programs');
+  }
+  if (/transcript|certificate/.test(text) || category === 'certificates') add('Open academic results and transcript', '/dashboard.html#academic-results');
+  if (/lecturer|teach|tutor/.test(text) || category === 'lecturer') add('Apply to teach', '/lecturer-register.html');
+  if (/support|contact|human|help/.test(text) || category === 'support') add('Contact support', '/contact.html');
+  if (/rejected|pending|approval|withdraw|drop course|missed|retake|reschedule|deducted|not reflected|forgot|reset password/.test(text) || ['login', 'lecturer', 'certificates'].includes(category)) {
+    add('Contact support', '/contact.html');
+  }
+  if (/login|password|account/.test(text) || category === 'login') add('Student login', '/login.html');
+  if (!links.length) add('Browse courses', '/courses.html');
+  return links.slice(0, 4);
+}
+
+function getSpecificFeeAnswer(message) {
+  const text = String(message || '').toLowerCase();
+  const asksFee = /\b(fee|fees|cost|price|tuition|monthly|how much)\b/.test(text);
+  if (!asksFee) return null;
+  if (/\b(balance|owe|outstanding|paid|payment history|statement|due)\b|\bmy\s+fees?\b|\bmy\s+(course|program)\s+fee\b/.test(text)) {
+    return 'Your personal amount due and payments are shown in the Fee Statement on your student dashboard. Sign in to see your current balance; the bot cannot access private account amounts.';
+  }
+
+  const mentionedPartners = HELP_PARTNERS.filter(partner => new RegExp(`\\b${partner.name.toLowerCase()}\\b`).test(text));
+  if (mentionedPartners.length) {
+    const partnerNames = mentionedPartners.map(partner => partner.name).join(' and ');
+    if (/\b(exam|examination|registration)\s*(fee|fees|cost)|\b(fee|fees|cost)\s*(to sit|for the exam|for examination|registration)\b/.test(text)) {
+      return `The KES 5,000 per month amount is Herald's tuition for preparation classes, not the ${partnerNames} examination or registration fee. I don't have a verified current exam-fee figure; please check the awarding body's current fee schedule or contact us for help.`;
+    }
+    if (mentionedPartners.length === 1 && mentionedPartners[0].name === 'KNEC') {
+      return 'KNEC exam preparation tuition is KES 5,000 per month. This covers Herald preparation classes only; KNEC registration and examination charges are separate.';
+    }
+    return `${partnerNames} program tuition is KES 5,000 per month for each listed program. Awarding-body registration and examination charges are separate; contact us to confirm the specific program requirements.`;
+  }
+
+  if (/admission/.test(text)) return 'The admission fee is KES 3,000 when a course does not have a specific course fee recorded.';
+
+  const exactCode = courseFeeCatalog.find(course => new RegExp(`\\b${course.code.toLowerCase()}\\b`).test(text));
+  const queryWords = text.replace(/[^a-z0-9 ]/g, ' ').split(/\s+/).filter(word =>
+    word.length > 2 && !['the', 'and', 'for', 'how', 'much', 'what', 'does', 'cost', 'price', 'fee', 'fees', 'course', 'program', 'tuition', 'monthly', 'is', 'are', 'of', 'my', 'in', 'on'].includes(word)
+  );
+  const titleMatches = courseFeeCatalog.map(course => {
+    const title = course.title.toLowerCase();
+    const words = title.replace(/[^a-z0-9 ]/g, ' ').split(/\s+/).filter(word => word.length > 2);
+    const score = words.reduce((count, word) => count + (queryWords.some(queryWord => word.includes(queryWord) || queryWord.includes(word)) ? 1 : 0), 0);
+    return { course, score, exact: text.includes(title) };
+  }).filter(match => match.score > 0 || match.exact)
+    .sort((a, b) => Number(b.exact) - Number(a.exact) || b.score - a.score);
+  const matches = exactCode ? [exactCode] : (titleMatches[0]?.exact ? [titleMatches[0].course] : titleMatches.slice(0, 3).map(match => match.course));
+  if (matches.length) {
+    const amounts = matches.map(course => `${course.title} (${course.code}): KES ${Number(course.fee).toLocaleString()}`).join('; ');
+    const lead = matches.length > 1 ? 'Several catalog courses may match your question. Here are the closest matches: ' : 'The course catalog lists this fee: ';
+    return `${lead}${amounts}. These are the displayed course fees; contact us to confirm the current fee schedule and payment options.`;
+  }
+  if (/fee|fees|tuition|monthly/.test(text)) return 'Tuition for listed KASNEB, ABE, ABMA, ICM, ICS, NITA, and IATA programs is KES 5,000 per month. KNEC exam preparation is also KES 5,000 per month. Awarding-body registration and examination charges are separate. Short-course catalog fees are listed individually on the Courses page; if no specific course fee is recorded, the admission-fee fallback is KES 3,000.';
+  return null;
+}
+
+function getPartnerProgramsAnswer(message) {
+  const text = String(message || '').toLowerCase();
+  if (!/program|course|qualification|offer|study|available|list|how many|number of/.test(text)) return null;
+  const partner = HELP_PARTNERS.find(item => new RegExp(`\\b${item.name.toLowerCase()}\\b`).test(text));
+  if (!partner) return null;
+  const record = partnerPrograms.find(item => item.id === partner.anchor);
+  if (!record || !record.programs.length) return null;
+  const examples = record.programs.slice(0, 5);
+  const listing = examples.map(name => `• ${name}`).join('\n');
+  const remainder = record.programs.length > examples.length
+    ? ` See the complete list of ${record.programs.length} offerings on the program page.`
+    : '';
+  return `${record.name} has ${record.programs.length} listed offerings:\n${listing}${remainder}\nListed tuition is KES 5,000 per month. Awarding-body registration and examination charges are separate.`;
+}
+
 app.post('/api/help/ask', async (req, res) => {
   try {
     const ip = req.headers['x-forwarded-for']?.split(',')[0]?.trim() || req.ip || 'unknown';
@@ -2848,13 +2948,23 @@ app.post('/api/help/ask', async (req, res) => {
     const message = String(req.body?.message || '').trim().slice(0, 500);
     if (!message) return res.status(400).json({ error: 'Message required.' });
 
-    // Who is asking? (session-aware — Stage 3 will use this for AI context)
+    // Use session role as context for the answer.
     const who = req.session?.student ? 'student'
               : req.session?.lecturer ? 'lecturer'
               : req.session?.admin ? 'admin'
               : 'visitor';
 
-    // Stage 1: FAQ match only
+    const feeAnswer = getSpecificFeeAnswer(message);
+    if (feeAnswer) {
+      return res.json({ source: 'knowledge', answer: feeAnswer, links: getHelpLinks(message, 'fees'), who });
+    }
+
+    const programsAnswer = getPartnerProgramsAnswer(message);
+    if (programsAnswer) {
+      return res.json({ source: 'knowledge', answer: programsAnswer, links: getHelpLinks(message, 'courses'), who });
+    }
+
+    // Prefer the maintained FAQ before requesting an AI fallback.
     const match = findBestFaq(message);
     if (match) {
       return res.json({
@@ -2862,6 +2972,7 @@ app.post('/api/help/ask', async (req, res) => {
         matched_question: match.faq.question,
         answer: match.faq.answer,
         category: match.faq.category,
+        links: getHelpLinks(message, match.faq.category),
         who,
       });
     }
@@ -2872,6 +2983,7 @@ app.post('/api/help/ask', async (req, res) => {
       return res.json({
         source: 'fallback',
         answer: "I'm not sure about that one yet. I can help with: registration, fees & M-Pesa, courses, exams, transcripts & certificates, lecturer applications, and login issues. Try rephrasing your question, or email support@heraldtrainer.co.ke for a human reply.",
+        links: getHelpLinks(message),
         who,
       });
     }
@@ -2888,7 +3000,7 @@ app.post('/api/help/ask', async (req, res) => {
           messages: [
             {
               role: 'system',
-              content: 'You are the Herald Trainer help assistant for heraldtrainer.co.ke, a training institution in Kenya. Answer questions about: registration, fees and M-Pesa payments, courses, exams, transcripts/certificates, lecturer applications, login issues, and general portal usage. Be concise (2-4 sentences). If you do not know, say so and suggest emailing support@heraldtrainer.co.ke. Never make up fee amounts or dates. The user asking is a ' + who + '.'
+              content: 'You are the Herald Trainer help assistant for heraldtrainer.co.ke. Be precise and concise (2-4 sentences). Use only the supplied facts; do not guess fees, exam dates, admission requirements, payment numbers, or policies. Confirm uncertainty and link users to the relevant page. Current fees: listed KASNEB, ABE, ABMA, ICM, ICS, NITA, and IATA program tuition is KES 5,000 per month; selected KNEC Business and Technical exam preparation is KES 5,000 per month; KNEC/awarding-body registration and exam charges are separate; admission fee fallback is KES 3,000 when no specific course fee is recorded. Course catalog amounts are per the exact listed course and should be stated as displayed, not assumed monthly. Relevant pages: /register.html, /login.html, /dashboard.html, /courses.html, /partners.html, /student-exams.html, /contact.html, /lecturer-register.html. Partner offerings: ' + partnerPrograms.map(partner => `${partner.name}: ${partner.programs.join(', ')}`).join(' | ') + '. Course catalog fees: ' + courseFeeCatalog.map(course => `${course.code} ${course.title}: KES ${Number(course.fee).toLocaleString()}`).join(' | ') + '. The user is a ' + who + '.'
             },
             { role: 'user', content: message }
           ],
@@ -2907,7 +3019,7 @@ app.post('/api/help/ask', async (req, res) => {
       const aiAnswer = groqData?.choices?.[0]?.message?.content?.trim();
 
       if (aiAnswer) {
-        return res.json({ source: 'ai', answer: aiAnswer, who });
+        return res.json({ source: 'ai', answer: aiAnswer, links: getHelpLinks(message), who });
       }
       throw new Error('Empty AI response');
     } catch (groqErr) {
@@ -2915,6 +3027,7 @@ app.post('/api/help/ask', async (req, res) => {
       return res.json({
         source: 'fallback',
         answer: "I'm not sure about that one yet. I can help with: registration, fees & M-Pesa, courses, exams, transcripts & certificates, lecturer applications, and login issues. Try rephrasing your question, or email support@heraldtrainer.co.ke for a human reply.",
+        links: getHelpLinks(message),
         who,
       });
     }
