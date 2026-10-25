@@ -19,6 +19,20 @@ const courseFeeCatalog = require('./course-fees');
 const partnerPrograms = require('./partner-programs');
 const ADMISSION_FEE = 3000;
 
+function paymentErrorMessage(err) {
+  return [err?.message, err?.errorMessage, err?.description, err?.cause?.message]
+    .find(value => typeof value === 'string' && value.trim())
+    || 'Payment request failed. Please contact the school if the problem continues.';
+}
+
+function logPaymentFailure(context, err) {
+  console.error(context, {
+    code: err?.code || err?.errorCode || undefined,
+    status: err?.statusCode || err?.status || err?.response?.status || undefined,
+    message: paymentErrorMessage(err),
+  });
+}
+
 function getCourseFee(course) {
   const adminFee = Number(course.fee);
   if (Number.isFinite(adminFee) && adminFee > 0) return { amount: adminFee, label: 'Course fee' };
@@ -576,7 +590,10 @@ app.post('/api/public/materials/:id/pay', async (req, res) => {
       args: [material.id, amount, push.CheckoutRequestID, phoneNumber, tokenHash],
     });
     res.json({ ok: true, message: 'Approve the M-Pesa prompt on your phone.', checkoutRequestId: push.CheckoutRequestID, accessToken });
-  } catch (err) { res.status(500).json({ error: err.message }); }
+  } catch (err) {
+    logPaymentFailure('Guest material M-Pesa request failed:', err);
+    res.status(502).json({ error: paymentErrorMessage(err) });
+  }
 });
 
 app.get('/api/public/materials/:id/purchase-status/:accessToken', async (req, res) => {
@@ -896,7 +913,10 @@ app.post('/api/my-materials/:id/pay', authStudent, async (req, res) => {
     if (!push.CheckoutRequestID) throw new Error('M-Pesa did not return a checkout request ID.');
     await db.execute({ sql: `INSERT INTO material_purchases (student_id, material_id, amount_due, status, checkout_request_id) VALUES (?, ?, ?, 'pending', ?)`, args: [req.user.id, material.id, amount, push.CheckoutRequestID] });
     res.json({ ok: true, message: 'Approve the M-Pesa prompt on your phone.', checkoutRequestId: push.CheckoutRequestID });
-  } catch (err) { res.status(500).json({ error: err.message }); }
+  } catch (err) {
+    logPaymentFailure('Student material M-Pesa request failed:', err);
+    res.status(502).json({ error: paymentErrorMessage(err) });
+  }
 });
 
 app.get('/api/my-materials/:id/download', authStudent, async (req, res) => {
@@ -3505,8 +3525,8 @@ app.post('/api/mpesa/stk-push', authStudent, async (req, res) => {
         checkoutRequestId: push.CheckoutRequestID 
     });
   } catch (err) {
-    console.error('M-Pesa STK Error:', err);
-    res.status(500).json({ error: err.message });
+    logPaymentFailure('Fee M-Pesa STK request failed:', err);
+    res.status(502).json({ error: paymentErrorMessage(err) });
   }
 });
 

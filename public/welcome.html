@@ -2422,7 +2422,7 @@ window.payForPublicMaterial = async id => {
       body: JSON.stringify({ phoneNumber }),
     });
     const result = await response.json();
-    if (!response.ok) throw new Error(result.error || 'Could not start payment.');
+    if (!response.ok) throw new Error(result.error || `Payment request failed (HTTP ${response.status}). Please try again or contact the school.`);
     if (result.owned) { await loadPublicMaterials(); return; }
     if (result.accessToken) localStorage.setItem(`material-access-${id}`, result.accessToken);
     const guest = !!result.accessToken;
