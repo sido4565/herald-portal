@@ -101,6 +101,10 @@
     .lecturer-apply-note { margin-top:24px; padding:20px 22px; border-radius:14px; background:#fff8e6; color:var(--navy); display:flex; align-items:center; justify-content:space-between; gap:16px; flex-wrap:wrap; }
     .lecturer-apply-note[hidden] { display:none !important; }
     .lecturer-apply-note a { color:#805d06; font-weight:800; text-decoration:underline; text-underline-offset:3px; }
+    .lecturer-application[hidden] { display:none !important; }
+    .lecturer-application { margin-top:20px; padding:22px; background:#fff; border:1px solid #e5e8ed; border-radius:16px; }
+    .lecturer-application h3 { margin:0 0 14px; color:var(--navy); }
+    .lecturer-application-frame { display:block; width:100%; min-height:1000px; border:0; border-radius:10px; background:#fff; }
     .portal-login-grid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:18px; }
     .portal-login-card { display:block; background:#fff; border:1px solid #e5e8ed; border-radius:16px; padding:26px; box-shadow:0 10px 28px rgba(11,26,51,.06); transition:transform .2s,border-color .2s; }
     .portal-login-card:hover { transform:translateY(-4px); border-color:var(--gold); }
@@ -1724,7 +1728,11 @@ body.dark .contact-item-label { color: #94a3b8; }
     <p>Explore current lecturer vacancies and other opportunities at Herald Trainer and Consultant.</p>
   </div>
   <div class="jobs-grid" id="publicJobsGrid" aria-live="polite"><p class="materials-empty">Loading opportunities…</p></div>
-  <div class="lecturer-apply-note" id="lecturerApplyNote" hidden><span>Interested in teaching with Herald?</span><a href="lecturer-register.html">Apply to become a lecturer →</a></div>
+  <div class="lecturer-apply-note" id="lecturerApplyNote" hidden><span>Interested in teaching with Herald?</span><a href="#lecturerApplication">Apply to teach →</a></div>
+  <div class="lecturer-application" id="lecturerApplication" hidden>
+    <h3>Lecturer Application</h3>
+    <iframe class="lecturer-application-frame" id="lecturerApplicationFrame" data-src="lecturer-register.html" title="Original lecturer application form"></iframe>
+  </div>
 </section>
 
 <section class="section" id="logins">
@@ -1792,9 +1800,7 @@ body.dark .contact-item-label { color: #94a3b8; }
   <div class="tagline">Skills · Knowledge · Better Futures</div>
 
   <p style="margin-top: 24px; font-size: 13px;">
-    <a href="lecturer-login.html" style="color: #e6b84c; margin-right: 8px;">Lecturer login</a>
-    <span style="opacity: 0.4;">·</span>
-    <a href="lecturer-register.html" style="color: #e6b84c; margin-left: 8px;">Apply to teach</a>
+    <a href="lecturer-login.html" style="color: #e6b84c;">Lecturer login</a>
   </p>
 </footer>
 
@@ -2418,12 +2424,19 @@ const materialEscape = value => { const el = document.createElement('span'); el.
 async function loadPublicJobs() {
   const grid = document.getElementById('publicJobsGrid');
   const lecturerApplyNote = document.getElementById('lecturerApplyNote');
+  const lecturerApplication = document.getElementById('lecturerApplication');
+  const lecturerApplicationFrame = document.getElementById('lecturerApplicationFrame');
   if (!grid) return;
   try {
     const response = await fetch('/api/public/jobs');
     if (!response.ok) throw new Error('Could not load job listings.');
     const jobs = await response.json();
-    if (lecturerApplyNote) lecturerApplyNote.hidden = !jobs.some(job => /lectur/i.test(`${job.category || ''} ${job.title || ''}`));
+    const lecturerVacancyOpen = jobs.some(job => /lectur/i.test(`${job.category || ''} ${job.title || ''}`));
+    if (lecturerApplyNote) lecturerApplyNote.hidden = !lecturerVacancyOpen;
+    if (lecturerApplication) lecturerApplication.hidden = !lecturerVacancyOpen;
+    if (lecturerVacancyOpen && lecturerApplicationFrame && !lecturerApplicationFrame.hasAttribute('src')) {
+      lecturerApplicationFrame.src = lecturerApplicationFrame.dataset.src;
+    }
     grid.innerHTML = jobs.length ? jobs.map(job => {
       const isLecturerJob = /lectur/i.test(`${job.category || ''} ${job.title || ''}`);
       return `
@@ -2434,12 +2447,13 @@ async function loadPublicJobs() {
           <p>${materialEscape(job.description)}</p>
           ${job.requirements ? `<p style="margin-top:12px"><strong>Requirements</strong><br>${materialEscape(job.requirements)}</p>` : ''}
           ${isLecturerJob
-            ? '<a class="job-apply" href="lecturer-register.html">Apply to teach</a>'
+            ? '<a class="job-apply" href="#lecturerApplication">Apply to teach</a>'
             : `<a class="job-apply" href="mailto:${encodeURIComponent(job.application_email)}?subject=${encodeURIComponent(`Application: ${job.title}`)}">Apply by email</a>`}
         </article>`;
     }).join('') : '<p class="materials-empty">There are no open positions right now. Please check back soon.</p>';
   } catch (error) {
     if (lecturerApplyNote) lecturerApplyNote.hidden = true;
+    if (lecturerApplication) lecturerApplication.hidden = true;
     grid.innerHTML = '<p class="materials-empty">Job listings are temporarily unavailable.</p>';
     console.error(error);
   }
