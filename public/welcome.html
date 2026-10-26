@@ -68,12 +68,12 @@
     .nav-brand img { width: 36px; height: 36px; border-radius: 6px; }
     .nav-links {
       display: flex;
-      gap: 28px;
+      gap: clamp(10px, 1.5vw, 22px);
       list-style: none;
     }
     .nav-links a {
       color: rgba(255,255,255,0.85);
-      font-size: 14px;
+      font-size: clamp(11px, 1vw, 13px);
       font-weight: 500;
       transition: color 0.15s;
       position: relative;
@@ -89,6 +89,15 @@
       transition: background 0.15s;
     }
     .nav-cta:hover { background: var(--gold-light); }
+
+    .jobs-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(280px,1fr)); gap:20px; }
+    .job-card { background:#fff; border:1px solid #e5e8ed; border-radius:16px; padding:24px; box-shadow:0 10px 28px rgba(11,26,51,.06); }
+    .job-card h3 { color:var(--navy); font-size:20px; margin:12px 0 8px; }
+    .job-meta { color:var(--muted); font-size:13px; margin-bottom:14px; }
+    .job-card p { color:var(--muted); font-size:14px; line-height:1.65; white-space:pre-line; }
+    .job-category { display:inline-block; color:#805d06; background:#fff5d9; padding:5px 10px; border-radius:99px; font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.06em; }
+    .job-apply { display:inline-flex; margin-top:18px; background:var(--navy); color:#fff; padding:10px 16px; border-radius:8px; font-size:13px; font-weight:700; }
+    .job-apply:hover { background:var(--gold); }
 
 /* ─── Mobile Hamburger ─── */
 .nav-burger {
@@ -229,12 +238,12 @@
 
     /* ─── Hero ─── */
     .hero {
-      min-height: 100vh;
+      min-height: 100svh;
       display: flex;
       align-items: center;
       justify-content: center;
       text-align: center;
-      padding: 100px 24px 60px;
+      padding: 88px 24px 28px;
       background-image:
         linear-gradient(135deg, rgba(11,26,51,0.88) 0%, rgba(11,26,51,0.75) 100%),
         url('images/hero-landing.jpg');
@@ -255,21 +264,21 @@
       font-weight: 600;
       letter-spacing: 0.08em;
       text-transform: uppercase;
-      margin-bottom: 24px;
+      margin-bottom: 16px;
     }
     .hero h1 {
       font-size: clamp(36px, 6vw, 68px);
       font-weight: 900;
       line-height: 1.05;
       letter-spacing: -0.03em;
-      margin-bottom: 24px;
+      margin-bottom: 16px;
     }
     .hero h1 span { color: var(--gold-light); }
     .hero-sub {
       font-size: clamp(16px, 2vw, 20px);
       opacity: 0.85;
       max-width: 640px;
-      margin: 0 auto 40px;
+      margin: 0 auto 24px;
       line-height: 1.6;
     }
     .hero-cta {
@@ -1520,13 +1529,14 @@ body.dark .contact-item-label { color: #94a3b8; }
 
   <!-- Desktop links -->
   <ul class="nav-links">
-    <li><a href="#guides">What Guides Us</a></li>
-    <li><a href="#services">Services</a></li>
-    <li><a href="#courses">Courses</a></li>
-    <li><a href="#materials">Books &amp; Materials</a></li>
-    <li><a href="login.html">Student Portal</a></li>
-    <li><a href="partners.html">Partners</a></li>
-    <li><a href="#contact">Contact</a></li>
+    <li><a href="#guides" target="_blank" rel="noopener">What Guides Us</a></li>
+    <li><a href="#services" target="_blank" rel="noopener">Services</a></li>
+    <li><a href="#courses" target="_blank" rel="noopener">Courses</a></li>
+    <li><a href="#materials" target="_blank" rel="noopener">Books &amp; Materials</a></li>
+    <li><a href="login.html" target="_blank" rel="noopener">Student Portal</a></li>
+    <li><a href="partners.html" target="_blank" rel="noopener">Partners</a></li>
+    <li><a href="#jobs" target="_blank" rel="noopener">Jobs</a></li>
+    <li><a href="#contact" target="_blank" rel="noopener">Contact</a></li>
   </ul>
 
   <!-- Desktop CTA -->
@@ -1545,13 +1555,14 @@ body.dark .contact-item-label { color: #94a3b8; }
     <button class="mobile-menu-close" id="mobileMenuClose" aria-label="Close menu">×</button>
   </div>
   <ul class="mobile-menu-links">
-    <li><a href="#guides"><span>01</span>What Guides Us</a></li>
-    <li><a href="#services"><span>02</span>Services</a></li>
-    <li><a href="#courses"><span>03</span>Courses</a></li>
-    <li><a href="#materials"><span>04</span>Books &amp; Materials</a></li>
-    <li><a href="login.html"><span>05</span>Student Portal</a></li>
-    <li><a href="partners.html">Partners</a></li>
-    <li><a href="#contact"><span>04</span>Contact</a></li>
+    <li><a href="#guides" target="_blank" rel="noopener"><span>01</span>What Guides Us</a></li>
+    <li><a href="#services" target="_blank" rel="noopener"><span>02</span>Services</a></li>
+    <li><a href="#courses" target="_blank" rel="noopener"><span>03</span>Courses</a></li>
+    <li><a href="#materials" target="_blank" rel="noopener"><span>04</span>Books &amp; Materials</a></li>
+    <li><a href="login.html" target="_blank" rel="noopener"><span>05</span>Student Portal</a></li>
+    <li><a href="partners.html" target="_blank" rel="noopener">Partners</a></li>
+    <li><a href="#jobs" target="_blank" rel="noopener"><span>07</span>Jobs</a></li>
+    <li><a href="#contact" target="_blank" rel="noopener"><span>06</span>Contact</a></li>
   </ul>
   <div class="mobile-menu-cta">
     <a href="register.html" class="btn-gold" style="display:block; text-align:center;">Enroll Now</a>
@@ -1678,6 +1689,16 @@ body.dark .contact-item-label { color: #94a3b8; }
     <select id="materialsAccessFilter" aria-label="Filter by access"><option value="all">Free &amp; paid</option><option value="free">Free resources</option><option value="paid">Paid resources</option></select>
   </div>
   <div class="materials-grid" id="publicMaterialsGrid" aria-live="polite"><p class="materials-empty">Loading course materials…</p></div>
+</section>
+
+<!-- Contact -->
+<section class="section" id="jobs">
+  <div class="section-head">
+    <span class="section-label">Join Our Team</span>
+    <h2>Career Opportunities</h2>
+    <p>Explore current lecturer vacancies and other opportunities at Herald Trainer and Consultant.</p>
+  </div>
+  <div class="jobs-grid" id="publicJobsGrid" aria-live="polite"><p class="materials-empty">Loading opportunities…</p></div>
 </section>
 
 <!-- Contact -->
@@ -2165,6 +2186,7 @@ backToTop.addEventListener('click', () => {
 // ═══════════════════════════════════════════════════════════
 document.querySelectorAll('.nav-links a, .hero-cta a[href^="#"]').forEach(link => {
   link.addEventListener('click', (e) => {
+    if (link.target === '_blank') return;
     const href = link.getAttribute('href');
     if (href.startsWith('#') && href.length > 1) {
       e.preventDefault();
@@ -2336,6 +2358,29 @@ let studentMaterialAccess = new Map();
 let guestMaterialPurchases = new Map();
 let signedInStudent = false;
 const materialEscape = value => { const el = document.createElement('span'); el.textContent = value ?? ''; return el.innerHTML; };
+
+async function loadPublicJobs() {
+  const grid = document.getElementById('publicJobsGrid');
+  if (!grid) return;
+  try {
+    const response = await fetch('/api/public/jobs');
+    if (!response.ok) throw new Error('Could not load job listings.');
+    const jobs = await response.json();
+    grid.innerHTML = jobs.length ? jobs.map(job => `
+      <article class="job-card">
+        <span class="job-category">${materialEscape(job.category)}</span>
+        <h3>${materialEscape(job.title)}</h3>
+        <div class="job-meta">${[job.location, job.employment_type, job.closing_date ? `Apply by ${job.closing_date}` : ''].filter(Boolean).map(materialEscape).join(' · ')}</div>
+        <p>${materialEscape(job.description)}</p>
+        ${job.requirements ? `<p style="margin-top:12px"><strong>Requirements</strong><br>${materialEscape(job.requirements)}</p>` : ''}
+        <a class="job-apply" href="mailto:${encodeURIComponent(job.application_email)}?subject=${encodeURIComponent(`Application: ${job.title}`)}">Apply by email</a>
+      </article>`).join('') : '<p class="materials-empty">There are no open positions right now. Please check back soon.</p>';
+  } catch (error) {
+    grid.innerHTML = '<p class="materials-empty">Job listings are temporarily unavailable.</p>';
+    console.error(error);
+  }
+}
+loadPublicJobs();
 
 async function loadPublicMaterials() {
   try {

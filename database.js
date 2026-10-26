@@ -84,6 +84,19 @@ async function initSchema() {
       body TEXT NOT NULL,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP
     )`,
+    `CREATE TABLE IF NOT EXISTS jobs (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      title TEXT NOT NULL,
+      category TEXT NOT NULL DEFAULT 'Other',
+      location TEXT,
+      employment_type TEXT,
+      description TEXT NOT NULL,
+      requirements TEXT,
+      application_email TEXT NOT NULL DEFAULT 'info@heraldtrainer.co.ke',
+      closing_date TEXT,
+      is_published INTEGER NOT NULL DEFAULT 1,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    )`,
     `CREATE TABLE IF NOT EXISTS fees (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       student_id INTEGER NOT NULL,

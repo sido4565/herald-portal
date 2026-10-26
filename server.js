@@ -541,6 +541,17 @@ app.get('/api/me', authStudent, async (req, res) => {
   res.json(r.rows[0]);
 });
 
+app.get('/api/public/jobs', async (req, res) => {
+  const r = await db.execute({
+    sql: `SELECT id, title, category, location, employment_type, description, requirements,
+                 application_email, closing_date, created_at
+          FROM jobs WHERE is_published = 1
+          AND (closing_date IS NULL OR closing_date = '' OR closing_date >= date('now'))
+          ORDER BY created_at DESC`,
+  });
+  res.json(r.rows);
+});
+
 app.get('/api/public/courses', async (req, res) => {
   const dbCourses = await db.execute('SELECT DISTINCT title, code FROM courses ORDER BY title');
   const catalog = [
@@ -2264,6 +2275,61 @@ app.get('/api/admin/courses/:id/students', authAdmin, async (req, res) => {
     args: [req.params.id],
   });
   res.json(r.rows);
+});
+
+// ---------- Jobs (admin) ----------
+function jobPayload(body = {}) {
+  return {
+    title: String(body.title || '').trim(),
+    category: String(body.category || 'Other').trim(),
+    location: String(body.location || '').trim(),
+    employment_type: String(body.employment_type || '').trim(),
+    description: String(body.description || '').trim(),
+    requirements: String(body.requirements || '').trim(),
+    application_email: String(body.application_email || 'info@heraldtrainer.co.ke').trim(),
+    closing_date: String(body.closing_date || '').trim(),
+    is_published: body.is_published === 0 || body.is_published === '0' || body.is_published === false ? 0 : 1,
+  };
+}
+
+function validJob(job) {
+  return job.title && job.title.length <= 160 && job.category.length <= 80 &&
+    job.location.length <= 120 && job.employment_type.length <= 80 &&
+    job.description && job.description.length <= 12000 && job.requirements.length <= 12000 &&
+    /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(job.application_email) &&
+    job.application_email.length <= 254 && (!job.closing_date || /^\d{4}-\d{2}-\d{2}$/.test(job.closing_date));
+}
+
+app.get('/api/admin/jobs', authAdmin, async (req, res) => {
+  const r = await db.execute('SELECT * FROM jobs ORDER BY created_at DESC');
+  res.json(r.rows);
+});
+
+app.post('/api/admin/jobs', authAdmin, async (req, res) => {
+  const job = jobPayload(req.body);
+  if (!validJob(job)) return res.status(400).json({ error: 'Enter a title, description, valid application email, and valid closing date.' });
+  await db.execute({
+    sql: `INSERT INTO jobs (title, category, location, employment_type, description, requirements, application_email, closing_date, is_published)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    args: [job.title, job.category, job.location, job.employment_type, job.description, job.requirements, job.application_email, job.closing_date, job.is_published],
+  });
+  res.json({ ok: true });
+});
+
+app.put('/api/admin/jobs/:id', authAdmin, async (req, res) => {
+  const job = jobPayload(req.body);
+  if (!validJob(job)) return res.status(400).json({ error: 'Enter a title, description, valid application email, and valid closing date.' });
+  await db.execute({
+    sql: `UPDATE jobs SET title = ?, category = ?, location = ?, employment_type = ?, description = ?, requirements = ?,
+          application_email = ?, closing_date = ?, is_published = ? WHERE id = ?`,
+    args: [job.title, job.category, job.location, job.employment_type, job.description, job.requirements, job.application_email, job.closing_date, job.is_published, req.params.id],
+  });
+  res.json({ ok: true });
+});
+
+app.delete('/api/admin/jobs/:id', authAdmin, async (req, res) => {
+  await db.execute({ sql: 'DELETE FROM jobs WHERE id = ?', args: [req.params.id] });
+  res.json({ ok: true });
 });
 
 // ---------- Announcements (admin) ----------

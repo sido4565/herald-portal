@@ -160,6 +160,7 @@ if ($('#adminName')) {
       case 'admissions':    return loadAdmissions(); // <-- NEW
       case 'courses':       return loadCourses();
       case 'announcements': return loadAnnouncements();
+      case 'jobs':          return loadJobs();
       case 'results':       return loadResults();
       case 'fees':          return loadFees();
       case 'timetable':     return loadTimetable();
@@ -532,6 +533,8 @@ if (bulkBtn) bulkBtn.addEventListener('click', openBulkAssignModal);
       await loadAnnouncements();
     }));
 
+    $('#addJobBtn').addEventListener('click', () => openJobModal());
+
     $('#addResultBtn').addEventListener('click', async () => {
       try { await ensureCache(); } catch (e) { return toast(e.message, 'error'); }
       openModal('Add Result', [
@@ -787,6 +790,8 @@ if (addLectBtn) {
         if (act === 'view-course')   return viewCourseStudents(id);
         if (act === 'edit-ann')      return editAnn(id);
         if (act === 'del-ann')       return delAnn(id);
+        if (act === 'edit-job')      return editJob(id);
+        if (act === 'del-job')       return delJob(id);
         if (act === 'del-result')    return delResult(id);
         if (act === 'edit-fee')      return editFee(id);
         if (act === 'del-fee')       return delFee(id);
@@ -1207,6 +1212,62 @@ async function openBulkAssignModal() {
       await loadAnnouncements();
       toast('Announcement deleted.');
     } catch (e) { toast(e.message, 'error'); }
+  }
+
+  async function loadJobs() {
+    const list = await api('/api/admin/jobs');
+    const wrap = $('#jobsAdminList');
+    wrap.innerHTML = list.map(job => `
+      <div class="ann-card">
+        <div class="ann-head">
+          <strong>${esc(job.title)}</strong>
+          <span class="ann-date">${job.is_published ? 'Published' : 'Draft'}${job.closing_date ? ` · Closes ${esc(job.closing_date)}` : ''}</span>
+        </div>
+        <p>${esc(job.category)}${job.location ? ` · ${esc(job.location)}` : ''}${job.employment_type ? ` · ${esc(job.employment_type)}` : ''}</p>
+        <div class="ann-actions">
+          <button class="btn-xs" data-act="edit-job" data-id="${job.id}" type="button">Edit</button>
+          <button class="btn-xs danger" data-act="del-job" data-id="${job.id}" type="button">Delete</button>
+        </div>
+      </div>`).join('') || '<p class="empty">No job listings yet.</p>';
+    wireTableActions(wrap);
+  }
+
+  function jobFields(job = {}) {
+    return [
+      { name: 'title', label: 'Job title', value: job.title, required: true },
+      { name: 'category', label: 'Category (e.g. Lecturer, Administration, Other)', value: job.category || 'Lecturer', required: true },
+      { name: 'location', label: 'Location', value: job.location },
+      { name: 'employment_type', label: 'Employment type (e.g. Full-time, Part-time, Contract)', value: job.employment_type },
+      { name: 'description', label: 'Job description', type: 'textarea', value: job.description, required: true },
+      { name: 'requirements', label: 'Requirements', type: 'textarea', value: job.requirements },
+      { name: 'application_email', label: 'Application email', type: 'email', value: job.application_email || 'info@heraldtrainer.co.ke', required: true },
+      { name: 'closing_date', label: 'Closing date', type: 'date', value: job.closing_date },
+      { name: 'is_published', label: 'Visibility', type: 'select', value: job.is_published ?? 1,
+        options: [{ value: 1, label: 'Published on website' }, { value: 0, label: 'Draft (hidden)' }] },
+    ];
+  }
+
+  function openJobModal(job = null) {
+    openModal(job ? 'Edit Job Listing' : 'Post a Job', jobFields(job || {}), async data => {
+      data.is_published = Number(data.is_published);
+      await api(job ? `/api/admin/jobs/${job.id}` : '/api/admin/jobs', {
+        method: job ? 'PUT' : 'POST', body: data,
+      });
+      await loadJobs();
+    });
+  }
+
+  async function editJob(id) {
+    const list = await api('/api/admin/jobs');
+    const job = list.find(item => Number(item.id) === id);
+    if (job) openJobModal(job);
+  }
+
+  async function delJob(id) {
+    if (!confirm('Delete this job listing?')) return;
+    await api(`/api/admin/jobs/${id}`, { method: 'DELETE' });
+    await loadJobs();
+    toast('Job listing deleted.');
   }
 
   // ---------------- Results ----------------
