@@ -203,6 +203,16 @@ async function deletePrivateMaterialFile(key, storageType) {
   }
 }
 
+async function deleteLecturerMaterialFile(key, storageType) {
+  if (!key) return;
+  if (storageType === 'r2' && r2 && R2_BUCKET) {
+    await r2.send(new DeleteObjectCommand({ Bucket: R2_BUCKET, Key: key }));
+  } else if (storageType === 'local') {
+    const fullPath = path.join(UPLOAD_DIR, path.basename(key));
+    if (fs.existsSync(fullPath)) fs.unlinkSync(fullPath);
+  }
+}
+
 async function deliverMaterialFile(material, res) {
   const filename = String(material.file_name || `${material.title}.pdf`).replace(/[\\"\r\n]/g, '_');
   if (material.storage_type === 'r2-private' && material.storage_key && r2 && R2_PRIVATE_BUCKET) {
@@ -1556,26 +1566,62 @@ app.post('/api/lecturer/attendance', authLecturer, async (req, res) => {
   }
 });
 
+async function lecturerCanTeachCourse(lecturerId, courseId) {
+  const assigned = await db.execute({
+    sql: 'SELECT 1 FROM lecturer_courses WHERE lecturer_id = ? AND course_id = ? LIMIT 1',
+    args: [lecturerId, courseId],
+  });
+  if (assigned.rows.length) return true;
+
+  const hasAssignments = await db.execute({
+    sql: 'SELECT 1 FROM lecturer_courses WHERE lecturer_id = ? LIMIT 1',
+    args: [lecturerId],
+  });
+  if (hasAssignments.rows.length) return false;
+
+  const legacy = await db.execute({
+    sql: `SELECT 1 FROM courses c JOIN lecturers l ON l.id = ?
+          WHERE c.id = ? AND LOWER(c.trainer) LIKE '%' || LOWER(l.name) || '%' LIMIT 1`,
+    args: [lecturerId, courseId],
+  });
+  return legacy.rows.length > 0;
+}
+
 app.get('/api/lecturer/materials', authLecturer, async (req, res) => {
-  const r = await db.execute(`
-    SELECT m.*, c.code, c.title AS course_title,
+  const courses = await db.execute({
+    sql: `SELECT c.id FROM courses c
+          WHERE EXISTS (SELECT 1 FROM lecturer_courses lc WHERE lc.lecturer_id = ? AND lc.course_id = c.id)
+             OR (NOT EXISTS (SELECT 1 FROM lecturer_courses lc WHERE lc.lecturer_id = ?)
+                 AND c.trainer LIKE '%' || (SELECT name FROM lecturers WHERE id = ?) || '%')`,
+    args: [req.lecturer.id, req.lecturer.id, req.lecturer.id],
+  });
+  const courseIds = courses.rows.map(row => row.id);
+  if (!courseIds.length) return res.json([]);
+  const placeholders = courseIds.map(() => '?').join(',');
+  const r = await db.execute({
+    sql: `SELECT m.*, c.code, c.title AS course_title,
       (SELECT COUNT(*) FROM material_views WHERE material_id = m.id) AS view_count
-    FROM materials m JOIN courses c ON c.id = m.course_id
-    ORDER BY m.release_date DESC, m.id DESC LIMIT 200
-  `);
+      FROM materials m JOIN courses c ON c.id = m.course_id
+      WHERE m.created_by = ? AND m.course_id IN (${placeholders})
+      ORDER BY m.release_date DESC, m.id DESC LIMIT 200`,
+    args: [req.lecturer.id, ...courseIds],
+  });
   res.json(r.rows);
 });
 
 app.post('/api/lecturer/materials', authLecturer, async (req, res) => {
   try {
     const { course_id, title, description, material_type, file_path, file_name, external_url, release_date } = req.body;
-    if (!course_id || !title || !release_date) {
+    if (!Number.isInteger(Number(course_id)) || !String(title || '').trim() || !/^\d{4}-\d{2}-\d{2}$/.test(String(release_date || ''))) {
       return res.status(400).json({ error: 'course_id, title, and release_date are required' });
     }
+    if (!(await lecturerCanTeachCourse(req.lecturer.id, Number(course_id)))) {
+      return res.status(403).json({ error: 'You can only post materials to your assigned courses.' });
+    }
     const info = await db.execute({
-      sql: `INSERT INTO materials (course_id, title, description, material_type, file_path, file_name, external_url, release_date, created_by)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      args: [course_id, title, description || '', material_type || 'file', file_path || null, file_name || null, external_url || null, release_date, req.lecturer.id],
+      sql: `INSERT INTO materials (course_id, title, description, material_type, file_path, file_name, external_url, release_date, created_by, storage_key, storage_type)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      args: [Number(course_id), String(title).trim(), description || '', material_type || 'file', file_path || null, file_name || null, external_url || null, release_date, req.lecturer.id, req.body.file_key || null, req.body.storage || null],
     });
     res.json({ ok: true, id: Number(info.lastInsertRowid) });
   } catch (err) {
@@ -1584,10 +1630,58 @@ app.post('/api/lecturer/materials', authLecturer, async (req, res) => {
   }
 });
 
+app.put('/api/lecturer/materials/:id', authLecturer, async (req, res) => {
+  try {
+    const currentRes = await db.execute({
+      sql: 'SELECT * FROM materials WHERE id = ? AND created_by = ?',
+      args: [req.params.id, req.lecturer.id],
+    });
+    const current = currentRes.rows[0];
+    if (!current) return res.status(404).json({ error: 'Material not found.' });
+    const { course_id, title, description, release_date, external_url } = req.body;
+    const targetCourse = Number(course_id || current.course_id);
+    if (!String(title || '').trim() || !/^\d{4}-\d{2}-\d{2}$/.test(String(release_date || ''))) {
+      return res.status(400).json({ error: 'Title and a valid release date are required.' });
+    }
+    if (!(await lecturerCanTeachCourse(req.lecturer.id, targetCourse))) {
+      return res.status(403).json({ error: 'You can only manage materials for your assigned courses.' });
+    }
+    if (external_url) {
+      try { if (!['http:', 'https:'].includes(new URL(external_url).protocol)) throw new Error('invalid protocol'); }
+      catch (_) { return res.status(400).json({ error: 'External links must use http or https.' }); }
+    }
+    const replaceFile = !!req.body.file_path;
+    const removeAttachment = !!req.body.remove_attachment;
+    const filePath = replaceFile ? req.body.file_path : (removeAttachment ? null : current.file_path);
+    const fileName = replaceFile ? (req.body.file_name || null) : (removeAttachment ? null : current.file_name);
+    const storageKey = replaceFile ? (req.body.file_key || null) : (removeAttachment ? null : current.storage_key);
+    const storageType = replaceFile ? (req.body.storage || null) : (removeAttachment ? null : current.storage_type);
+    const link = removeAttachment ? null : (external_url || (replaceFile ? null : current.external_url));
+    const materialType = replaceFile ? 'file' : (link ? 'link' : (filePath ? 'file' : 'text'));
+    await db.execute({
+      sql: `UPDATE materials SET course_id = ?, title = ?, description = ?, release_date = ?,
+            file_path = ?, file_name = ?, external_url = ?, storage_key = ?, storage_type = ?, material_type = ?
+            WHERE id = ? AND created_by = ?`,
+      args: [targetCourse, String(title).trim(), String(description || '').trim(), release_date, filePath, fileName, link, storageKey, storageType, materialType, req.params.id, req.lecturer.id],
+    });
+    if ((replaceFile || removeAttachment) && current.storage_key && current.storage_key !== storageKey) {
+      await deleteLecturerMaterialFile(current.storage_key, current.storage_type);
+    }
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 app.delete('/api/lecturer/materials/:id', authLecturer, async (req, res) => {
   try {
+    const rowRes = await db.execute({ sql: 'SELECT course_id, storage_key, storage_type FROM materials WHERE id = ? AND created_by = ?', args: [req.params.id, req.lecturer.id] });
+    const row = rowRes.rows[0];
+    if (!row) return res.status(404).json({ error: 'Material not found.' });
+    if (!(await lecturerCanTeachCourse(req.lecturer.id, row.course_id))) return res.status(403).json({ error: 'You can only manage materials for your assigned courses.' });
     await db.execute({ sql: 'DELETE FROM material_views WHERE material_id = ?', args: [req.params.id] });
-    await db.execute({ sql: 'DELETE FROM materials WHERE id = ?', args: [req.params.id] });
+    await db.execute({ sql: 'DELETE FROM materials WHERE id = ? AND created_by = ?', args: [req.params.id, req.lecturer.id] });
+    await deleteLecturerMaterialFile(row.storage_key, row.storage_type);
     res.json({ ok: true });
   } catch (err) {
     res.status(500).json({ error: err.message });

@@ -296,116 +296,120 @@
     });
 
     async function loadMaterials() {
-  const list = await api('/api/lecturer/materials');
-  const courses = await api('/api/lecturer/my-courses');
+      const [materials, courses] = await Promise.all([
+        api('/api/lecturer/materials'),
+        api('/api/lecturer/my-courses'),
+      ]);
+      const wrap = $('#materialsList');
+      if (!materials.length) {
+        wrap.innerHTML = '<p class="empty">No study materials posted to your courses yet. Click "Post Material" to add one.</p>';
+        return;
+      }
+      wrap.innerHTML = materials.map(m => `
+        <article style="background:var(--card);border:1px solid var(--border-soft);border-radius:10px;padding:16px;margin:12px 0;">
+          <div style="display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap;align-items:flex-start;">
+            <div style="min-width:220px;flex:1;">
+              <strong>${esc(m.title)}</strong>
+              <div style="color:var(--muted);font-size:13px;margin-top:5px;">${esc(m.code)} — ${esc(m.course_title)}</div>
+              ${m.description ? `<p style="margin:8px 0;">${esc(m.description)}</p>` : ''}
+              <small style="color:var(--muted);">Release date: ${esc(String(m.release_date || '').slice(0, 10))}${m.file_name ? ` · File: ${esc(m.file_name)}` : ''}${m.external_url ? ` · Link attached` : ''}</small>
+            </div>
+            <div style="display:flex;gap:8px;">
+              <button class="btn-xs" type="button" data-material-edit="${m.id}">Edit</button>
+              <button class="btn-xs" type="button" data-material-delete="${m.id}" style="color:#b91c1c;">Delete</button>
+            </div>
+          </div>
+        </article>`).join('');
 
-  const wrap = $('#materialsList');
-  if (!list.length) {
-    wrap.innerHTML = '<p class="empty">No materials posted yet. Click "Post Material" to add one.</p>';
-    return;
-  }
+      wrap.querySelectorAll('[data-material-edit]').forEach(btn => btn.addEventListener('click', () => {
+        const material = materials.find(m => String(m.id) === btn.dataset.materialEdit);
+        if (material) openMaterialForm(courses, material);
+      }));
+      wrap.querySelectorAll('[data-material-delete]').forEach(btn => btn.addEventListener('click', async () => {
+        if (!confirm('Delete this study material? Students will no longer be able to access it.')) return;
+        try {
+          await api(`/api/lecturer/materials/${btn.dataset.materialDelete}`, { method: 'DELETE' });
+          toast('Study material deleted');
+          await loadMaterials();
+        } catch (e) { toast(e.message, 'error'); }
+      }));
+    }
 
-  // ---------- Live Classes ----------
-  // Delete handlers
-  wrap.querySelectorAll('[data-material-id]').forEach(btn => {
-    btn.addEventListener('click', async () => {
-      if (!confirm('Delete this material?')) return;
+    function openMaterialForm(courses, material = null) {
+      const editing = !!material;
+      const overlay = document.createElement('div');
+      overlay.className = 'modal-overlay';
+      overlay.innerHTML = `
+        <div class="modal" style="max-width:560px;">
+          <h3>${editing ? 'Edit Study Material' : 'Post Study Material'}</h3>
+          <form id="matForm" class="modal-form">
+            <label>Course</label>
+            <select name="course_id" required>
+              <option value="">— Select course —</option>
+              ${courses.map(c => `<option value="${c.id}" ${editing && String(c.id) === String(material.course_id) ? 'selected' : ''}>${esc(c.code)} — ${esc(c.title)}</option>`).join('')}
+            </select>
+            <label>Title</label>
+            <input name="title" required value="${esc(material?.title || '')}" placeholder="e.g. Week 3 — Marketing Funnels" />
+            <label>Description</label>
+            <textarea name="description" rows="3" placeholder="Brief description of the material">${esc(material?.description || '')}</textarea>
+            <label>Release Date (unlocks for students)</label>
+            <input type="date" name="release_date" value="${esc(String(material?.release_date || new Date().toISOString().slice(0,10)).slice(0,10))}" required />
+            ${editing && (material.file_name || material.external_url) ? `<p style="font-size:13px;color:var(--muted);margin:0;">Current attachment: ${esc(material.file_name || material.external_url)}</p><label style="display:flex;gap:8px;align-items:center;"><input type="checkbox" name="remove_attachment" /> Remove current attachment</label>` : ''}
+            <label>File ${editing ? '(optional — choose a replacement)' : '(optional — PDF, DOCX, PPTX, image, video)'}</label>
+            <input type="file" name="file" id="matFile" accept=".pdf,.doc,.docx,.ppt,.pptx,.jpg,.jpeg,.png,.webp,.mp4,.webm" />
+            <label>External URL (optional — YouTube, Drive, etc.)</label>
+            <input type="url" name="external_url" value="${esc(material?.external_url || '')}" placeholder="https://..." />
+          </form>
+          <div class="modal-actions">
+            <button class="btn-ghost dark" type="button" data-close>Cancel</button>
+            <button class="btn-primary" id="matSaveBtn" type="button">${editing ? 'Save Changes' : 'Post'}</button>
+          </div>
+        </div>`;
+      document.body.appendChild(overlay);
+      overlay.addEventListener('click', e => {
+        if (e.target === overlay || e.target.closest('[data-close]')) overlay.remove();
+      });
+      overlay.querySelector('#matSaveBtn').addEventListener('click', async () => {
+        const form = overlay.querySelector('#matForm');
+        const fd = new FormData(form);
+        const fileInput = overlay.querySelector('#matFile');
+        const hasFile = fileInput.files && fileInput.files.length > 0;
+        const payload = {
+          course_id: Number(fd.get('course_id')),
+          title: String(fd.get('title') || '').trim(),
+          description: fd.get('description'),
+          release_date: fd.get('release_date'),
+          external_url: String(fd.get('external_url') || '').trim(),
+          material_type: hasFile ? 'file' : (fd.get('external_url') ? 'link' : 'text'),
+          remove_attachment: !!fd.get('remove_attachment'),
+        };
+        if (!payload.course_id || !payload.title || !payload.release_date) return toast('Course, title, and release date are required', 'error');
+        try {
+          if (hasFile) {
+            const upFd = new FormData();
+            upFd.append('file', fileInput.files[0]);
+            const upRes = await fetch('/api/lecturer/materials/upload', { method: 'POST', credentials: 'same-origin', body: upFd });
+            const upJson = await upRes.json();
+            if (!upRes.ok) throw new Error(upJson.error || 'File upload failed');
+            Object.assign(payload, { file_path: upJson.file_path, file_name: upJson.file_name, file_key: upJson.file_key, storage: upJson.storage });
+          }
+          await api(editing ? `/api/lecturer/materials/${material.id}` : '/api/lecturer/materials', {
+            method: editing ? 'PUT' : 'POST', body: payload,
+          });
+          overlay.remove();
+          toast(editing ? 'Study material updated' : 'Material posted');
+          await loadMaterials();
+        } catch (e) { toast(e.message, 'error'); }
+      });
+    }
+
+    $('#addMaterialBtn')?.addEventListener('click', async () => {
       try {
-        await api(`/api/lecturer/materials/${btn.dataset.materialId}`, { method: 'DELETE' });
-        toast('Deleted');
-        await loadMaterials();
+        const courses = await api('/api/lecturer/my-courses');
+        if (!courses.length) return toast('You have no courses assigned yet.', 'error');
+        openMaterialForm(courses);
       } catch (e) { toast(e.message, 'error'); }
     });
-  });
-}
-
-$('#addMaterialBtn')?.addEventListener('click', async () => {
-  const courses = await api('/api/lecturer/my-courses');
-  if (!courses.length) return toast('You have no courses assigned yet.', 'error');
-
-  // Build custom modal
-  const overlay = document.createElement('div');
-  overlay.className = 'modal-overlay';
-  overlay.innerHTML = `
-    <div class="modal" style="max-width: 560px;">
-      <h3>Post Study Material</h3>
-      <form id="matForm" class="modal-form">
-        <label>Course</label>
-        <select name="course_id" required>
-          <option value="">— Select course —</option>
-          ${courses.map(c => `<option value="${c.id}">${esc(c.code)} — ${esc(c.title)}</option>`).join('')}
-        </select>
-
-        <label>Title</label>
-        <input name="title" required placeholder="e.g. Week 3 — Marketing Funnels" />
-
-        <label>Description</label>
-        <textarea name="description" rows="3" placeholder="Brief description of the material"></textarea>
-
-        <label>Release Date (unlocks for students)</label>
-        <input type="date" name="release_date" value="${new Date().toISOString().slice(0,10)}" required />
-
-        <label>File (optional — PDF, DOCX, PPTX, image, video)</label>
-        <input type="file" name="file" id="matFile" accept=".pdf,.doc,.docx,.ppt,.pptx,.jpg,.jpeg,.png,.webp,.mp4,.webm" />
-
-        <label>External URL (optional — YouTube, Drive, etc.)</label>
-        <input type="url" name="external_url" placeholder="https://..." />
-      </form>
-      <div class="modal-actions">
-        <button class="btn-ghost dark" type="button" data-close>Cancel</button>
-        <button class="btn-primary" id="matSaveBtn" type="button">Post</button>
-      </div>
-    </div>`;
-  document.body.appendChild(overlay);
-
-  overlay.addEventListener('click', e => {
-    if (e.target === overlay || e.target.closest('[data-close]')) overlay.remove();
-  });
-
-  overlay.querySelector('#matSaveBtn').addEventListener('click', async () => {
-    const form = overlay.querySelector('#matForm');
-    const fd = new FormData(form);
-    const fileInput = overlay.querySelector('#matFile');
-    const hasFile = fileInput.files && fileInput.files.length > 0;
-
-    const payload = {
-      course_id: Number(fd.get('course_id')),
-      title: fd.get('title'),
-      description: fd.get('description'),
-      release_date: fd.get('release_date'),
-      external_url: fd.get('external_url'),
-      material_type: hasFile ? 'file' : (fd.get('external_url') ? 'link' : 'text'),
-    };
-
-    if (!payload.course_id || !payload.title || !payload.release_date) {
-      return toast('Course, title, and release date are required', 'error');
-    }
-
-    try {
-      // Upload file first if present
-      if (hasFile) {
-        const upFd = new FormData();
-        upFd.append('file', fileInput.files[0]);
-        const upRes = await fetch('/api/lecturer/materials/upload', {
-          method: 'POST',
-          credentials: 'same-origin',
-          body: upFd,
-        });
-        const upJson = await upRes.json();
-        if (!upRes.ok) throw new Error(upJson.error || 'File upload failed');
-        payload.file_path = upJson.file_path;
-        payload.file_name = upJson.file_name;
-      }
-
-      await api('/api/lecturer/materials', { method: 'POST', body: payload });
-      overlay.remove();
-      toast('Material posted ✅');
-      await loadMaterials();
-    } catch (e) {
-      toast(e.message, 'error');
-    }
-  });
-});
 
     // ---------- Live Classes ----------
     async function loadLiveClasses() {
