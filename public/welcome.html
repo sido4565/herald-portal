@@ -23,6 +23,14 @@
   <meta property="og:type" content="website" />
   <meta property="og:url" content="https://herald-portal.onrender.com/" />
   <meta name="twitter:card" content="summary_large_image" />
+  <script>
+    (() => {
+      const views = ['guides', 'services', 'courses', 'materials', 'jobs', 'contact'];
+      const view = new URLSearchParams(location.search).get('view');
+      document.documentElement.classList.add(views.includes(view) ? 'topic-view' : 'landing-home');
+      if (views.includes(view)) document.documentElement.dataset.topic = view;
+    })();
+  </script>
   <style>
     :root {
       --navy: #0b1a33;
@@ -98,6 +106,29 @@
     .job-category { display:inline-block; color:#805d06; background:#fff5d9; padding:5px 10px; border-radius:99px; font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.06em; }
     .job-apply { display:inline-flex; margin-top:18px; background:var(--navy); color:#fff; padding:10px 16px; border-radius:8px; font-size:13px; font-weight:700; }
     .job-apply:hover { background:var(--gold); }
+
+    html.landing-home, html.landing-home body { height:100%; overflow:hidden; }
+    html.landing-home .stats,
+    html.landing-home .partners,
+    html.landing-home .section,
+    html.landing-home .site-footer,
+    html.landing-home .back-to-top { display:none !important; }
+    html.topic-view .nav,
+    html.topic-view .mobile-menu,
+    html.topic-view .mobile-backdrop,
+    html.topic-view .hero,
+    html.topic-view .stats,
+    html.topic-view .partners,
+    html.topic-view .site-footer,
+    html.topic-view .back-to-top,
+    html.topic-view body > .section { display:none !important; }
+    html.topic-view #guides[data-topic="guides"],
+    html.topic-view #services[data-topic="services"],
+    html.topic-view #courses[data-topic="courses"],
+    html.topic-view #materials[data-topic="materials"],
+    html.topic-view #jobs[data-topic="jobs"],
+    html.topic-view #contact[data-topic="contact"] { display:block !important; }
+    html.topic-view body > .section { max-width:1200px; min-height:100vh; padding-top:48px; }
 
 /* ─── Mobile Hamburger ─── */
 .nav-burger {
@@ -1529,14 +1560,14 @@ body.dark .contact-item-label { color: #94a3b8; }
 
   <!-- Desktop links -->
   <ul class="nav-links">
-    <li><a href="#guides" target="_blank" rel="noopener">What Guides Us</a></li>
-    <li><a href="#services" target="_blank" rel="noopener">Services</a></li>
-    <li><a href="#courses" target="_blank" rel="noopener">Courses</a></li>
-    <li><a href="#materials" target="_blank" rel="noopener">Books &amp; Materials</a></li>
-    <li><a href="login.html" target="_blank" rel="noopener">Student Portal</a></li>
-    <li><a href="partners.html" target="_blank" rel="noopener">Partners</a></li>
-    <li><a href="#jobs" target="_blank" rel="noopener">Jobs</a></li>
-    <li><a href="#contact" target="_blank" rel="noopener">Contact</a></li>
+    <li><a class="topic-window-link" href="welcome.html?view=guides#guides">What Guides Us</a></li>
+    <li><a class="topic-window-link" href="welcome.html?view=services#services">Services</a></li>
+    <li><a class="topic-window-link" href="welcome.html?view=courses#courses">Courses</a></li>
+    <li><a class="topic-window-link" href="welcome.html?view=materials#materials">Books &amp; Materials</a></li>
+    <li><a class="topic-window-link" href="login.html">Student Portal</a></li>
+    <li><a class="topic-window-link" href="partners.html">Partners</a></li>
+    <li><a class="topic-window-link" href="welcome.html?view=jobs#jobs">Jobs</a></li>
+    <li><a class="topic-window-link" href="welcome.html?view=contact#contact">Contact</a></li>
   </ul>
 
   <!-- Desktop CTA -->
@@ -1555,18 +1586,18 @@ body.dark .contact-item-label { color: #94a3b8; }
     <button class="mobile-menu-close" id="mobileMenuClose" aria-label="Close menu">×</button>
   </div>
   <ul class="mobile-menu-links">
-    <li><a href="#guides" target="_blank" rel="noopener"><span>01</span>What Guides Us</a></li>
-    <li><a href="#services" target="_blank" rel="noopener"><span>02</span>Services</a></li>
-    <li><a href="#courses" target="_blank" rel="noopener"><span>03</span>Courses</a></li>
-    <li><a href="#materials" target="_blank" rel="noopener"><span>04</span>Books &amp; Materials</a></li>
-    <li><a href="login.html" target="_blank" rel="noopener"><span>05</span>Student Portal</a></li>
-    <li><a href="partners.html" target="_blank" rel="noopener">Partners</a></li>
-    <li><a href="#jobs" target="_blank" rel="noopener"><span>07</span>Jobs</a></li>
-    <li><a href="#contact" target="_blank" rel="noopener"><span>06</span>Contact</a></li>
+    <li><a class="topic-window-link" href="welcome.html?view=guides#guides"><span>01</span>What Guides Us</a></li>
+    <li><a class="topic-window-link" href="welcome.html?view=services#services"><span>02</span>Services</a></li>
+    <li><a class="topic-window-link" href="welcome.html?view=courses#courses"><span>03</span>Courses</a></li>
+    <li><a class="topic-window-link" href="welcome.html?view=materials#materials"><span>04</span>Books &amp; Materials</a></li>
+    <li><a class="topic-window-link" href="login.html"><span>05</span>Student Portal</a></li>
+    <li><a class="topic-window-link" href="partners.html"><span>06</span>Partners</a></li>
+    <li><a class="topic-window-link" href="welcome.html?view=jobs#jobs"><span>07</span>Jobs</a></li>
+    <li><a class="topic-window-link" href="welcome.html?view=contact#contact"><span>08</span>Contact</a></li>
   </ul>
   <div class="mobile-menu-cta">
     <a href="register.html" class="btn-gold" style="display:block; text-align:center;">Enroll Now</a>
-    <a href="login.html" class="btn-outline-white" style="display:block; text-align:center; margin-top:10px;">Student Portal →</a>
+    <a href="login.html" class="btn-outline-white topic-window-link" style="display:block; text-align:center; margin-top:10px;">Student Portal →</a>
   </div>
 </div>
 
@@ -1584,7 +1615,7 @@ body.dark .contact-item-label { color: #94a3b8; }
     </p>
     <div class="hero-cta">
       <a href="register.html" class="btn-gold">Enroll Now</a>
-      <a href="#courses" class="btn-outline-white">View Courses</a>
+      <a href="welcome.html?view=courses#courses" class="btn-outline-white topic-window-link">View Courses</a>
     </div>
   </div>
 </section>
@@ -2346,6 +2377,20 @@ document.querySelectorAll('.nav-links a, .hero-cta a[href^="#"]').forEach(link =
 // ═══════════════════════════════════════════════════════════
 // Init — render tabs and courses on page load
 // ═══════════════════════════════════════════════════════════
+if (document.documentElement.classList.contains('topic-view')) {
+  const topic = document.documentElement.dataset.topic;
+  document.getElementById(topic)?.setAttribute('data-topic', topic);
+}
+
+document.querySelectorAll('.topic-window-link').forEach(link => {
+  link.addEventListener('click', event => {
+    event.preventDefault();
+    const width = Math.min(1280, Math.max(360, window.screen.availWidth - 80));
+    const height = Math.min(920, Math.max(640, window.screen.availHeight - 100));
+    window.open(link.href, '_blank', `popup=yes,width=${width},height=${height},resizable=yes,scrollbars=yes,noopener`);
+  });
+});
+
 renderTabs();
 renderCourses();
 
