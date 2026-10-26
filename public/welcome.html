@@ -129,6 +129,30 @@
     html.topic-view #jobs[data-topic="jobs"],
     html.topic-view #contact[data-topic="contact"] { display:block !important; }
     html.topic-view body > .section { max-width:1200px; min-height:100vh; padding-top:48px; }
+    .topic-popup {
+      position:fixed; inset:0; z-index:1000; display:none; align-items:center; justify-content:center;
+      padding:24px; background:rgba(3,10,22,.78); backdrop-filter:blur(8px);
+    }
+    .topic-popup.open { display:flex; }
+    .topic-popup-panel {
+      width:min(1200px,100%); height:min(900px,100%); background:var(--cream); border-radius:18px;
+      overflow:hidden; display:flex; flex-direction:column; box-shadow:0 28px 90px rgba(0,0,0,.45);
+    }
+    .topic-popup-head {
+      min-height:54px; display:flex; justify-content:flex-end; align-items:center; padding:8px 14px;
+      background:var(--navy); color:white;
+    }
+    .topic-popup-close {
+      border:0; border-radius:8px; padding:8px 14px; color:white; background:rgba(255,255,255,.12);
+      font:inherit; font-size:14px; font-weight:600; cursor:pointer;
+    }
+    .topic-popup-close:hover { background:var(--gold); }
+    .topic-popup-frame { width:100%; flex:1; min-height:0; border:0; background:var(--cream); }
+    html.popup-open, html.popup-open body { overflow:hidden; }
+    @media (max-width:600px) {
+      .topic-popup { padding:0; }
+      .topic-popup-panel { width:100%; height:100%; border-radius:0; }
+    }
 
 /* ─── Mobile Hamburger ─── */
 .nav-burger {
@@ -1604,6 +1628,15 @@ body.dark .contact-item-label { color: #94a3b8; }
 <!-- Backdrop -->
 <div class="mobile-backdrop" id="mobileBackdrop"></div>
 
+<div class="topic-popup" id="topicPopup" aria-hidden="true">
+  <div class="topic-popup-panel" role="dialog" aria-modal="true" aria-label="Website section">
+    <div class="topic-popup-head">
+      <button class="topic-popup-close" id="topicPopupClose" type="button" aria-label="Close popup">Close ✕</button>
+    </div>
+    <iframe class="topic-popup-frame" id="topicPopupFrame" title="Selected Herald website section"></iframe>
+  </div>
+</div>
+
 <!-- Hero -->
 <section class="hero" id="top">
   <div class="hero-content">
@@ -2385,10 +2418,32 @@ if (document.documentElement.classList.contains('topic-view')) {
 document.querySelectorAll('.topic-window-link').forEach(link => {
   link.addEventListener('click', event => {
     event.preventDefault();
-    const width = Math.min(1280, Math.max(360, window.screen.availWidth - 80));
-    const height = Math.min(920, Math.max(640, window.screen.availHeight - 100));
-    window.open(link.href, '_blank', `popup=yes,width=${width},height=${height},resizable=yes,scrollbars=yes,noopener`);
+    const popup = document.getElementById('topicPopup');
+    const frame = document.getElementById('topicPopupFrame');
+    if (!popup || !frame) return;
+    frame.src = link.href;
+    popup.classList.add('open');
+    popup.setAttribute('aria-hidden', 'false');
+    document.documentElement.classList.add('popup-open');
+    document.getElementById('topicPopupClose')?.focus();
   });
+});
+
+function closeTopicPopup() {
+  const popup = document.getElementById('topicPopup');
+  const frame = document.getElementById('topicPopupFrame');
+  if (!popup) return;
+  popup.classList.remove('open');
+  popup.setAttribute('aria-hidden', 'true');
+  document.documentElement.classList.remove('popup-open');
+  if (frame) frame.src = 'about:blank';
+}
+document.getElementById('topicPopupClose')?.addEventListener('click', closeTopicPopup);
+document.getElementById('topicPopup')?.addEventListener('click', event => {
+  if (event.target.id === 'topicPopup') closeTopicPopup();
+});
+document.addEventListener('keydown', event => {
+  if (event.key === 'Escape' && document.getElementById('topicPopup')?.classList.contains('open')) closeTopicPopup();
 });
 
 renderTabs();
