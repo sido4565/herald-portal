@@ -109,7 +109,6 @@
 
     html.landing-home, html.landing-home body { height:100%; overflow:hidden; }
     html.landing-home .stats,
-    html.landing-home .partners,
     html.landing-home .section,
     html.landing-home .site-footer,
     html.landing-home .back-to-top { display:none !important; }
@@ -131,11 +130,11 @@
     html.topic-view body > .section { max-width:1200px; min-height:100vh; padding-top:48px; }
     .topic-popup {
       position:fixed; inset:0; z-index:1000; display:none; align-items:center; justify-content:center;
-      padding:24px; background:rgba(3,10,22,.78); backdrop-filter:blur(8px);
+      padding:5vh 5vw; background:rgba(3,10,22,.78); backdrop-filter:blur(8px);
     }
     .topic-popup.open { display:flex; }
     .topic-popup-panel {
-      width:min(1200px,100%); height:min(900px,100%); background:var(--cream); border-radius:18px;
+      width:100%; height:100%; background:var(--cream); border-radius:18px;
       overflow:hidden; display:flex; flex-direction:column; box-shadow:0 28px 90px rgba(0,0,0,.45);
     }
     .topic-popup-head {
@@ -149,10 +148,11 @@
     .topic-popup-close:hover { background:var(--gold); }
     .topic-popup-frame { width:100%; flex:1; min-height:0; border:0; background:var(--cream); }
     html.popup-open, html.popup-open body { overflow:hidden; }
-    @media (max-width:600px) {
-      .topic-popup { padding:0; }
-      .topic-popup-panel { width:100%; height:100%; border-radius:0; }
-    }
+    .hero .partners { max-width:900px; margin:0 auto 18px; padding:13px 18px; border:1px solid rgba(230,184,76,.22); border-radius:14px; background:rgba(11,26,51,.52); }
+    .hero .partners::before, .hero .partners::after { width:36px; }
+    .hero .partners-label { margin-bottom:7px; font-size:10px; }
+    .hero .partners-track { gap:28px; }
+    .hero .partner-item { padding:6px 14px; font-size:13px; }
 
 /* ─── Mobile Hamburger ─── */
 .nav-burger {
@@ -1640,6 +1640,29 @@ body.dark .contact-item-label { color: #94a3b8; }
 <!-- Hero -->
 <section class="hero" id="top">
   <div class="hero-content">
+    <section class="partners" aria-label="Partner institutions and exam boards">
+      <div class="partners-label">Partner Institutions &amp; Exam Boards</div>
+      <div class="partners-track-wrap">
+        <div class="partners-track">
+          <a class="partner-item topic-window-link" href="partners.html#kasneb"><span class="partner-code">01</span>KASNEB</a>
+          <a class="partner-item topic-window-link" href="partners.html#abe"><span class="partner-code">02</span>ABE</a>
+          <a class="partner-item topic-window-link" href="partners.html#abma"><span class="partner-code">03</span>ABMA</a>
+          <a class="partner-item topic-window-link" href="partners.html#icm"><span class="partner-code">04</span>ICM (UK)</a>
+          <a class="partner-item topic-window-link" href="partners.html#ics"><span class="partner-code">05</span>ICS</a>
+          <a class="partner-item topic-window-link" href="partners.html#nita"><span class="partner-code">06</span>NITA</a>
+          <a class="partner-item topic-window-link" href="partners.html#iata"><span class="partner-code">07</span>IATA</a>
+          <a class="partner-item topic-window-link" href="partners.html#knec-prep"><span class="partner-code">08</span>KNEC Exam Prep</a>
+          <a class="partner-item topic-window-link" href="partners.html#kasneb" aria-hidden="true" tabindex="-1"><span class="partner-code">01</span>KASNEB</a>
+          <a class="partner-item topic-window-link" href="partners.html#abe" aria-hidden="true" tabindex="-1"><span class="partner-code">02</span>ABE</a>
+          <a class="partner-item topic-window-link" href="partners.html#abma" aria-hidden="true" tabindex="-1"><span class="partner-code">03</span>ABMA</a>
+          <a class="partner-item topic-window-link" href="partners.html#icm" aria-hidden="true" tabindex="-1"><span class="partner-code">04</span>ICM (UK)</a>
+          <a class="partner-item topic-window-link" href="partners.html#ics" aria-hidden="true" tabindex="-1"><span class="partner-code">05</span>ICS</a>
+          <a class="partner-item topic-window-link" href="partners.html#nita" aria-hidden="true" tabindex="-1"><span class="partner-code">06</span>NITA</a>
+          <a class="partner-item topic-window-link" href="partners.html#iata" aria-hidden="true" tabindex="-1"><span class="partner-code">07</span>IATA</a>
+          <a class="partner-item topic-window-link" href="partners.html#knec-prep" aria-hidden="true" tabindex="-1"><span class="partner-code">08</span>KNEC Exam Prep</a>
+        </div>
+      </div>
+    </section>
     <div class="hero-badge">Mombasa, Kenya</div>
     <h1>Skills. Knowledge.<br><span>Better Futures.</span></h1>
     <p class="hero-sub">
@@ -1673,33 +1696,6 @@ body.dark .contact-item-label { color: #94a3b8; }
     <div class="stat-lbl">Years of Excellence</div>
   </div>
 </div>
-
-<!-- Partners Ticker -->
-<section class="partners" aria-label="Partner institutions and exam boards">
-  <div class="partners-label">Partner Institutions & Exam Boards</div>
-  <div class="partners-track-wrap">
-    <div class="partners-track">
-      <!-- Loop 1 -->
-      <a class="partner-item" href="partners.html#kasneb"><span class="partner-code">01</span>KASNEB</a>
-      <a class="partner-item" href="partners.html#abe"><span class="partner-code">02</span>ABE</a>
-      <a class="partner-item" href="partners.html#abma"><span class="partner-code">03</span>ABMA</a>
-      <a class="partner-item" href="partners.html#icm"><span class="partner-code">04</span>ICM (UK)</a>
-      <a class="partner-item" href="partners.html#ics"><span class="partner-code">05</span>ICS</a>
-      <a class="partner-item" href="partners.html#nita"><span class="partner-code">06</span>NITA</a>
-      <a class="partner-item" href="partners.html#iata"><span class="partner-code">07</span>IATA</a>
-      <a class="partner-item" href="partners.html#knec-prep"><span class="partner-code">08</span>KNEC Exam Prep</a>
-      <!-- Loop 2 — exact copy for seamless scroll -->
-      <a class="partner-item" href="partners.html#kasneb"><span class="partner-code">01</span>KASNEB</a>
-      <a class="partner-item" href="partners.html#abe"><span class="partner-code">02</span>ABE</a>
-      <a class="partner-item" href="partners.html#abma"><span class="partner-code">03</span>ABMA</a>
-      <a class="partner-item" href="partners.html#icm"><span class="partner-code">04</span>ICM (UK)</a>
-      <a class="partner-item" href="partners.html#ics"><span class="partner-code">05</span>ICS</a>
-      <a class="partner-item" href="partners.html#nita"><span class="partner-code">06</span>NITA</a>
-      <a class="partner-item" href="partners.html#iata"><span class="partner-code">07</span>IATA</a>
-      <a class="partner-item" href="partners.html#knec-prep"><span class="partner-code">08</span>KNEC Exam Prep</a>
-    </div>
-  </div>
-</section>
 
 <!-- What Guides Us -->
 <section class="section" id="guides">
