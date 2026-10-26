@@ -2424,15 +2424,20 @@ async function loadPublicJobs() {
     if (!response.ok) throw new Error('Could not load job listings.');
     const jobs = await response.json();
     if (lecturerApplyNote) lecturerApplyNote.hidden = !jobs.some(job => /lectur/i.test(`${job.category || ''} ${job.title || ''}`));
-    grid.innerHTML = jobs.length ? jobs.map(job => `
-      <article class="job-card">
-        <span class="job-category">${materialEscape(job.category)}</span>
-        <h3>${materialEscape(job.title)}</h3>
-        <div class="job-meta">${[job.location, job.employment_type, job.closing_date ? `Apply by ${job.closing_date}` : ''].filter(Boolean).map(materialEscape).join(' · ')}</div>
-        <p>${materialEscape(job.description)}</p>
-        ${job.requirements ? `<p style="margin-top:12px"><strong>Requirements</strong><br>${materialEscape(job.requirements)}</p>` : ''}
-        <a class="job-apply" href="mailto:${encodeURIComponent(job.application_email)}?subject=${encodeURIComponent(`Application: ${job.title}`)}">Apply by email</a>
-      </article>`).join('') : '<p class="materials-empty">There are no open positions right now. Please check back soon.</p>';
+    grid.innerHTML = jobs.length ? jobs.map(job => {
+      const isLecturerJob = /lectur/i.test(`${job.category || ''} ${job.title || ''}`);
+      return `
+        <article class="job-card">
+          <span class="job-category">${materialEscape(job.category)}</span>
+          <h3>${materialEscape(job.title)}</h3>
+          <div class="job-meta">${[job.location, job.employment_type, job.closing_date ? `Apply by ${job.closing_date}` : ''].filter(Boolean).map(materialEscape).join(' · ')}</div>
+          <p>${materialEscape(job.description)}</p>
+          ${job.requirements ? `<p style="margin-top:12px"><strong>Requirements</strong><br>${materialEscape(job.requirements)}</p>` : ''}
+          ${isLecturerJob
+            ? '<a class="job-apply" href="lecturer-register.html">Apply to teach</a>'
+            : `<a class="job-apply" href="mailto:${encodeURIComponent(job.application_email)}?subject=${encodeURIComponent(`Application: ${job.title}`)}">Apply by email</a>`}
+        </article>`;
+    }).join('') : '<p class="materials-empty">There are no open positions right now. Please check back soon.</p>';
   } catch (error) {
     if (lecturerApplyNote) lecturerApplyNote.hidden = true;
     grid.innerHTML = '<p class="materials-empty">Job listings are temporarily unavailable.</p>';
