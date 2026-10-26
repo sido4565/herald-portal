@@ -1235,7 +1235,7 @@ async function openBulkAssignModal() {
   function jobFields(job = {}) {
     return [
       { name: 'title', label: 'Job title', value: job.title, required: true },
-      { name: 'category', label: 'Category (e.g. Lecturer, Administration, Other)', value: job.category || 'Lecturer', required: true },
+      { name: 'category', label: 'Category (e.g. Lecturer, Administration, Other)', value: job.category || 'Other', required: true },
       { name: 'location', label: 'Location', value: job.location },
       { name: 'employment_type', label: 'Employment type (e.g. Full-time, Part-time, Contract)', value: job.employment_type },
       { name: 'description', label: 'Job description', type: 'textarea', value: job.description, required: true },

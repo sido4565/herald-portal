@@ -91,7 +91,8 @@
 </head>
 <body>
   <div class="wrap">
-    <div id="formView">
+    <div class="body" id="applicationGate" role="status">Checking current lecturer vacancies…</div>
+    <div id="formView" style="display:none;">
       <div class="head">
         <img src="images/herald-logo.png" alt="Herald" />
         <h1>Lecturer Registration</h1>
@@ -209,8 +210,28 @@
       <script>
     document.addEventListener('DOMContentLoaded', () => {
       const form = document.getElementById('lecturerRegForm');
+      const formView = document.getElementById('formView');
+      const applicationGate = document.getElementById('applicationGate');
       const btn = document.getElementById('submitBtn');
       const msg = document.getElementById('formMsg');
+
+      fetch('/api/public/jobs')
+        .then(response => {
+          if (!response.ok) throw new Error('Vacancies could not be checked.');
+          return response.json();
+        })
+        .then(jobs => {
+          const vacancyOpen = jobs.some(job => /lectur/i.test(`${job.category || ''} ${job.title || ''}`));
+          if (vacancyOpen) {
+            formView.style.display = '';
+            applicationGate.style.display = 'none';
+          } else {
+            applicationGate.innerHTML = '<h2>No lecturer vacancies are open</h2><p>We are not accepting lecturer applications right now. Please check the <a href="welcome.html?view=jobs#jobs">Jobs section</a> again later.</p>';
+          }
+        })
+        .catch(() => {
+          applicationGate.innerHTML = '<h2>Vacancies unavailable</h2><p>We could not check current lecturer vacancies. Please try again later or return to the <a href="welcome.html">Herald website</a>.</p>';
+        });
 
       if (!form) {
         console.error("❌ Could not find form with id 'lecturerRegForm'");

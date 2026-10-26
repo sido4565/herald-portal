@@ -541,6 +541,17 @@ app.get('/api/me', authStudent, async (req, res) => {
   res.json(r.rows[0]);
 });
 
+async function hasOpenLecturerVacancy() {
+  const result = await db.execute({
+    sql: `SELECT id FROM jobs
+          WHERE is_published = 1
+            AND (closing_date IS NULL OR closing_date = '' OR closing_date >= date('now'))
+            AND (lower(category) LIKE '%lectur%' OR lower(title) LIKE '%lectur%')
+          LIMIT 1`,
+  });
+  return result.rows.length > 0;
+}
+
 app.get('/api/public/jobs', async (req, res) => {
   const r = await db.execute({
     sql: `SELECT id, title, category, location, employment_type, description, requirements,
@@ -1194,7 +1205,14 @@ app.get('/api/student/transcript/pdf', authStudent, async (req, res) => {
 });
 
 // ==================== LECTURER ROUTES ====================
-app.post('/api/lecturer/register', materialUpload.fields([
+app.post('/api/lecturer/register', async (req, res, next) => {
+  try {
+    if (!(await hasOpenLecturerVacancy())) {
+      return res.status(403).json({ error: 'Lecturer applications are closed because there is no open lecturer vacancy.' });
+    }
+    next();
+  } catch (err) { next(err); }
+}, materialUpload.fields([
   { name: 'cv', maxCount: 1 },
   { name: 'cover_letter', maxCount: 1 },
   { name: 'testimonials', maxCount: 1 }
