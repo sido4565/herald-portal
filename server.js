@@ -1020,12 +1020,13 @@ app.get('/api/student/transcript/pdf', authStudent, async (req, res) => {
     const student = sRes.rows[0];
 
     // 2. Fetch results
+    const selectedTerm = typeof req.query.term === 'string' ? req.query.term.trim() : '';
     const rRes = await db.execute({
       sql: `SELECT r.marks, r.grade, r.term, c.code AS course_code, c.title AS course_title
             FROM results r JOIN courses c ON c.id = r.course_id
-            WHERE r.student_id = ?
+            WHERE r.student_id = ?${selectedTerm ? ' AND r.term = ?' : ''}
             ORDER BY r.term ASC, c.code ASC`,
-      args: [req.user.id],
+      args: selectedTerm ? [req.user.id, selectedTerm] : [req.user.id],
     });
     const results = rRes.rows;
 
@@ -1034,7 +1035,11 @@ app.get('/api/student/transcript/pdf', authStudent, async (req, res) => {
 
     // Set response headers to trigger a file download
     res.setHeader('Content-Type', 'application/pdf');
-    res.setHeader('Content-Disposition', `attachment; filename="Herald-Transcript-${student.reg_no}.pdf"`);
+    const safeTerm = selectedTerm.replace(/[^\w.-]+/g, '-').replace(/^-|-$/g, '');
+    const transcriptName = safeTerm
+      ? `Herald-Transcript-${student.reg_no}-${safeTerm}.pdf`
+      : `Herald-Transcript-${student.reg_no}.pdf`;
+    res.setHeader('Content-Disposition', `attachment; filename="${transcriptName}"`);
 
     // Pipe the PDF directly to the response
     doc.pipe(res);

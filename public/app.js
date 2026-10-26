@@ -328,8 +328,21 @@ async function loadDashboard() {
   try {
     const resRes = await fetch('/api/results');
     const results = await resRes.json();
-    document.querySelector('#resultsTable tbody').innerHTML = results.length
-      ? results.map(r => `
+    const semesterSelect = document.getElementById('resultsSemester');
+    const resultsBody = document.querySelector('#resultsTable tbody');
+    const transcriptLink = document.getElementById('downloadTranscriptBtn');
+    const semesters = [...new Set(results.map(r => r.term).filter(Boolean))].sort((a, b) => a.localeCompare(b));
+    semesters.forEach(term => {
+      const option = document.createElement('option');
+      option.value = term;
+      option.textContent = term;
+      semesterSelect.appendChild(option);
+    });
+    const renderResults = () => {
+      const selectedTerm = semesterSelect.value;
+      const filtered = selectedTerm ? results.filter(r => r.term === selectedTerm) : results;
+      resultsBody.innerHTML = filtered.length
+        ? filtered.map(r => `
           <tr>
             <td>${esc(r.code)}</td>
             <td>${esc(r.title)}</td>
@@ -338,7 +351,12 @@ async function loadDashboard() {
             <td><strong>${esc(r.grade)}</strong></td>
           </tr>
         `).join('')
-      : '<tr><td colspan="5" class="empty">No results published yet.</td></tr>';
+        : '<tr><td colspan="5" class="empty">No results recorded for this semester.</td></tr>';
+      transcriptLink.href = `/api/student/transcript/pdf${selectedTerm ? `?term=${encodeURIComponent(selectedTerm)}` : ''}`;
+      transcriptLink.setAttribute('aria-label', selectedTerm ? `Download ${selectedTerm} transcript PDF` : 'Download transcript PDF for all semesters');
+    };
+    semesterSelect.addEventListener('change', renderResults);
+    renderResults();
   } catch (e) { console.error(e); }
 
   // ─── Fees ───
@@ -567,20 +585,6 @@ async function loadDashboard() {
     }
   } catch (e) { console.error('materials load', e); }
 
-  // ─── Transcript Download ───
-  const dlBtn = document.getElementById('downloadTranscriptBtn');
-  if (dlBtn) {
-    dlBtn.addEventListener('click', async () => {
-      try {
-        const res = await fetch('/api/my-transcript');
-        if (!res.ok) throw new Error('Failed to load transcript');
-        const data = await res.json();
-        generateTranscriptHTML(data);
-      } catch (e) {
-        toast('Could not generate transcript: ' + e.message, 'error');
-      }
-    });
-  }
 }
 
 // ============================================================

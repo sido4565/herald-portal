@@ -182,9 +182,15 @@
       <section class="card wide" id="academic-results">
         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
           <h3 style="margin:0;">Academic Results</h3>
-          <a href="/api/student/transcript/pdf" class="btn-primary" style="text-decoration:none; padding: 8px 16px; font-size: 12px; border-radius: 6px;">
+          <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
+            <label for="resultsSemester" style="font-size:13px;">Semester</label>
+            <select id="resultsSemester" aria-label="Select semester" style="padding:8px 10px; border:1px solid var(--border-soft); border-radius:6px; background:var(--surface); color:var(--text);">
+              <option value="">All semesters</option>
+            </select>
+          <a id="downloadTranscriptBtn" href="/api/student/transcript/pdf" class="btn-primary" style="text-decoration:none; padding: 8px 16px; font-size: 12px; border-radius: 6px;">
             📥 Download PDF Transcript
           </a>
+          </div>
         </div>
         <div class="table-wrap">
           <table id="resultsTable">

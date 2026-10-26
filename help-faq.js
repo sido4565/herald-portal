@@ -138,7 +138,7 @@ const FAQ = [
     id: 'exams-results',
     keywords: ['results', 'marks', 'grades', 'score', 'exam results', 'grade'],
     question: 'Where do I see my exam results?',
-    answer: 'Log in to your Student Dashboard → "Academic Results" table shows all completed exams with course code, term, marks, and grade. For a printable summary, click "Download PDF Transcript" at the top of the Academic Results section.',
+    answer: 'Log in to your Student Dashboard → "Academic Results". Select a semester to view its course results, or choose "All semesters" to view all results. Download the PDF transcript to get the selected semester (or all semesters).',
     category: 'exams',
   },
   {
@@ -154,7 +154,7 @@ const FAQ = [
     id: 'transcript-download',
     keywords: ['transcript', 'download transcript', 'pdf transcript', 'academic transcript'],
     question: 'How do I download my transcript?',
-    answer: 'Log in to your Student Dashboard → "Academic Results" card → click "📥 Download PDF Transcript" (top-right of that section). The PDF includes all completed courses, marks, and grades. If the button does not work, try a different browser (Chrome/Firefox recommended) or disable any ad blocker.',
+    answer: 'Log in to your Student Dashboard → "Academic Results" card → select the semester you want, then click "📥 Download PDF Transcript". Choose "All semesters" to download the full transcript.',
     category: 'certificates',
   },
   {
