@@ -23,14 +23,6 @@
   <meta property="og:type" content="website" />
   <meta property="og:url" content="https://herald-portal.onrender.com/" />
   <meta name="twitter:card" content="summary_large_image" />
-  <script>
-    (() => {
-      const views = ['guides', 'services', 'courses', 'materials', 'jobs', 'logins', 'contact'];
-      const view = new URLSearchParams(location.search).get('view');
-      document.documentElement.classList.add(views.includes(view) ? 'topic-view' : 'landing-home');
-      if (views.includes(view)) document.documentElement.dataset.topic = view;
-    })();
-  </script>
   <style>
     :root {
       --navy: #0b1a33;
@@ -114,48 +106,6 @@
     .portal-login-card:hover { transform:translateY(-4px); border-color:var(--gold); }
     .portal-login-card h3 { color:var(--navy); margin:0; font-size:20px; }
 
-    html.landing-home, html.landing-home body { height:100%; overflow:hidden; }
-    html.landing-home .stats,
-    html.landing-home .section,
-    html.landing-home .site-footer,
-    html.landing-home .back-to-top { display:none !important; }
-    html.topic-view .nav,
-    html.topic-view .mobile-menu,
-    html.topic-view .mobile-backdrop,
-    html.topic-view .hero,
-    html.topic-view .stats,
-    html.topic-view .partners,
-    html.topic-view .site-footer,
-    html.topic-view .back-to-top,
-    html.topic-view body > .section { display:none !important; }
-    html.topic-view #guides[data-topic="guides"],
-    html.topic-view #services[data-topic="services"],
-    html.topic-view #courses[data-topic="courses"],
-    html.topic-view #materials[data-topic="materials"],
-    html.topic-view #jobs[data-topic="jobs"],
-    html.topic-view #logins[data-topic="logins"],
-    html.topic-view #contact[data-topic="contact"] { display:block !important; }
-    html.topic-view body > .section { max-width:1200px; min-height:100vh; padding-top:48px; }
-    .topic-popup {
-      position:fixed; inset:0; z-index:1000; display:none; align-items:center; justify-content:center;
-      padding:5vh 5vw; background:rgba(3,10,22,.78); backdrop-filter:blur(8px);
-    }
-    .topic-popup.open { display:flex; }
-    .topic-popup-panel {
-      width:100%; height:100%; background:var(--cream); border-radius:18px;
-      overflow:hidden; display:flex; flex-direction:column; box-shadow:0 28px 90px rgba(0,0,0,.45);
-    }
-    .topic-popup-head {
-      min-height:54px; display:flex; justify-content:flex-end; align-items:center; padding:8px 14px;
-      background:var(--navy); color:white;
-    }
-    .topic-popup-close {
-      border:0; border-radius:8px; padding:8px 14px; color:white; background:rgba(255,255,255,.12);
-      font:inherit; font-size:14px; font-weight:600; cursor:pointer;
-    }
-    .topic-popup-close:hover { background:var(--gold); }
-    .topic-popup-frame { width:100%; flex:1; min-height:0; border:0; background:var(--cream); }
-    html.popup-open, html.popup-open body { overflow:hidden; }
     .hero .partners { max-width:900px; margin:0 auto 18px; padding:13px 18px; border:1px solid rgba(230,184,76,.22); border-radius:14px; background:rgba(11,26,51,.52); }
     .hero .partners::before, .hero .partners::after { width:36px; }
     .hero .partners-label { margin-bottom:7px; font-size:10px; }
@@ -176,10 +126,6 @@
       .hero-cta .btn-gold, .hero-cta .btn-outline-white { padding:12px 18px; }
       .portal-login-grid { grid-template-columns:1fr; }
       .lecturer-apply-note { align-items:flex-start; }
-    }
-    @media (max-height:620px) and (max-width:900px) {
-      html.landing-home, html.landing-home body { height:auto; min-height:100%; overflow-y:auto; }
-      html.landing-home .hero { align-items:flex-start; }
     }
 
 /* ─── Mobile Hamburger ─── */
@@ -1612,14 +1558,14 @@ body.dark .contact-item-label { color: #94a3b8; }
 
   <!-- Desktop links -->
   <ul class="nav-links">
-    <li><a class="topic-window-link" href="welcome.html?view=guides#guides">What Guides Us</a></li>
-    <li><a class="topic-window-link" href="welcome.html?view=services#services">Services</a></li>
-    <li><a class="topic-window-link" href="welcome.html?view=courses#courses">Courses</a></li>
-    <li><a class="topic-window-link" href="welcome.html?view=materials#materials">Books &amp; Materials</a></li>
-    <li><a class="topic-window-link" href="welcome.html?view=logins#logins">Logins</a></li>
-    <li><a class="topic-window-link" href="partners.html">Partners</a></li>
-    <li><a class="topic-window-link" href="welcome.html?view=jobs#jobs">Jobs</a></li>
-    <li><a class="topic-window-link" href="welcome.html?view=contact#contact">Contact</a></li>
+    <li><a href="#guides">What Guides Us</a></li>
+    <li><a href="#services">Services</a></li>
+    <li><a href="#courses">Courses</a></li>
+    <li><a href="#materials">Books &amp; Materials</a></li>
+    <li><a href="#logins">Logins</a></li>
+    <li><a href="#partners">Partners</a></li>
+    <li><a href="#jobs">Jobs</a></li>
+    <li><a href="#contact">Contact</a></li>
   </ul>
 
   <!-- Desktop CTA -->
@@ -1638,56 +1584,47 @@ body.dark .contact-item-label { color: #94a3b8; }
     <button class="mobile-menu-close" id="mobileMenuClose" aria-label="Close menu">×</button>
   </div>
   <ul class="mobile-menu-links">
-    <li><a class="topic-window-link" href="welcome.html?view=guides#guides"><span>01</span>What Guides Us</a></li>
-    <li><a class="topic-window-link" href="welcome.html?view=services#services"><span>02</span>Services</a></li>
-    <li><a class="topic-window-link" href="welcome.html?view=courses#courses"><span>03</span>Courses</a></li>
-    <li><a class="topic-window-link" href="welcome.html?view=materials#materials"><span>04</span>Books &amp; Materials</a></li>
-    <li><a class="topic-window-link" href="welcome.html?view=logins#logins"><span>05</span>Logins</a></li>
-    <li><a class="topic-window-link" href="partners.html"><span>06</span>Partners</a></li>
-    <li><a class="topic-window-link" href="welcome.html?view=jobs#jobs"><span>07</span>Jobs</a></li>
-    <li><a class="topic-window-link" href="welcome.html?view=contact#contact"><span>08</span>Contact</a></li>
+    <li><a href="#guides"><span>01</span>What Guides Us</a></li>
+    <li><a href="#services"><span>02</span>Services</a></li>
+    <li><a href="#courses"><span>03</span>Courses</a></li>
+    <li><a href="#materials"><span>04</span>Books &amp; Materials</a></li>
+    <li><a href="#logins"><span>05</span>Logins</a></li>
+    <li><a href="#partners"><span>06</span>Partners</a></li>
+    <li><a href="#jobs"><span>07</span>Jobs</a></li>
+    <li><a href="#contact"><span>08</span>Contact</a></li>
   </ul>
   <div class="mobile-menu-cta">
     <a href="register.html" class="btn-gold" style="display:block; text-align:center;">Enroll Now</a>
-    <a href="welcome.html?view=logins#logins" class="btn-outline-white topic-window-link" style="display:block; text-align:center; margin-top:10px;">All Logins →</a>
+    <a href="#logins" class="btn-outline-white" style="display:block; text-align:center; margin-top:10px;">All Logins →</a>
   </div>
 </div>
 
 <!-- Backdrop -->
 <div class="mobile-backdrop" id="mobileBackdrop"></div>
 
-<div class="topic-popup" id="topicPopup" aria-hidden="true">
-  <div class="topic-popup-panel" role="dialog" aria-modal="true" aria-label="Website section">
-    <div class="topic-popup-head">
-      <button class="topic-popup-close" id="topicPopupClose" type="button" aria-label="Close popup">Close ✕</button>
-    </div>
-    <iframe class="topic-popup-frame" id="topicPopupFrame" title="Selected Herald website section"></iframe>
-  </div>
-</div>
-
 <!-- Hero -->
 <section class="hero" id="top">
   <div class="hero-content">
-    <section class="partners" aria-label="Partner institutions and exam boards">
+    <section class="partners" id="partners" aria-label="Partner institutions and exam boards">
       <div class="partners-label">Partner Institutions &amp; Exam Boards</div>
       <div class="partners-track-wrap">
         <div class="partners-track">
-          <a class="partner-item topic-window-link" href="partners.html#kasneb"><span class="partner-code">01</span>KASNEB</a>
-          <a class="partner-item topic-window-link" href="partners.html#abe"><span class="partner-code">02</span>ABE</a>
-          <a class="partner-item topic-window-link" href="partners.html#abma"><span class="partner-code">03</span>ABMA</a>
-          <a class="partner-item topic-window-link" href="partners.html#icm"><span class="partner-code">04</span>ICM (UK)</a>
-          <a class="partner-item topic-window-link" href="partners.html#ics"><span class="partner-code">05</span>ICS</a>
-          <a class="partner-item topic-window-link" href="partners.html#nita"><span class="partner-code">06</span>NITA</a>
-          <a class="partner-item topic-window-link" href="partners.html#iata"><span class="partner-code">07</span>IATA</a>
-          <a class="partner-item topic-window-link" href="partners.html#knec-prep"><span class="partner-code">08</span>KNEC Exam Prep</a>
-          <a class="partner-item topic-window-link" href="partners.html#kasneb" aria-hidden="true" tabindex="-1"><span class="partner-code">01</span>KASNEB</a>
-          <a class="partner-item topic-window-link" href="partners.html#abe" aria-hidden="true" tabindex="-1"><span class="partner-code">02</span>ABE</a>
-          <a class="partner-item topic-window-link" href="partners.html#abma" aria-hidden="true" tabindex="-1"><span class="partner-code">03</span>ABMA</a>
-          <a class="partner-item topic-window-link" href="partners.html#icm" aria-hidden="true" tabindex="-1"><span class="partner-code">04</span>ICM (UK)</a>
-          <a class="partner-item topic-window-link" href="partners.html#ics" aria-hidden="true" tabindex="-1"><span class="partner-code">05</span>ICS</a>
-          <a class="partner-item topic-window-link" href="partners.html#nita" aria-hidden="true" tabindex="-1"><span class="partner-code">06</span>NITA</a>
-          <a class="partner-item topic-window-link" href="partners.html#iata" aria-hidden="true" tabindex="-1"><span class="partner-code">07</span>IATA</a>
-          <a class="partner-item topic-window-link" href="partners.html#knec-prep" aria-hidden="true" tabindex="-1"><span class="partner-code">08</span>KNEC Exam Prep</a>
+          <a class="partner-item" href="partners.html#kasneb"><span class="partner-code">01</span>KASNEB</a>
+          <a class="partner-item" href="partners.html#abe"><span class="partner-code">02</span>ABE</a>
+          <a class="partner-item" href="partners.html#abma"><span class="partner-code">03</span>ABMA</a>
+          <a class="partner-item" href="partners.html#icm"><span class="partner-code">04</span>ICM (UK)</a>
+          <a class="partner-item" href="partners.html#ics"><span class="partner-code">05</span>ICS</a>
+          <a class="partner-item" href="partners.html#nita"><span class="partner-code">06</span>NITA</a>
+          <a class="partner-item" href="partners.html#iata"><span class="partner-code">07</span>IATA</a>
+          <a class="partner-item" href="partners.html#knec-prep"><span class="partner-code">08</span>KNEC Exam Prep</a>
+          <a class="partner-item" href="partners.html#kasneb" aria-hidden="true" tabindex="-1"><span class="partner-code">01</span>KASNEB</a>
+          <a class="partner-item" href="partners.html#abe" aria-hidden="true" tabindex="-1"><span class="partner-code">02</span>ABE</a>
+          <a class="partner-item" href="partners.html#abma" aria-hidden="true" tabindex="-1"><span class="partner-code">03</span>ABMA</a>
+          <a class="partner-item" href="partners.html#icm" aria-hidden="true" tabindex="-1"><span class="partner-code">04</span>ICM (UK)</a>
+          <a class="partner-item" href="partners.html#ics" aria-hidden="true" tabindex="-1"><span class="partner-code">05</span>ICS</a>
+          <a class="partner-item" href="partners.html#nita" aria-hidden="true" tabindex="-1"><span class="partner-code">06</span>NITA</a>
+          <a class="partner-item" href="partners.html#iata" aria-hidden="true" tabindex="-1"><span class="partner-code">07</span>IATA</a>
+          <a class="partner-item" href="partners.html#knec-prep" aria-hidden="true" tabindex="-1"><span class="partner-code">08</span>KNEC Exam Prep</a>
         </div>
       </div>
     </section>
@@ -1699,7 +1636,7 @@ body.dark .contact-item-label { color: #94a3b8; }
     </p>
     <div class="hero-cta">
       <a href="register.html" class="btn-gold">Enroll Now</a>
-      <a href="welcome.html?view=courses#courses" class="btn-outline-white topic-window-link">View Courses</a>
+      <a href="#courses" class="btn-outline-white">View Courses</a>
     </div>
   </div>
 </section>
@@ -2285,21 +2222,39 @@ backToTop.addEventListener('click', () => {
 // ═══════════════════════════════════════════════════════════
 // Smooth scroll for nav
 // ═══════════════════════════════════════════════════════════
-document.querySelectorAll('.nav-links a, .hero-cta a[href^="#"]').forEach(link => {
+document.querySelectorAll('.nav-links a[href^="#"], .mobile-menu-links a[href^="#"], .hero-cta a[href^="#"]').forEach(link => {
   link.addEventListener('click', (e) => {
-    if (link.target === '_blank') return;
     const href = link.getAttribute('href');
     if (href.startsWith('#') && href.length > 1) {
       e.preventDefault();
-      const target = document.querySelector(href);
-      if (target) {
-        const offset = 80;
-        const top = target.getBoundingClientRect().top + window.scrollY - offset;
-        window.scrollTo({ top, behavior: 'smooth' });
+      if (document.getElementById(href.slice(1))) {
+        if (window.location.hash !== href) history.pushState({ section: href.slice(1) }, '', href);
+        scrollToSection(href, 'smooth');
       }
     }
   });
 });
+
+function scrollToSection(hash, behavior = 'smooth') {
+  const target = document.getElementById(decodeURIComponent(hash.slice(1)));
+  if (!target) return;
+  const offset = document.getElementById('nav')?.offsetHeight || 80;
+  const top = target.getBoundingClientRect().top + window.scrollY - offset;
+  window.scrollTo({ top: Math.max(0, top), behavior });
+}
+
+window.addEventListener('popstate', () => {
+  if (window.location.hash) scrollToSection(window.location.hash, 'smooth');
+  else window.scrollTo({ top: 0, behavior: 'smooth' });
+});
+
+window.addEventListener('hashchange', () => {
+  if (window.location.hash) scrollToSection(window.location.hash, 'smooth');
+});
+
+if (window.location.hash) {
+  requestAnimationFrame(() => scrollToSection(window.location.hash, 'auto'));
+}
 
 // ═══════════════════════════════════════════════════════════
 // Mobile menu
@@ -2447,42 +2402,6 @@ document.querySelectorAll('.nav-links a, .hero-cta a[href^="#"]').forEach(link =
 // ═══════════════════════════════════════════════════════════
 // Init — render tabs and courses on page load
 // ═══════════════════════════════════════════════════════════
-if (document.documentElement.classList.contains('topic-view')) {
-  const topic = document.documentElement.dataset.topic;
-  document.getElementById(topic)?.setAttribute('data-topic', topic);
-}
-
-document.querySelectorAll('.topic-window-link').forEach(link => {
-  link.addEventListener('click', event => {
-    event.preventDefault();
-    const popup = document.getElementById('topicPopup');
-    const frame = document.getElementById('topicPopupFrame');
-    if (!popup || !frame) return;
-    frame.src = link.href;
-    popup.classList.add('open');
-    popup.setAttribute('aria-hidden', 'false');
-    document.documentElement.classList.add('popup-open');
-    document.getElementById('topicPopupClose')?.focus();
-  });
-});
-
-function closeTopicPopup() {
-  const popup = document.getElementById('topicPopup');
-  const frame = document.getElementById('topicPopupFrame');
-  if (!popup) return;
-  popup.classList.remove('open');
-  popup.setAttribute('aria-hidden', 'true');
-  document.documentElement.classList.remove('popup-open');
-  if (frame) frame.src = 'about:blank';
-}
-document.getElementById('topicPopupClose')?.addEventListener('click', closeTopicPopup);
-document.getElementById('topicPopup')?.addEventListener('click', event => {
-  if (event.target.id === 'topicPopup') closeTopicPopup();
-});
-document.addEventListener('keydown', event => {
-  if (event.key === 'Escape' && document.getElementById('topicPopup')?.classList.contains('open')) closeTopicPopup();
-});
-
 renderTabs();
 renderCourses();
 
