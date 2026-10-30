@@ -214,6 +214,7 @@ if ($('#adminName')) {
         <td><span class="pill ${l.status === 'active' ? 'pill-green' : l.status === 'suspended' ? 'pill-red' : 'pill-amber'}">${esc(l.status)}</span></td>
         <td>
           <button class="btn-xs" data-act="assign-courses" data-id="${l.id}" data-name="${esc(l.name)}" type="button">📚 Assign Courses</button>
+          <button class="btn-xs" data-act="reset-lecturer-pw" data-id="${l.id}" data-name="${esc(l.name)}" type="button">Reset Password</button>
           ${l.status === 'active'
             ? `<button class="btn-xs danger" data-act="suspend-lect" data-id="${l.id}" type="button">Suspend</button>`
             : `<button class="btn-xs" data-act="reactivate-lect" data-id="${l.id}" type="button">Reactivate</button>`}
@@ -327,6 +328,7 @@ if ($('#adminName')) {
         if (act === 'reactivate-lect') { await api(`/api/admin/lecturers/${id}/reactivate`, { method: 'POST' }); toast('Lecturer reactivated'); }
         if (act === 'delete-lect')     { if (!confirm('Delete permanently?')) return; await api(`/api/admin/lecturers/${id}`, { method: 'DELETE' }); toast('Lecturer deleted'); }
         if (act === 'assign-courses')  { return openAssignCoursesModal(id, btn.dataset.name); }
+        if (act === 'reset-lecturer-pw') { return resetLecturerPwd(id, btn.dataset.name); }
         await loadLecturers();
       } catch (err) { toast(err.message, 'error'); }
     };
@@ -827,8 +829,18 @@ if (addLectBtn) {
     if (!pwd) return;
     if (pwd.length < 6) return toast('Password must be at least 6 characters', 'error');
     try {
-      await api(`/api/admin/students/${id}/reset-password`, { method: 'POST', body: { newPassword: pwd } });
-      toast('Password reset successfully.');
+      const result = await api(`/api/admin/students/${id}/reset-password`, { method: 'POST', body: { newPassword: pwd } });
+      toast(`Password reset and emailed to ${result.email}.`);
+    } catch (e) { toast(e.message, 'error'); }
+  }
+
+  async function resetLecturerPwd(id, name) {
+    const pwd = prompt(`New password for ${name} (minimum 6 characters):`);
+    if (!pwd) return;
+    if (pwd.length < 6) return toast('Password must be at least 6 characters', 'error');
+    try {
+      const result = await api(`/api/admin/lecturers/${id}/reset-password`, { method: 'POST', body: { newPassword: pwd } });
+      toast(`Password reset and emailed to ${result.email}.`);
     } catch (e) { toast(e.message, 'error'); }
   }
 

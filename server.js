@@ -1979,6 +1979,40 @@ app.delete('/api/admin/lecturers/:id', authAdmin, async (req, res) => {
   }
 });
 
+app.post('/api/admin/lecturers/:id/reset-password', authAdmin, async (req, res) => {
+  const { newPassword } = req.body;
+  if (typeof newPassword !== 'string' || newPassword.length < 6) {
+    return res.status(400).json({ error: 'Password must be at least 6 characters.' });
+  }
+  if (!mailer || !mailer.ENABLED || typeof mailer.sendMail !== 'function') {
+    return res.status(503).json({ error: 'Password reset email is unavailable. Configure the mailer and try again.' });
+  }
+  try {
+    const lr = await db.execute({ sql: 'SELECT name, email, staff_no, password FROM lecturers WHERE id = ?', args: [req.params.id] });
+    const lecturer = lr.rows[0];
+    if (!lecturer) return res.status(404).json({ error: 'Lecturer not found.' });
+
+    const previousHash = lecturer.password;
+    const newHash = bcrypt.hashSync(newPassword, 10);
+    await db.execute({ sql: 'UPDATE lecturers SET password = ? WHERE id = ?', args: [newHash, req.params.id] });
+    try {
+      await mailer.sendMail({
+        to: lecturer.email,
+        subject: 'Your Herald Portal lecturer password has been reset',
+        text: `Hello ${lecturer.name}, your lecturer password has been reset by an administrator. Your new password is: ${newPassword}\nStaff No: ${lecturer.staff_no}`,
+        html: `<h2>Password Reset</h2><p>Hello ${lecturer.name},</p><p>An administrator reset your lecturer account password.</p><p>New password: <code>${newPassword}</code></p><p>Staff No: ${lecturer.staff_no}</p>`,
+      });
+    } catch (mailError) {
+      await db.execute({ sql: 'UPDATE lecturers SET password = ? WHERE id = ?', args: [previousHash, req.params.id] });
+      throw mailError;
+    }
+    res.json({ ok: true, email: lecturer.email });
+  } catch (err) {
+    console.error('Lecturer password reset failed:', err.message);
+    res.status(502).json({ error: 'Password reset email could not be sent. The password was not changed. Please try again.' });
+  }
+});
+
 app.post('/api/admin/lecturers', authAdmin, async (req, res) => {
   const { name, email, phone, password, qualification, specialization, bio } = req.body;
   if (!name || !email || !password) {
@@ -2210,23 +2244,33 @@ app.delete('/api/admin/students/:id', authAdmin, async (req, res) => {
 
 app.post('/api/admin/students/:id/reset-password', authAdmin, async (req, res) => {
   const { newPassword } = req.body;
-  if (!newPassword || newPassword.length < 6) return res.status(400).json({ error: 'Password must be at least 6 characters.' });
-  await db.execute({
-    sql: 'UPDATE students SET password = ? WHERE id = ?',
-    args: [bcrypt.hashSync(newPassword, 10), req.params.id],
-  });
-  const sr = await db.execute({ sql: 'SELECT name, email, reg_no FROM students WHERE id = ?', args: [req.params.id] });
-  const student = sr.rows[0];
-  if (student) {
-    sendMailSafe('sendMail', {
-      to: student.email,
-      subject: 'Your Herald Portal password has been reset',
-      html: `<h2>Password Reset</h2><p>Hello ${student.name},</p>
-             <p>New password: <code>${newPassword}</code></p>
-             <p>Reg No: ${student.reg_no}</p>`,
-    });
+  if (typeof newPassword !== 'string' || newPassword.length < 6) return res.status(400).json({ error: 'Password must be at least 6 characters.' });
+  if (!mailer || !mailer.ENABLED || typeof mailer.sendMail !== 'function') {
+    return res.status(503).json({ error: 'Password reset email is unavailable. Configure the mailer and try again.' });
   }
-  res.json({ ok: true });
+  try {
+    const sr = await db.execute({ sql: 'SELECT name, email, reg_no, password FROM students WHERE id = ?', args: [req.params.id] });
+    const student = sr.rows[0];
+    if (!student) return res.status(404).json({ error: 'Student not found.' });
+    const previousHash = student.password;
+    const newHash = bcrypt.hashSync(newPassword, 10);
+    await db.execute({ sql: 'UPDATE students SET password = ? WHERE id = ?', args: [newHash, req.params.id] });
+    try {
+      await mailer.sendMail({
+        to: student.email,
+        subject: 'Your Herald Portal password has been reset',
+        text: `Hello ${student.name}, your portal password has been reset by an administrator. Your new password is: ${newPassword}\nReg No: ${student.reg_no}`,
+        html: `<h2>Password Reset</h2><p>Hello ${student.name},</p><p>An administrator reset your account password.</p><p>New password: <code>${newPassword}</code></p><p>Reg No: ${student.reg_no}</p>`,
+      });
+    } catch (mailError) {
+      await db.execute({ sql: 'UPDATE students SET password = ? WHERE id = ?', args: [previousHash, req.params.id] });
+      throw mailError;
+    }
+    res.json({ ok: true, email: student.email });
+  } catch (err) {
+    console.error('Student password reset failed:', err.message);
+    res.status(502).json({ error: 'Password reset email could not be sent. The password was not changed. Please try again.' });
+  }
 });
 
 app.post('/api/admin/send-fee-reminders', authAdmin, async (req, res) => {
