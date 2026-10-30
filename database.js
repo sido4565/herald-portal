@@ -37,6 +37,16 @@ async function initSchema() {
       role TEXT DEFAULT 'trainer',
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP
     )`,
+    `CREATE TABLE IF NOT EXISTS password_reset_requests (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      account_type TEXT NOT NULL CHECK(account_type IN ('student', 'lecturer')),
+      account_id INTEGER NOT NULL,
+      email TEXT NOT NULL,
+      status TEXT NOT NULL DEFAULT 'pending' CHECK(status IN ('pending', 'approved', 'rejected')),
+      requested_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      resolved_at DATETIME,
+      resolved_by INTEGER
+    )`,
         `CREATE TABLE IF NOT EXISTS lecturers (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       staff_no TEXT UNIQUE NOT NULL,

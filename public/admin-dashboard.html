@@ -38,6 +38,7 @@
       <button class="admin-tab" data-panel="students" type="button">Students</button>
       <button class="admin-tab" data-panel="admissions" type="button">Admissions</button> 
       <button class="admin-tab" data-panel="lecturers" type="button">Lecturers</button>
+      <button class="admin-tab" data-panel="password-resets" type="button">Password Requests</button>
       <button class="admin-tab" data-panel="courses" type="button">Courses</button>
       <button class="admin-tab" data-panel="announcements" type="button">Announcements</button>
       <button class="admin-tab" data-panel="jobs" type="button">Jobs</button>
@@ -98,6 +99,17 @@
       <div class="table-wrap">
         <table id="lecturersTable">
           <thead><tr><th>Staff No</th><th>Name</th><th>Email</th><th>Qualification</th><th>Status</th><th>Actions</th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="admin-panel" id="panel-password-resets">
+      <div class="panel-head"><h2>Pending Password Reset Requests</h2></div>
+      <p style="color:var(--muted);margin-top:-8px;">Approving a request creates a temporary password and emails it to the account’s registered address.</p>
+      <div class="table-wrap">
+        <table id="passwordResetRequestsTable">
+          <thead><tr><th>Account</th><th>Name</th><th>Email</th><th>Requested</th><th>Actions</th></tr></thead>
           <tbody></tbody>
         </table>
       </div>

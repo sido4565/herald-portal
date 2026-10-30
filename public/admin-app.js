@@ -156,6 +156,7 @@ if ($('#adminName')) {
     switch (name) {
       case 'overview':      return loadOverview();
       case 'lecturers':     return loadLecturers();
+      case 'password-resets': return loadPasswordResetRequests();
       case 'students':      return loadStudents();
       case 'admissions':    return loadAdmissions(); // <-- NEW
       case 'courses':       return loadCourses();
@@ -224,6 +225,42 @@ if ($('#adminName')) {
     `).join('') || '<tr><td colspan="6" class="empty">No approved lecturers.</td></tr>';
 
     wireLecturerActions();
+  }
+
+  async function loadPasswordResetRequests() {
+    const requests = await api('/api/admin/password-reset-requests');
+    const tbody = $('#passwordResetRequestsTable tbody');
+    tbody.innerHTML = requests.map(r => `
+      <tr>
+        <td>${esc(r.account_number || '—')}<br><span class="pill pill-amber">${esc(r.account_type)}</span></td>
+        <td>${esc(r.name || '—')}</td>
+        <td>${esc(r.email)}</td>
+        <td>${r.requested_at ? new Date(r.requested_at).toLocaleString() : '—'}</td>
+        <td>
+          <button class="btn-xs" data-reset-request-act="approve" data-id="${r.id}" type="button">Approve & Email</button>
+          <button class="btn-xs danger" data-reset-request-act="reject" data-id="${r.id}" type="button">Reject</button>
+        </td>
+      </tr>`).join('') || '<tr><td colspan="5" class="empty">No pending password reset requests.</td></tr>';
+    tbody.onclick = async event => {
+      const button = event.target.closest('button[data-reset-request-act]');
+      if (!button) return;
+      const action = button.dataset.resetRequestAct;
+      if (action === 'approve' && !confirm('Approve this reset? A temporary password will be emailed to the account address.')) return;
+      button.disabled = true;
+      try {
+        if (action === 'approve') {
+          const result = await api(`/api/admin/password-reset-requests/${button.dataset.id}/approve`, { method: 'POST' });
+          toast(`Reset approved and temporary password emailed to ${result.email}.`);
+        } else {
+          await api(`/api/admin/password-reset-requests/${button.dataset.id}/reject`, { method: 'POST' });
+          toast('Password reset request rejected.');
+        }
+        await loadPasswordResetRequests();
+      } catch (err) {
+        toast(err.message, 'error');
+        button.disabled = false;
+      }
+    };
   }
 
   // ---------- Assign Courses to Lecturer Modal ----------

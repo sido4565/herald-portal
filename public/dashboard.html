@@ -212,6 +212,17 @@
         <ul id="assignments" class="list"></ul>
       </section>
     </div>
+    <section class="card" style="margin:20px 0;max-width:560px;">
+      <h3>Change Password</h3>
+      <form id="studentPasswordForm">
+        <label for="currentStudentPassword">Current password</label>
+        <input id="currentStudentPassword" name="currentPassword" type="password" autocomplete="current-password" required />
+        <label for="newStudentPassword">New password (minimum 6 characters)</label>
+        <input id="newStudentPassword" name="newPassword" type="password" minlength="6" autocomplete="new-password" required />
+        <button class="btn-primary" type="submit" style="margin-top:12px;">Change Password</button>
+        <p id="studentPasswordMsg" class="msg" aria-live="polite"></p>
+      </form>
+    </section>
   </main>
 
   <div id="toastWrap" class="toast-wrap"></div>
@@ -267,6 +278,35 @@
     })();
   </script>
 
+  <script>
+    document.getElementById('studentPasswordForm').addEventListener('submit', async event => {
+      event.preventDefault();
+      const form = event.currentTarget;
+      const button = form.querySelector('button');
+      const message = document.getElementById('studentPasswordMsg');
+      button.disabled = true;
+      message.className = 'msg';
+      message.textContent = '';
+      try {
+        const response = await fetch('/api/student/change-password', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'same-origin',
+          body: JSON.stringify(Object.fromEntries(new FormData(form))),
+        });
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.error || 'Could not change password.');
+        message.className = 'msg success';
+        message.textContent = 'Password changed successfully.';
+        form.reset();
+      } catch (error) {
+        message.className = 'msg error';
+        message.textContent = error.message;
+      } finally {
+        button.disabled = false;
+      }
+    });
+  </script>
   <script src="app.js"></script>
   <script src="home-button.js"></script>
 

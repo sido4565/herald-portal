@@ -439,6 +439,19 @@ app.post('/api/login', async (req, res) => {
   res.json({ ok: true, name: s.name });
 });
 
+app.post('/api/student/change-password', authStudent, async (req, res) => {
+  const { currentPassword, newPassword } = req.body;
+  if (typeof newPassword !== 'string' || newPassword.length < 6) {
+    return res.status(400).json({ error: 'New password must be at least 6 characters.' });
+  }
+  const current = await db.execute({ sql: 'SELECT password FROM students WHERE id = ?', args: [req.user.id] });
+  if (!current.rows[0] || !bcrypt.compareSync(currentPassword || '', current.rows[0].password)) {
+    return res.status(400).json({ error: 'Current password is incorrect.' });
+  }
+  await db.execute({ sql: 'UPDATE students SET password = ? WHERE id = ?', args: [bcrypt.hashSync(newPassword, 10), req.user.id] });
+  res.json({ ok: true });
+});
+
 app.post('/api/register', materialUpload.fields([
   { name: 'kcse_certificate', maxCount: 1 },
   { name: 'completion_letter', maxCount: 1 }
@@ -1353,6 +1366,35 @@ app.post('/api/lecturer/change-password', authLecturer, async (req, res) => {
   res.json({ ok: true });
 });
 
+// Public password reset requests always return the same response to avoid exposing accounts.
+app.post('/api/password-reset-requests', async (req, res) => {
+  const accountType = req.body.accountType;
+  const email = typeof req.body.email === 'string' ? req.body.email.trim().toLowerCase() : '';
+  if (!['student', 'lecturer'].includes(accountType) || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    return res.status(400).json({ error: 'Choose an account type and enter a valid email address.' });
+  }
+  try {
+    const table = accountType === 'student' ? 'students' : 'lecturers';
+    const account = await db.execute({ sql: `SELECT id, email FROM ${table} WHERE lower(email) = ? LIMIT 1`, args: [email] });
+    if (account.rows[0]) {
+      const existing = await db.execute({
+        sql: `SELECT id FROM password_reset_requests WHERE account_type = ? AND account_id = ? AND status = 'pending' LIMIT 1`,
+        args: [accountType, account.rows[0].id],
+      });
+      if (!existing.rows.length) {
+        await db.execute({
+          sql: 'INSERT INTO password_reset_requests (account_type, account_id, email) VALUES (?, ?, ?)',
+          args: [accountType, account.rows[0].id, account.rows[0].email],
+        });
+      }
+    }
+    res.json({ ok: true, message: 'If an account matches that email, a reset request has been sent to the admin for review.' });
+  } catch (err) {
+    console.error('Password reset request failed:', err.message);
+    res.status(500).json({ error: 'Could not submit the reset request. Please try again.' });
+  }
+});
+
 app.get('/api/lecturer/my-courses', authLecturer, async (req, res) => {
   try {
     const assigned = await db.execute({
@@ -1893,6 +1935,82 @@ app.get('/api/admin/stats', authAdmin, async (req, res) => {
 });
 
 // ---------- Lecturers (superadmin) ----------
+app.get('/api/admin/password-reset-requests', authAdmin, async (req, res) => {
+  try {
+    const r = await db.execute(`
+      SELECT pr.id, pr.account_type, pr.account_id, pr.email, pr.status, pr.requested_at,
+             CASE WHEN pr.account_type = 'student' THEN s.name ELSE l.name END AS name,
+             CASE WHEN pr.account_type = 'student' THEN s.reg_no ELSE l.staff_no END AS account_number
+      FROM password_reset_requests pr
+      LEFT JOIN students s ON pr.account_type = 'student' AND s.id = pr.account_id
+      LEFT JOIN lecturers l ON pr.account_type = 'lecturer' AND l.id = pr.account_id
+      WHERE pr.status = 'pending'
+      ORDER BY pr.requested_at ASC
+    `);
+    res.json(r.rows);
+  } catch (err) {
+    res.status(500).json({ error: 'Could not load password reset requests.' });
+  }
+});
+
+app.post('/api/admin/password-reset-requests/:id/approve', authAdmin, async (req, res) => {
+  if (!mailer || !mailer.ENABLED || typeof mailer.sendMail !== 'function') {
+    return res.status(503).json({ error: 'Password reset email is unavailable. Configure the mailer and try again.' });
+  }
+  try {
+    const rr = await db.execute({
+      sql: `SELECT * FROM password_reset_requests WHERE id = ? AND status = 'pending'`,
+      args: [req.params.id],
+    });
+    const request = rr.rows[0];
+    if (!request) return res.status(404).json({ error: 'Pending request not found.' });
+    const table = request.account_type === 'student' ? 'students' : 'lecturers';
+    const account = await db.execute({
+      sql: `SELECT id, name, email, password FROM ${table} WHERE id = ?`,
+      args: [request.account_id],
+    });
+    const user = account.rows[0];
+    if (!user) return res.status(404).json({ error: 'Account no longer exists.' });
+
+    const temporaryPassword = crypto.randomBytes(12).toString('hex');
+    const newHash = bcrypt.hashSync(temporaryPassword, 10);
+    const escapeHtml = value => String(value || '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+    await db.execute({ sql: `UPDATE ${table} SET password = ? WHERE id = ?`, args: [newHash, user.id] });
+    try {
+      await mailer.sendMail({
+        to: user.email,
+        subject: 'Your Herald Portal password reset was approved',
+        text: `Hello ${user.name}, your password reset request was approved. Your temporary password is: ${temporaryPassword}. Please sign in and change it as soon as possible.`,
+        html: `<h2>Password Reset Approved</h2><p>Hello ${escapeHtml(user.name)},</p><p>Your password reset request was approved by an administrator.</p><p>Temporary password: <code>${temporaryPassword}</code></p><p>Please sign in and change your password as soon as possible.</p>`,
+      });
+    } catch (mailError) {
+      await db.execute({ sql: `UPDATE ${table} SET password = ? WHERE id = ?`, args: [user.password, user.id] });
+      throw mailError;
+    }
+    await db.execute({
+      sql: `UPDATE password_reset_requests SET status = 'approved', resolved_at = CURRENT_TIMESTAMP, resolved_by = ? WHERE id = ?`,
+      args: [req.admin.id, request.id],
+    });
+    res.json({ ok: true, email: user.email });
+  } catch (err) {
+    console.error('Password reset approval failed:', err.message);
+    res.status(502).json({ error: 'Could not complete the reset and email delivery. The request remains pending.' });
+  }
+});
+
+app.post('/api/admin/password-reset-requests/:id/reject', authAdmin, async (req, res) => {
+  try {
+    const result = await db.execute({
+      sql: `UPDATE password_reset_requests SET status = 'rejected', resolved_at = CURRENT_TIMESTAMP, resolved_by = ? WHERE id = ? AND status = 'pending'`,
+      args: [req.admin.id, req.params.id],
+    });
+    if (!result.rowsAffected) return res.status(404).json({ error: 'Pending request not found.' });
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(500).json({ error: 'Could not reject the password reset request.' });
+  }
+});
+
 app.get('/api/admin/lecturers', authAdmin, async (req, res) => {
   try {
     const r = await db.execute(`
