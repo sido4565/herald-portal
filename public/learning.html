@@ -22,6 +22,7 @@
     .progress-track { height:9px; background:#e5e7eb; border-radius:99px; overflow:hidden; margin:12px 0; }
     .progress-track span { display:block; height:100%; background:#0f766e; }
     .chapter-list { display:grid; gap:12px; margin:18px 0; }
+    .study-notes { white-space:pre-wrap; line-height:1.75; font-size:15px; padding:16px; border-radius:9px; background:#f8fafc; color:#334155; margin:14px 0; }
     .chapter-top { display:flex; justify-content:space-between; align-items:flex-start; gap:12px; }
     .chapter-status { white-space:nowrap; border-radius:99px; padding:4px 9px; background:#f1f5f9; color:#475569; font-size:11px; font-weight:800; }
     .chapter-status.done { background:#dcfce7; color:#166534; }
@@ -123,29 +124,26 @@
       document.getElementById('pageTitle').textContent = `${course.code} · ${course.title}`;
       document.getElementById('pageIntro').textContent = `${Number(course.duration_weeks) || 8} week study plan · ${Number(course.progress_percent)}% complete. Finish each chapter and pass its quiz to unlock the next.`;
       if (!chapters.length) {
+        if (Number(course.total_chapters) > 0 && Number(course.completed_chapters) === Number(course.total_chapters)) {
+          content.innerHTML = `<a class="learning-btn secondary" href="learning.html">← All courses</a><div class="notice">Course complete! You passed all ${course.total_chapters} chapter quizzes and finished this ${Number(course.duration_weeks) || 8}-week learning plan.</div>`;
+          return;
+        }
         const note = path.status === 'generating' ? 'Your lecturer has uploaded materials. The system is preparing chapter lessons and quizzes.' : path.error || 'The course plan will appear when study materials are uploaded.';
         content.innerHTML = `<a class="learning-btn secondary" href="learning.html">← All courses</a><div class="notice ${path.status === 'error' ? 'warn' : ''}">${esc(note)}</div>${path.status === 'error' ? '<button class="learning-btn" type="button" onclick="retryPathBuild()">Retry study plan</button>' : ''}`;
         return;
       }
       const cards = chapters.map(chapter => {
-        const status = chapter.passed ? 'Passed' : chapter.locked ? 'Locked' : chapter.materials_completed ? 'Ready for quiz' : 'Study materials';
-        const statusClass = chapter.passed ? 'done' : chapter.locked ? 'locked' : '';
-        const allUnlocked = chapter.materials.length > 0 && chapter.materials.every(material => material.unlocked);
+        const status = chapter.materials_completed ? 'Ready for quiz' : 'Current chapter';
         return `<article class="chapter-card">
-          <div class="chapter-top"><div><div class="learning-meta">Chapter ${chapter.position} · Target week ${chapter.target_week}${chapter.target_date ? ` · by ${esc(chapter.target_date)}` : ''} · ${chapter.estimated_hours} study hours</div>
-            <h3>${esc(chapter.title)}</h3><p class="learning-meta">${esc(chapter.overview || '')}</p></div><span class="chapter-status ${statusClass}">${status}</span></div>
-          ${chapter.locked ? '<div class="notice">Pass the previous chapter quiz to unlock these materials.</div>' : `
-            <div style="margin-top:10px;">${chapter.materials.map(material => `<div class="study-material">
-              <div><strong>${esc(material.title)}</strong><div class="learning-meta">${esc(material.resource_category || 'Study resource')}${material.file_name ? ` · ${esc(material.file_name)}` : ''}${material.is_paid && !material.unlocked ? ' · Purchase required' : ''}</div>${material.description ? `<div class="learning-meta">${esc(material.description)}</div>` : ''}</div>
-              ${material.unlocked ? (material.access_url ? `<a class="learning-btn secondary" href="${esc(material.access_url)}" target="_blank" rel="noopener">Study →</a>` : '<span class="learning-meta">Study the notes above</span>') : `<a class="chapter-status locked" href="dashboard.html#learning-materials" style="text-decoration:none;">Unlock / check release</a>`}
-            </div>`).join('')}</div>
-            ${chapter.materials_completed ? `<button class="learning-btn" type="button" onclick="openQuiz(${chapter.id})">${chapter.passed ? 'Retake chapter quiz' : 'Take chapter quiz →'}</button>` : `<button class="learning-btn" type="button" ${allUnlocked ? '' : 'disabled'} onclick="markStudied(${chapter.id})">I’ve studied these materials</button>`}
-          `}
+          <div class="chapter-top"><div><div class="learning-meta">Module ${chapter.position} of ${course.total_chapters} · Target week ${chapter.target_week}${chapter.target_date ? ` · by ${esc(chapter.target_date)}` : ''} · ${chapter.estimated_hours} study hours</div>
+            <h3>${esc(chapter.title)}</h3></div><span class="chapter-status">${status}</span></div>
+          ${chapter.study_notes ? `<div class="study-notes">${esc(chapter.study_notes)}</div>` : `<div class="notice">${path.status === 'generating' || path.status === 'pending' ? 'Preparing this module’s study notes…' : 'Study notes are not available yet. The course plan may need to be refreshed.'}</div>`}
+          ${chapter.materials_completed ? `<button class="learning-btn" type="button" onclick="openQuiz(${chapter.id})">Take chapter quiz →</button>` : `<button class="learning-btn" type="button" ${chapter.study_notes ? '' : 'disabled'} onclick="markStudied(${chapter.id})">I’ve studied these notes</button>`}
           ${chapter.attempts ? `<p class="learning-meta" style="margin-bottom:0;">Quiz attempts: ${chapter.attempts} · Best score: ${chapter.best_score}%${chapter.passed ? ' · Passed' : ' · 70% required to continue'}</p>` : ''}
         </article>`;
       }).join('');
       const warning = path.error ? `<div class="notice warn">${esc(path.error)}</div>` : '';
-      content.innerHTML = `<a class="learning-btn secondary" href="learning.html">← All courses</a>${warning}<div class="progress-track" role="progressbar" aria-valuenow="${course.progress_percent}" aria-valuemin="0" aria-valuemax="100"><span style="width:${course.progress_percent}%"></span></div><div class="learning-meta">${chapters.filter(c=>c.passed).length} of ${chapters.length} chapters completed</div><div class="chapter-list">${cards}</div>`;
+      content.innerHTML = `<a class="learning-btn secondary" href="learning.html">← All courses</a>${warning}<div class="progress-track" role="progressbar" aria-valuenow="${course.progress_percent}" aria-valuemin="0" aria-valuemax="100"><span style="width:${course.progress_percent}%"></span></div><div class="learning-meta">${course.completed_chapters} of ${course.total_chapters} chapters completed</div><div class="chapter-list">${cards}</div>`;
     }
 
     async function markStudied(chapterId) {

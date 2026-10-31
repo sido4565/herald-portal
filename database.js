@@ -276,6 +276,7 @@ async function initSchema() {
       position INTEGER NOT NULL,
       title TEXT NOT NULL,
       overview TEXT,
+      study_notes TEXT,
       material_ids TEXT NOT NULL,
       estimated_hours REAL NOT NULL DEFAULT 2,
       UNIQUE(course_id, position)
@@ -345,6 +346,10 @@ async function initSchema() {
   const progressColumns = await client.execute('PRAGMA table_info(student_chapter_progress)');
   if (!progressColumns.rows.some(column => column.name === 'materials_completed')) {
     await client.execute('ALTER TABLE student_chapter_progress ADD COLUMN materials_completed INTEGER NOT NULL DEFAULT 0');
+  }
+  const chapterColumns = await client.execute('PRAGMA table_info(learning_chapters)');
+  if (!chapterColumns.rows.some(column => column.name === 'study_notes')) {
+    await client.execute('ALTER TABLE learning_chapters ADD COLUMN study_notes TEXT');
   }
   const materialColumns = await client.execute('PRAGMA table_info(materials)');
   for (const [name, definition] of [
