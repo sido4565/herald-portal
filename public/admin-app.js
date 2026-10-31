@@ -735,7 +735,16 @@ if (addLectBtn) {
         return;
       }
       const button = e.target.closest('[data-delete-material]');
-      if (!button) return;
+      if (!button) {
+        const editButton = e.target.closest('[data-edit-material]');
+        if (editButton) {
+          try {
+            const materials = await api('/api/admin/materials');
+            return openAdminMaterialModal(materials.find(row => Number(row.id) === Number(editButton.dataset.editMaterial)));
+          } catch (err) { return toast(err.message, 'error'); }
+        }
+        return;
+      }
       if (!confirm('Delete this book or study material?')) return;
       try {
         await api(`/api/admin/materials/${button.dataset.deleteMaterial}`, { method: 'DELETE' });
@@ -832,6 +841,7 @@ if (addLectBtn) {
         if (act === 'edit-job')      return editJob(id);
         if (act === 'del-job')       return delJob(id);
         if (act === 'del-result')    return delResult(id);
+        if (act === 'edit-result')   return editResult(id);
         if (act === 'edit-fee')      return editFee(id);
         if (act === 'del-fee')       return delFee(id);
         if (act === 'pay-fee')       return payFee(id);
@@ -1330,9 +1340,24 @@ async function openBulkAssignModal() {
         <td>${r.marks}</td>
         <td><strong>${esc(r.grade)}</strong></td>
         <td>${esc(r.term)}</td>
-        <td><button class="btn-xs danger" data-act="del-result" data-id="${r.id}" type="button">Delete</button></td>
+        <td><button class="btn-xs" data-act="edit-result" data-id="${r.id}" type="button">Edit</button> <button class="btn-xs danger" data-act="del-result" data-id="${r.id}" type="button">Delete</button></td>
       </tr>`).join('') || '<tr><td colspan="6" class="empty">No results recorded.</td></tr>';
     wireTableActions(tb);
+  }
+
+  async function editResult(id) {
+    const rows = await api('/api/admin/results');
+    const result = rows.find(row => Number(row.id) === id);
+    if (!result) return toast('Result not found.');
+    openModal('Edit Result', [
+      { name: 'marks', label: 'Marks (0-100)', type: 'number', value: result.marks, required: true },
+      { name: 'term', label: 'Term', value: result.term, required: true },
+    ], async data => {
+      data.marks = Number(data.marks);
+      await api(`/api/admin/results/${id}`, { method: 'PUT', body: data });
+      await loadResults();
+      toast('Result updated.');
+    });
   }
 
   async function delResult(id) {
@@ -1770,31 +1795,32 @@ async function openBulkAssignModal() {
         <td>${Number(row.is_paid) ? '<span class="pill pill-amber">Paid</span>' : '<span class="pill pill-green">Free</span>'}</td>
         <td>${Number(row.is_paid) ? `KES ${Number(row.price).toLocaleString()}` : '—'}</td>
         <td>${Number(row.download_count || 0)}</td>
-        <td><button class="btn-xs danger" type="button" data-delete-material="${row.id}">Delete</button></td>
+        <td><button class="btn-xs" type="button" data-edit-material="${row.id}">Edit</button> <button class="btn-xs danger" type="button" data-delete-material="${row.id}">Delete</button></td>
       </tr>`).join('')}</tbody></table></div>` : '<p class="empty">No books or study materials yet. Upload one to start the course library.</p>'}`;
   }
 
-  async function openAdminMaterialModal() {
+  async function openAdminMaterialModal(material = null) {
     try { await ensureCache(); } catch (err) { return toast(err.message, 'error'); }
     const overlay = document.createElement('div');
     overlay.className = 'modal-overlay';
     overlay.innerHTML = `
       <div class="modal" style="max-width:640px;">
-        <h3>Upload Book or Study Material</h3>
+        <h3>${material ? 'Edit Course Material' : 'Upload Book or Study Material'}</h3>
         <form id="adminMaterialForm" class="modal-form">
-          <label>Course</label><select name="course_id" required><option value="">— Select course —</option>${coursesCache.map(c => `<option value="${c.id}">${esc(c.code)} — ${esc(c.title)}</option>`).join('')}</select>
-          <label>Resource type</label><select name="resource_category"><option value="book">Book</option><option value="notes">Notes</option><option value="slides">Slides</option><option value="video">Video</option><option value="other">Other</option></select>
-          <label>Title</label><input name="title" required maxlength="160" placeholder="e.g. Introduction to Accounting" />
-          <label>Description</label><textarea name="description" rows="3" maxlength="2000"></textarea>
-          <label>Release date</label><input type="date" name="release_date" value="${new Date().toISOString().slice(0,10)}" required />
-          <label>Access</label><select name="access" id="adminMaterialAccess"><option value="free">Free</option><option value="paid">Paid</option></select>
-          <div id="adminMaterialPriceWrap" style="display:none;"><label>Price (KES)</label><input type="number" name="price" min="1" step="1" /></div>
+          <label>Course</label><select name="course_id" required><option value="">— Select course —</option>${coursesCache.map(c => `<option value="${c.id}" ${Number(c.id) === Number(material?.course_id) ? 'selected' : ''}>${esc(c.code)} — ${esc(c.title)}</option>`).join('')}</select>
+          <label>Resource type</label><select name="resource_category"><option value="book" ${material?.resource_category === 'book' ? 'selected' : ''}>Book</option><option value="notes" ${material?.resource_category === 'notes' ? 'selected' : ''}>Notes</option><option value="slides" ${material?.resource_category === 'slides' ? 'selected' : ''}>Slides</option><option value="video" ${material?.resource_category === 'video' ? 'selected' : ''}>Video</option><option value="other" ${!['book','notes','slides','video'].includes(material?.resource_category) ? 'selected' : ''}>Other</option></select>
+          <label>Title</label><input name="title" required maxlength="160" placeholder="e.g. Introduction to Accounting" value="${esc(material?.title || '')}" />
+          <label>Description</label><textarea name="description" rows="3" maxlength="2000">${esc(material?.description || '')}</textarea>
+          <label>Release date</label><input type="date" name="release_date" value="${esc(material?.release_date || new Date().toISOString().slice(0,10))}" required />
+          <label>Access</label><select name="access" id="adminMaterialAccess"><option value="free" ${!Number(material?.is_paid) ? 'selected' : ''}>Free</option><option value="paid" ${Number(material?.is_paid) ? 'selected' : ''}>Paid</option></select>
+          <div id="adminMaterialPriceWrap" style="display:none;"><label>Price (KES)</label><input type="number" name="price" min="1" step="1" value="${Number(material?.price) || ''}" /></div>
           <label>Book / notes file <span id="adminMaterialFileHint">(optional for free links/text)</span></label>
           <input type="file" id="adminMaterialFile" accept=".pdf,.doc,.docx,.ppt,.pptx,.jpg,.jpeg,.png,.webp,.mp4,.webm" />
-          <div id="adminMaterialExternalWrap"><label>Free external link (optional)</label><input type="url" name="external_url" placeholder="https://..." /></div>
+          ${material && (material.file_name || material.external_url) ? `<p style="font-size:12px;color:var(--muted);">Current attachment: ${esc(material.file_name || material.external_url)}</p><label><input type="checkbox" name="remove_attachment" value="yes" /> Remove current file/link</label>` : ''}
+          <div id="adminMaterialExternalWrap"><label>Free external link (optional)</label><input type="url" name="external_url" placeholder="https://..." value="${esc(material?.external_url || '')}" /></div>
           <p id="adminMaterialPaidHint" style="display:none;color:var(--danger);font-size:12px;">Paid items must be uploaded as a file. External links cannot be protected from direct sharing.</p>
         </form>
-        <div class="modal-actions"><button class="btn-ghost dark" data-close type="button">Cancel</button><button class="btn-primary" id="adminMaterialSave" type="button">Upload</button></div>
+        <div class="modal-actions"><button class="btn-ghost dark" data-close type="button">Cancel</button><button class="btn-primary" id="adminMaterialSave" type="button">${material ? 'Save Changes' : 'Upload'}</button></div>
       </div>`;
     document.body.appendChild(overlay);
     overlay.addEventListener('click', e => { if (e.target === overlay || e.target.closest('[data-close]')) overlay.remove(); });
@@ -1814,7 +1840,7 @@ async function openBulkAssignModal() {
       if (!form.reportValidity()) return;
       const data = Object.fromEntries(new FormData(form));
       const paid = data.access === 'paid';
-      if (paid && !file.files.length) return toast('Paid materials must be uploaded as a file.', 'error');
+      if (paid && !file.files.length && !material?.storage_key) return toast('Paid materials must be uploaded as a file.', 'error');
       if (paid && (!Number.isInteger(Number(data.price)) || Number(data.price) < 1)) return toast('Enter a whole-number price in KES.', 'error');
       const button = overlay.querySelector('#adminMaterialSave');
       button.disabled = true;
@@ -1827,14 +1853,14 @@ async function openBulkAssignModal() {
           if (!response.ok) throw new Error(result.error || 'Upload failed');
           uploaded = result;
         }
-        await api('/api/admin/materials', { method: 'POST', body: {
+        await api(material ? `/api/admin/materials/${material.id}` : '/api/admin/materials', { method: material ? 'PUT' : 'POST', body: {
           course_id: Number(data.course_id), title: data.title, description: data.description,
           release_date: data.release_date, resource_category: data.resource_category,
           is_paid: paid, price: paid ? Number(data.price) : 0,
-          external_url: paid ? '' : data.external_url,
+          external_url: paid ? '' : data.external_url, remove_attachment: data.remove_attachment === 'yes',
           ...uploaded,
         } });
-        overlay.remove(); toast('Material added to the course library.'); await loadLibrary();
+        overlay.remove(); toast(material ? 'Material updated.' : 'Material added to the course library.'); await loadLibrary();
       } catch (err) { button.disabled = false; toast(err.message, 'error'); }
     });
   }

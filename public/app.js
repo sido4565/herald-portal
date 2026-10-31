@@ -455,6 +455,25 @@ async function loadDashboard() {
     const lcs = await lcRes.json();
 
     const lcEl = document.getElementById('liveClasses');
+    const notice = document.getElementById('liveClassNotice');
+    const priorityClasses = lcs.filter(c => c.status === 'live' || c.status === 'upcoming');
+    if (notice && priorityClasses.length) {
+      const c = priorityClasses.find(item => item.status === 'live') || priorityClasses[0];
+      const start = new Date(c.scheduled_at);
+      document.getElementById('liveClassNoticeLabel').textContent = c.status === 'live' ? '🔴 Live class is happening now' : '📅 Upcoming live class';
+      document.getElementById('liveClassNoticeTitle').textContent = c.title;
+      document.getElementById('liveClassNoticeDetails').textContent = `${c.code} — ${c.course_title} · ${start.toLocaleString()} · ${c.duration_minutes} min`;
+      const join = document.getElementById('liveClassNoticeJoin');
+      join.href = c.meeting_url;
+      join.textContent = c.status === 'live' ? 'Join now →' : 'Open class link →';
+      notice.style.display = 'flex';
+      if (c.status === 'live') {
+        notice.style.background = '#ecfdf5';
+        notice.style.borderColor = '#a7f3d0';
+        notice.style.borderLeftColor = '#059669';
+        document.getElementById('liveClassNoticeLabel').style.color = '#047857';
+      }
+    }
     if (lcEl) {
       lcEl.innerHTML = lcs.length
         ? lcs.map(c => {

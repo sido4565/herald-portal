@@ -113,8 +113,15 @@
 <main class="container" style="padding-top: 24px;">
   <div class="exam-toolbar">
     <h2>My Exams</h2>
-    <button class="btn-new-exam" onclick="openCreateExamModal()">+ Create Exam</button>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+      <select id="generateExamCourse" aria-label="Course for generated final exam" style="padding:10px;border:1px solid var(--line);border-radius:8px;">
+        <option value="">Select course for final exam</option>
+      </select>
+      <button class="btn-new-exam" onclick="generateFinalExam()">Generate Exam Draft</button>
+      <button class="btn-new-exam" onclick="openCreateExamModal()">+ Create Exam</button>
+    </div>
   </div>
+  <p style="margin:-12px 0 20px;color:var(--muted);font-size:12px;">Generates a 20-question draft from readable PDF, DOCX, and PPTX content plus material descriptions. Scans, images, videos, and external links without descriptions are reported as unsupported. Review every question before publishing.</p>
   <div id="examList" class="exam-list">
     <div class="empty-state"><h3>Loading...</h3></div>
   </div>
@@ -196,6 +203,7 @@
 
 <script>
 let currentExamId = null;
+let lecturerCourses = [];
 
 // Load lecturer name
 fetch('/api/lecturer/me', { credentials: 'same-origin' })
@@ -219,7 +227,7 @@ async function loadExams() {
       <div class="admin-exam-card">
         <div class="info">
           <h3>${esc(e.title)}</h3>
-          <p class="meta">${esc(e.code || '')} — ${esc(e.course_title || '')}</p>
+          <p class="meta">${esc(e.code || '')} — ${esc(e.course_title || '')} · ${Number(e.is_active) ? 'Published' : 'Draft for review'}</p>
           <div class="stats">
             <div class="stat"><strong>${e.duration_minutes}</strong>min</div>
             <div class="stat"><strong>${e.total_marks}</strong>marks</div>
@@ -229,6 +237,7 @@ async function loadExams() {
         </div>
         <div class="actions">
           <button class="btn-sm primary" onclick="openManageQuestions(${e.id}, '${esc(e.title).replace(/'/g, "\\'")}')">Manage Questions</button>
+          ${!Number(e.is_active) && Number(e.question_count) ? `<button class="btn-sm" onclick="publishExam(${e.id})">Approve &amp; Publish</button>` : ''}
         </div>
       </div>
     `).join('');
@@ -242,10 +251,44 @@ async function loadCourses() {
     const res = await fetch('/api/lecturer/my-courses', { credentials: 'same-origin' });
     if (!res.ok) return;
     const courses = await res.json();
+    lecturerCourses = courses;
     const sel = document.getElementById('newExamCourse');
     sel.innerHTML = '<option value="">— Select a course —</option>' +
       courses.map(c => `<option value="${c.id}">${esc(c.code)} — ${esc(c.title)}</option>`).join('');
+    document.getElementById('generateExamCourse').innerHTML = '<option value="">Select course for final exam</option>' +
+      courses.map(c => `<option value="${c.id}">${esc(c.code)} — ${esc(c.title)}</option>`).join('');
   } catch (err) { console.error(err); }
+}
+
+async function generateFinalExam() {
+  const courseId = Number(document.getElementById('generateExamCourse').value);
+  if (!courseId) return toast('Select a course first.', 'error');
+  const button = document.querySelector('.exam-toolbar button[onclick="generateFinalExam()"]');
+  button.disabled = true;
+  button.textContent = 'Generating…';
+  try {
+    const res = await fetch(`/api/lecturer/courses/${courseId}/generate-final-exam`, { method: 'POST', credentials: 'same-origin' });
+    const data = await res.json();
+    if (!res.ok) { const error = new Error(data.error || 'Could not generate exam.'); error.unsupported = data.unsupported; throw error; }
+    toast(`Draft created with ${data.question_count} questions. Review the questions before publishing.`, 'success');
+    if (data.unsupported?.length) alert(`These materials were not readable and were skipped:\n${data.unsupported.join('\n')}`);
+    await loadExams();
+  } catch (err) {
+    toast(err.message, 'error');
+    if (err.unsupported?.length) alert(`These materials could not be used:\n${err.unsupported.join('\n')}`);
+  }
+  finally { button.disabled = false; button.textContent = 'Generate Exam Draft'; }
+}
+
+async function publishExam(examId) {
+  if (!confirm('Have you reviewed the questions and answers? Publish this exam to students?')) return;
+  try {
+    const res = await fetch(`/api/lecturer/exams/${examId}/publish`, { method: 'POST', credentials: 'same-origin' });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Could not publish exam.');
+    toast('Exam published to students.', 'success');
+    await loadExams();
+  } catch (err) { toast(err.message, 'error'); }
 }
 
 function openCreateExamModal() {

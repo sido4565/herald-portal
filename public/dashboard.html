@@ -86,6 +86,14 @@
   </header>
 
   <main class="container">
+    <div id="liveClassNotice" role="status" aria-live="polite" style="display:none; align-items:center; justify-content:space-between; gap:16px; flex-wrap:wrap; background:#eff6ff; border:1px solid #bfdbfe; border-left:5px solid #2563eb; border-radius:10px; padding:16px 20px; margin-bottom:20px; color:#10243a;">
+      <div>
+        <div id="liveClassNoticeLabel" style="font-size:11px; font-weight:800; letter-spacing:.06em; color:#1d4ed8; text-transform:uppercase; margin-bottom:4px;"></div>
+        <strong id="liveClassNoticeTitle" style="font-size:16px;"></strong>
+        <div id="liveClassNoticeDetails" style="font-size:13px; margin-top:4px; color:#475569;"></div>
+      </div>
+      <a id="liveClassNoticeJoin" class="btn-enroll" href="#" target="_blank" rel="noopener" style="text-decoration:none; white-space:nowrap;">Join class →</a>
+    </div>
     <section style="
   background-image: linear-gradient(90deg, rgba(11,26,51,0.88) 0%, rgba(11,26,51,0.45) 100%), url('images/hero-dashboard.jpg');
   background-size: cover;
@@ -101,6 +109,21 @@
   <h2 style="margin: 0 0 8px; font-size: 26px;">Welcome, <span id="welcomeName"></span></h2>
   <p style="margin: 0; opacity: 0.92;">Reg No <strong id="regNo"></strong> &middot; <span id="studentCourse"></span></p>
 </section>
+
+    <section class="card wide" aria-labelledby="distanceLearningTitle" style="margin-bottom:24px; border-left:5px solid #0f766e;">
+      <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:16px; flex-wrap:wrap;">
+        <div style="max-width:680px;">
+          <p style="margin:0 0 5px; color:#0f766e; font-size:11px; font-weight:800; letter-spacing:.07em; text-transform:uppercase;">Learn from anywhere</p>
+          <h2 id="distanceLearningTitle" style="margin:0 0 7px; font-size:20px;">Distance Learning</h2>
+          <p style="margin:0; color:var(--muted); font-size:13px;">Join scheduled online classes, study course materials at your own pace, and submit assignments from your dashboard.</p>
+        </div>
+        <nav aria-label="Distance learning links" style="display:flex; gap:8px; flex-wrap:wrap;">
+          <a href="#live-classes" class="btn-enroll" style="text-decoration:none;">Live classes</a>
+          <a href="#learning-materials" class="btn-enroll" style="text-decoration:none;">Study materials</a>
+          <a href="#assignments-section" class="btn-enroll" style="text-decoration:none;">Assignments</a>
+        </nav>
+      </div>
+    </section>
 
     <!-- Enrollment Reminder Banner -->
     <div id="enrollmentReminder" style="display: none; background: #fef2f2; border: 1px solid #fecaca; border-left: 4px solid #b91c1c; border-radius: 8px; padding: 20px; margin-bottom: 24px; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 16px;">
@@ -134,7 +157,7 @@
         <div id="examsList"><div class="exam-empty">Loading exams...</div></div>
       </section>
 
-      <section class="card">
+      <section class="card" id="live-classes">
         <h3>Announcements</h3>
         <ul id="announcements" class="list"></ul>
       </section>
@@ -202,12 +225,12 @@
         </div>
       </section>
 
-      <section class="card wide">
+      <section class="card wide" id="learning-materials">
         <h3>📚 Books &amp; Study Materials</h3>
         <ul id="materialsList" class="list"></ul>
       </section>
 
-      <section class="card wide">
+      <section class="card wide" id="assignments-section">
         <h3>Assignments</h3>
         <ul id="assignments" class="list"></ul>
       </section>
