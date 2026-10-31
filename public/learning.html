@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="robots" content="noindex, nofollow" />
+  <title>Self-Paced Learning — Herald Portal</title>
+  <link rel="icon" type="image/svg+xml" href="favicon.svg" />
+  <link rel="stylesheet" href="style.css" />
+  <style>
+    .learning-wrap { max-width:1040px; margin:30px auto 70px; padding:0 18px; }
+    .learning-hero { background:#10243a; color:#fff; border-radius:16px; padding:26px; margin-bottom:22px; }
+    .learning-hero h1 { margin:0 0 8px; font-size:25px; }
+    .learning-hero p { margin:0; opacity:.85; line-height:1.55; }
+    .learning-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(270px,1fr)); gap:14px; }
+    .learning-card,.chapter-card,.quiz-panel { background:var(--card,#fff); border:1px solid var(--border,#e1e7ef); border-radius:12px; padding:18px; color:var(--text,#10243a); }
+    .learning-card h2,.chapter-card h3 { margin:0 0 7px; }
+    .learning-meta { color:var(--muted,#647386); font-size:13px; line-height:1.55; }
+    .learning-btn { display:inline-block; border:0; border-radius:8px; padding:10px 14px; background:#0f766e; color:#fff; font:inherit; font-weight:700; text-decoration:none; cursor:pointer; }
+    .learning-btn.secondary { background:#10243a; }
+    .learning-btn:disabled { opacity:.5; cursor:not-allowed; }
+    .progress-track { height:9px; background:#e5e7eb; border-radius:99px; overflow:hidden; margin:12px 0; }
+    .progress-track span { display:block; height:100%; background:#0f766e; }
+    .chapter-list { display:grid; gap:12px; margin:18px 0; }
+    .chapter-top { display:flex; justify-content:space-between; align-items:flex-start; gap:12px; }
+    .chapter-status { white-space:nowrap; border-radius:99px; padding:4px 9px; background:#f1f5f9; color:#475569; font-size:11px; font-weight:800; }
+    .chapter-status.done { background:#dcfce7; color:#166534; }
+    .chapter-status.locked { background:#fef3c7; color:#92400e; }
+    .study-material { border-top:1px solid var(--border,#e1e7ef); padding:10px 0; display:flex; justify-content:space-between; align-items:center; gap:10px; }
+    .quiz-question { padding:14px 0; border-bottom:1px solid #e2e8f0; }
+    .quiz-question p { margin:0 0 10px; font-weight:700; }
+    .quiz-option { display:block; padding:7px 0; cursor:pointer; }
+    .quiz-option input { margin-right:8px; }
+    .quiz-feedback { padding:10px 0; border-bottom:1px solid #e2e8f0; font-size:13px; }
+    .notice { padding:14px; border-radius:9px; background:#eff6ff; color:#1e3a8a; margin:12px 0; }
+    .notice.error { background:#fef2f2; color:#991b1b; }
+    .notice.warn { background:#fff7ed; color:#9a3412; }
+    @media(max-width:600px) { .learning-hero { padding:20px; } .chapter-top { display:block; } .chapter-status { display:inline-block; margin-top:7px; } }
+  </style>
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">Herald Portal · Self-Paced Learning</div>
+    <div class="user-box"><a class="theme-toggle" href="dashboard.html" style="text-decoration:none;">← Dashboard</a></div>
+  </header>
+  <main class="learning-wrap">
+    <section class="learning-hero">
+      <h1 id="pageTitle">Learn at your own pace</h1>
+      <p id="pageIntro">Choose self-paced learning for an enrolled course. Your study plan and chapter quizzes are prepared from the course materials and paced to the course duration.</p>
+    </section>
+    <div id="learningContent"><p>Loading your courses…</p></div>
+    <section id="quizPanel" class="quiz-panel" style="display:none;margin-top:20px;"></section>
+  </main>
+  <script>
+    const esc = value => String(value ?? '').replace(/[&<>"']/g, char => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]));
+    const params = new URLSearchParams(location.search);
+    const courseId = params.get('course_id');
+    const content = document.getElementById('learningContent');
+    const quizPanel = document.getElementById('quizPanel');
+    let courseDetail = null;
+    let currentQuiz = null;
+    let overviewNeedsRefresh = false;
+
+    async function api(url, options = {}) {
+      const response = await fetch(url, { credentials:'same-origin', ...options, headers:{ ...(options.headers || {}), ...(options.body ? {'Content-Type':'application/json'} : {}) } });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || 'Could not load learning information.');
+      return data;
+    }
+
+    async function chooseMode(id, mode) {
+      try {
+        await api(`/api/student/courses/${id}/learning-mode`, { method:'POST', body:JSON.stringify({ mode }) });
+        if (mode === 'self_paced') location.href = `learning.html?course_id=${id}`;
+        else await loadCourses();
+      } catch (err) { alert(err.message); }
+    }
+
+    async function loadCourses() {
+      document.getElementById('pageTitle').textContent = 'Learn at your own pace';
+      document.getElementById('pageIntro').textContent = 'Choose self-paced learning for an enrolled course. Your chapter plan and quizzes use the course materials and duration.';
+      try {
+        const courses = await api('/api/student/self-paced-courses');
+        overviewNeedsRefresh = courses.some(course => course.learning_mode === 'self_paced' && ['pending','generating'].includes(course.path_status));
+        if (!courses.length) { content.innerHTML = '<div class="notice">You are not enrolled in a course yet. Enroll in a course to start learning.</div>'; return; }
+        content.innerHTML = `<div class="learning-grid">${courses.map(course => `
+          <article class="learning-card">
+            <div class="learning-meta">${esc(course.code)} · ${Number(course.duration_weeks) || 8} weeks</div>
+            <h2>${esc(course.title)}</h2>
+            ${course.learning_mode === 'self_paced' ? `
+              <div class="progress-track" role="progressbar" aria-valuenow="${Number(course.progress_percent)}" aria-valuemin="0" aria-valuemax="100"><span style="width:${Number(course.progress_percent)}%"></span></div>
+              <p class="learning-meta">${Number(course.completed_chapters)} of ${Number(course.chapter_count)} chapters passed · ${Number(course.progress_percent)}% complete</p>
+              <p class="learning-meta">${course.path_status === 'ready' ? 'Study plan ready' : course.path_status === 'generating' ? 'Preparing chapters and quizzes…' : course.path_status === 'error' ? esc(course.path_error || 'Study plan needs readable course materials.') : 'Waiting for course materials…'}</p>
+              <a class="learning-btn" href="learning.html?course_id=${course.course_id}">Continue learning →</a>
+              <button class="learning-btn secondary" type="button" onclick="chooseMode(${course.course_id},'classroom')" style="margin-left:5px;">Use class schedule</button>
+            ` : `
+              <p class="learning-meta">Switch to self-paced mode to get a chapter plan, weekly targets, and a quiz after each chapter.</p>
+              <button class="learning-btn" type="button" onclick="chooseMode(${course.course_id},'self_paced')">Start self-paced learning →</button>
+            `}
+          </article>`).join('')}</div>`;
+      } catch (err) { content.innerHTML = `<div class="notice error">${esc(err.message)}</div>`; }
+    }
+
+    async function loadCourse() {
+      document.getElementById('pageTitle').textContent = 'Loading course plan…';
+      try {
+        courseDetail = await api(`/api/student/self-paced-courses/${courseId}`);
+        renderCourse();
+      } catch (err) {
+        content.innerHTML = `<div class="notice error">${esc(err.message)}</div><a class="learning-btn secondary" href="learning.html">Back to courses</a>`;
+      }
+    }
+
+    async function retryPathBuild() {
+      try {
+        await api(`/api/student/courses/${courseId}/learning-mode`, { method:'POST', body:JSON.stringify({ mode:'self_paced' }) });
+        await loadCourse();
+      } catch (err) { alert(err.message); }
+    }
+
+    function renderCourse() {
+      const { course, path, chapters } = courseDetail;
+      document.getElementById('pageTitle').textContent = `${course.code} · ${course.title}`;
+      document.getElementById('pageIntro').textContent = `${Number(course.duration_weeks) || 8} week study plan · ${Number(course.progress_percent)}% complete. Finish each chapter and pass its quiz to unlock the next.`;
+      if (!chapters.length) {
+        const note = path.status === 'generating' ? 'Your lecturer has uploaded materials. The system is preparing chapter lessons and quizzes.' : path.error || 'The course plan will appear when study materials are uploaded.';
+        content.innerHTML = `<a class="learning-btn secondary" href="learning.html">← All courses</a><div class="notice ${path.status === 'error' ? 'warn' : ''}">${esc(note)}</div>${path.status === 'error' ? '<button class="learning-btn" type="button" onclick="retryPathBuild()">Retry study plan</button>' : ''}`;
+        return;
+      }
+      const cards = chapters.map(chapter => {
+        const status = chapter.passed ? 'Passed' : chapter.locked ? 'Locked' : chapter.materials_completed ? 'Ready for quiz' : 'Study materials';
+        const statusClass = chapter.passed ? 'done' : chapter.locked ? 'locked' : '';
+        const allUnlocked = chapter.materials.length > 0 && chapter.materials.every(material => material.unlocked);
+        return `<article class="chapter-card">
+          <div class="chapter-top"><div><div class="learning-meta">Chapter ${chapter.position} · Target week ${chapter.target_week}${chapter.target_date ? ` · by ${esc(chapter.target_date)}` : ''} · ${chapter.estimated_hours} study hours</div>
+            <h3>${esc(chapter.title)}</h3><p class="learning-meta">${esc(chapter.overview || '')}</p></div><span class="chapter-status ${statusClass}">${status}</span></div>
+          ${chapter.locked ? '<div class="notice">Pass the previous chapter quiz to unlock these materials.</div>' : `
+            <div style="margin-top:10px;">${chapter.materials.map(material => `<div class="study-material">
+              <div><strong>${esc(material.title)}</strong><div class="learning-meta">${esc(material.resource_category || 'Study resource')}${material.file_name ? ` · ${esc(material.file_name)}` : ''}${material.is_paid && !material.unlocked ? ' · Purchase required' : ''}</div>${material.description ? `<div class="learning-meta">${esc(material.description)}</div>` : ''}</div>
+              ${material.unlocked ? (material.access_url ? `<a class="learning-btn secondary" href="${esc(material.access_url)}" target="_blank" rel="noopener">Study →</a>` : '<span class="learning-meta">Study the notes above</span>') : `<a class="chapter-status locked" href="dashboard.html#learning-materials" style="text-decoration:none;">Unlock / check release</a>`}
+            </div>`).join('')}</div>
+            ${chapter.materials_completed ? `<button class="learning-btn" type="button" onclick="openQuiz(${chapter.id})">${chapter.passed ? 'Retake chapter quiz' : 'Take chapter quiz →'}</button>` : `<button class="learning-btn" type="button" ${allUnlocked ? '' : 'disabled'} onclick="markStudied(${chapter.id})">I’ve studied these materials</button>`}
+          `}
+          ${chapter.attempts ? `<p class="learning-meta" style="margin-bottom:0;">Quiz attempts: ${chapter.attempts} · Best score: ${chapter.best_score}%${chapter.passed ? ' · Passed' : ' · 70% required to continue'}</p>` : ''}
+        </article>`;
+      }).join('');
+      const warning = path.error ? `<div class="notice warn">${esc(path.error)}</div>` : '';
+      content.innerHTML = `<a class="learning-btn secondary" href="learning.html">← All courses</a>${warning}<div class="progress-track" role="progressbar" aria-valuenow="${course.progress_percent}" aria-valuemin="0" aria-valuemax="100"><span style="width:${course.progress_percent}%"></span></div><div class="learning-meta">${chapters.filter(c=>c.passed).length} of ${chapters.length} chapters completed</div><div class="chapter-list">${cards}</div>`;
+    }
+
+    async function markStudied(chapterId) {
+      try { await api(`/api/student/self-paced-chapters/${chapterId}/mark-studied`, { method:'POST', body:'{}' }); await loadCourse(); }
+      catch (err) { alert(err.message); }
+    }
+
+    async function openQuiz(chapterId) {
+      try {
+        currentQuiz = { chapterId, ...(await api(`/api/student/self-paced-chapters/${chapterId}/quiz`)) };
+        quizPanel.style.display = 'block';
+        quizPanel.innerHTML = `<h2>${esc(currentQuiz.chapter.title)} · Chapter Quiz</h2><p class="learning-meta">Answer all questions. Score 70% or higher to pass and unlock the next chapter.</p>
+          <form id="chapterQuizForm">${currentQuiz.questions.map((q, index) => `<div class="quiz-question"><p>${index + 1}. ${esc(q.question_text)}</p>${['A','B','C','D'].map(option => `<label class="quiz-option"><input type="radio" name="q_${q.id}" value="${option}" required>${option}. ${esc(q['option_' + option.toLowerCase()])}</label>`).join('')}</div>`).join('')}
+          <button class="learning-btn" style="margin-top:16px;">Submit quiz</button></form>`;
+        quizPanel.scrollIntoView({ behavior:'smooth', block:'start' });
+        document.getElementById('chapterQuizForm').addEventListener('submit', submitQuiz);
+      } catch (err) { alert(err.message); }
+    }
+
+    async function submitQuiz(event) {
+      event.preventDefault();
+      const form = event.currentTarget;
+      const button = form.querySelector('button'); button.disabled = true;
+      const answers = Object.fromEntries([...new FormData(form)].map(([name, value]) => [name.replace('q_', ''), value]));
+      try {
+        const result = await api(`/api/student/self-paced-chapters/${currentQuiz.chapterId}/submit-quiz`, { method:'POST', body:JSON.stringify({ answers }) });
+        const feedback = result.feedback.map((item, index) => `<div class="quiz-feedback"><strong>Question ${index + 1}: ${item.correct ? 'Correct' : `Answer ${item.correct_option}`}</strong>${item.explanation ? `<div>${esc(item.explanation)}</div>` : ''}</div>`).join('');
+        quizPanel.innerHTML = `<h2>${result.passed ? 'Chapter passed 🎉' : 'Keep studying and try again'}</h2><p>You scored ${result.score}/${result.total_marks} (${result.percentage}%). ${result.passed ? 'The next chapter is now unlocked.' : 'You need at least 70% to pass.'}</p>${feedback}<button class="learning-btn" type="button" onclick="closeQuiz()">Return to course plan</button>`;
+        await loadCourse();
+        quizPanel.style.display = 'block';
+        quizPanel.innerHTML = `<h2>${result.passed ? 'Chapter passed 🎉' : 'Keep studying and try again'}</h2><p>You scored ${result.score}/${result.total_marks} (${result.percentage}%). ${result.passed ? 'The next chapter is now unlocked.' : 'You need at least 70% to pass.'}</p>${feedback}<button class="learning-btn" type="button" onclick="closeQuiz()">Return to course plan</button>`;
+      } catch (err) { alert(err.message); button.disabled = false; }
+    }
+
+    function closeQuiz() { quizPanel.style.display = 'none'; quizPanel.innerHTML = ''; }
+    if (courseId) loadCourse(); else loadCourses();
+    setInterval(() => {
+      if (courseId && (!courseDetail || ['pending','generating'].includes(courseDetail.path.status)) && quizPanel.style.display === 'none') loadCourse();
+      else if (!courseId && overviewNeedsRefresh) loadCourses();
+    }, 12000);
+  </script>
+</body>
+</html>

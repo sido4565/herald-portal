@@ -33,7 +33,10 @@
       background: #fff; border: 1px solid #e6e9ed; border-radius: 14px;
       padding: 24px; margin-bottom: 16px;
       box-shadow: 0 4px 12px rgba(16,36,58,0.04);
+      -webkit-user-select: none;
+      user-select: none;
     }
+    #questionsContainer { -webkit-user-select:none; user-select:none; }
     .question-num { font-size: 11px; color: #b77b16; font-weight: 800; letter-spacing: 0.1em; text-transform: uppercase; margin-bottom: 8px; }
     .question-text { font-size: 17px; font-weight: 600; color: #10243a; margin-bottom: 16px; line-height: 1.4; }
     .option-label {
@@ -61,6 +64,14 @@
     }
     .submit-btn:hover { background: #1d405e; }
     .submit-btn:disabled { background: #647386; cursor: not-allowed; }
+    .page-btn {
+      background:#fff;color:#10243a;border:1px solid #cbd5e1;padding:12px 20px;border-radius:9px;
+      font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;margin:0 5px;
+    }
+    .page-btn:disabled {opacity:.45;cursor:not-allowed;}
+    .page-indicator {font-size:13px;font-weight:700;color:#445469;margin:0 10px;}
+    .group-size-field {display:flex;align-items:center;gap:10px;margin:0 0 18px;color:#445469;font-size:14px;}
+    .group-size-field select {padding:8px 10px;border:1px solid #cbd5e1;border-radius:7px;font:inherit;background:#fff;color:#10243a;}
     .modal-overlay {
       position: fixed; inset: 0; background: rgba(16,36,58,0.75);
       z-index: 500; display: none; align-items: center; justify-content: center;
@@ -98,7 +109,11 @@
       <li>The exam <strong>auto-submits</strong> when time runs out</li>
       <li>Do not refresh or close this tab</li>
       <li>Your progress is saved automatically</li>
+      <li>Questions appear in groups. Answer each group to continue.</li>
     </ul>
+    <label class="group-size-field" for="questionsPerPage">Questions per page
+      <select id="questionsPerPage"><option value="3" selected>3 questions</option><option value="5">5 questions</option></select>
+    </label>
     <button class="btn-start" onclick="startExam()">I Understand — Start Exam</button>
   </div>
 </div>
@@ -116,6 +131,9 @@
   <div class="exam-container" id="questionsContainer"></div>
 
   <div class="submit-bar">
+    <button class="page-btn" id="previousPageBtn" type="button" onclick="changeQuestionPage(-1)" style="display:none;">← Previous</button>
+    <span class="page-indicator" id="pageIndicator" aria-live="polite"></span>
+    <button class="page-btn" id="nextPageBtn" type="button" onclick="changeQuestionPage(1)" style="display:none;">Next group →</button>
     <button class="submit-btn" id="submitBtn" onclick="submitExam()">Submit Examination</button>
   </div>
 
@@ -141,6 +159,9 @@ let autosaveInterval = null;
 let timeRemaining = 0;
 let isSubmitting = false;
 let answers = {};
+let examQuestions = [];
+let questionsPerPage = 3;
+let currentQuestionPage = 0;
 
 // ─── Start ───
 async function startExam() {
@@ -167,12 +188,14 @@ async function startExam() {
     attemptId = data.attempt_id;
     timeRemaining = data.remaining_seconds;
     answers = data.saved_answers || {};
+    examQuestions = data.questions || [];
+    questionsPerPage = Number(document.getElementById('questionsPerPage').value) === 5 ? 5 : 3;
 
     document.getElementById('examTitle').textContent = data.exam.title;
     document.getElementById('courseCode').textContent = data.exam.code || '';
     document.getElementById('examUI').style.display = 'block';
 
-    renderQuestions(data.questions);
+    renderQuestions();
     startTimer();
     startAutosave();
 
@@ -190,11 +213,16 @@ async function startExam() {
 }
 
 // ─── Render questions ───
-function renderQuestions(questions) {
+function renderQuestions() {
   const container = document.getElementById('questionsContainer');
-  container.innerHTML = questions.map((q, idx) => `
+  const start = currentQuestionPage * questionsPerPage;
+  const pageQuestions = examQuestions.slice(start, start + questionsPerPage);
+  const end = start + pageQuestions.length;
+  container.innerHTML = pageQuestions.map((q, offset) => {
+    const idx = start + offset;
+    return `
     <div class="question-card">
-      <div class="question-num">Question ${idx + 1} of ${questions.length} · ${q.marks} mark${q.marks !== 1 ? 's' : ''}</div>
+      <div class="question-num">Question ${idx + 1} of ${examQuestions.length} · ${q.marks} mark${q.marks !== 1 ? 's' : ''}</div>
       <div class="question-text">${escapeHtml(q.question_text)}</div>
       ${['A', 'B', 'C', 'D'].map(opt => `
         <label class="option-label">
@@ -203,7 +231,14 @@ function renderQuestions(questions) {
         </label>
       `).join('')}
     </div>
-  `).join('');
+  `;
+  }).join('');
+
+  const pageCount = Math.ceil(examQuestions.length / questionsPerPage);
+  document.getElementById('pageIndicator').textContent = `Questions ${start + 1}–${end} of ${examQuestions.length} · Page ${currentQuestionPage + 1} of ${pageCount}`;
+  document.getElementById('previousPageBtn').style.display = currentQuestionPage > 0 ? 'inline-block' : 'none';
+  document.getElementById('nextPageBtn').style.display = currentQuestionPage < pageCount - 1 ? 'inline-block' : 'none';
+  document.getElementById('submitBtn').style.display = currentQuestionPage === pageCount - 1 ? 'inline-block' : 'none';
 
   // Bind change events
   container.querySelectorAll('input[type="radio"]').forEach(input => {
@@ -212,6 +247,38 @@ function renderQuestions(questions) {
       answers[qId] = e.target.value;
     });
   });
+}
+
+function currentPageIsComplete() {
+  const start = currentQuestionPage * questionsPerPage;
+  return examQuestions.slice(start, start + questionsPerPage).every(question => Boolean(answers[question.id]));
+}
+
+async function saveProgress() {
+  const res = await fetch(`/api/student/exams/${attemptId}/save`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'same-origin',
+    body: JSON.stringify({ answers }),
+  });
+  if (!res.ok) throw new Error('Could not save your answers. Check your connection and try again.');
+}
+
+async function changeQuestionPage(direction) {
+  const nextPage = currentQuestionPage + direction;
+  const pageCount = Math.ceil(examQuestions.length / questionsPerPage);
+  if (nextPage < 0 || nextPage >= pageCount) return;
+  if (direction > 0 && !currentPageIsComplete()) {
+    alert('Answer every question on this page before continuing.');
+    return;
+  }
+  const controls = [document.getElementById('previousPageBtn'), document.getElementById('nextPageBtn')];
+  controls.forEach(button => { button.disabled = true; });
+  try {
+    await saveProgress();
+    currentQuestionPage = nextPage;
+    renderQuestions();
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  } catch (err) { alert(err.message); }
+  finally { controls.forEach(button => { button.disabled = false; }); }
 }
 
 function escapeHtml(str) {
@@ -234,7 +301,7 @@ function startTimer() {
     if (timeRemaining <= 0) {
       clearInterval(timerInterval);
       alert('⏰ Time is up! Your exam will be submitted automatically.');
-      submitExam();
+      submitExam(true);
     }
 
     timeRemaining--;
@@ -248,17 +315,10 @@ function startTimer() {
 function startAutosave() {
   autosaveInterval = setInterval(async () => {
     try {
-      const res = await fetch(`/api/student/exams/${attemptId}/save`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'same-origin',
-        body: JSON.stringify({ answers }),
-      });
-      if (res.ok) {
-        const ind = document.getElementById('autosaveIndicator');
-        ind.classList.add('show');
-        setTimeout(() => ind.classList.remove('show'), 1500);
-      }
+      await saveProgress();
+      const ind = document.getElementById('autosaveIndicator');
+      ind.classList.add('show');
+      setTimeout(() => ind.classList.remove('show'), 1500);
     } catch (err) {
       console.error('Autosave failed:', err);
     }
@@ -266,9 +326,10 @@ function startAutosave() {
 }
 
 // ─── Submit ───
-async function submitExam() {
+async function submitExam(autoSubmit = false) {
   if (isSubmitting) return;
-  if (!confirm('Are you sure you want to submit? You cannot make changes after this.')) return;
+  if (!autoSubmit && !currentPageIsComplete()) return alert('Answer every question on this page before submitting.');
+  if (!autoSubmit && !confirm('Are you sure you want to submit? You cannot make changes after this.')) return;
 
   isSubmitting = true;
   clearInterval(timerInterval);
@@ -304,6 +365,17 @@ async function submitExam() {
     btn.disabled = false;
   }
 }
+
+// Discourage copying or selecting exam text in the browser.
+const examSurface = document.getElementById('examUI');
+['copy', 'cut', 'contextmenu', 'selectstart'].forEach(eventName => {
+  examSurface.addEventListener(eventName, event => {
+    if (eventName !== 'contextmenu' || event.target.closest('#questionsContainer')) event.preventDefault();
+  });
+});
+examSurface.addEventListener('keydown', event => {
+  if ((event.ctrlKey || event.metaKey) && ['a', 'c', 'x'].includes(event.key.toLowerCase())) event.preventDefault();
+});
 
 // ─── Auto-fill metadata on load ───
 if (examId) {

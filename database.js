@@ -72,12 +72,14 @@ async function initSchema() {
       title TEXT NOT NULL,
       trainer TEXT NOT NULL,
       description TEXT,
-      fee REAL
+      fee REAL,
+      duration_weeks INTEGER NOT NULL DEFAULT 8
     )`,
     `CREATE TABLE IF NOT EXISTS enrollments (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       student_id INTEGER NOT NULL,
       course_id INTEGER NOT NULL,
+      learning_mode TEXT NOT NULL DEFAULT 'classroom',
       enrolled_at DATETIME DEFAULT CURRENT_TIMESTAMP
     )`,
     `CREATE TABLE IF NOT EXISTS results (
@@ -261,6 +263,58 @@ async function initSchema() {
       status TEXT DEFAULT 'in_progress',
       answers_json TEXT
     )`,
+    `CREATE TABLE IF NOT EXISTS learning_paths (
+      course_id INTEGER PRIMARY KEY,
+      status TEXT NOT NULL DEFAULT 'pending',
+      error TEXT,
+      generated_at DATETIME,
+      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    )`,
+    `CREATE TABLE IF NOT EXISTS learning_chapters (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      course_id INTEGER NOT NULL,
+      position INTEGER NOT NULL,
+      title TEXT NOT NULL,
+      overview TEXT,
+      material_ids TEXT NOT NULL,
+      estimated_hours REAL NOT NULL DEFAULT 2,
+      UNIQUE(course_id, position)
+    )`,
+    `CREATE TABLE IF NOT EXISTS learning_quiz_questions (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      chapter_id INTEGER NOT NULL,
+      question_text TEXT NOT NULL,
+      option_a TEXT NOT NULL,
+      option_b TEXT NOT NULL,
+      option_c TEXT NOT NULL,
+      option_d TEXT NOT NULL,
+      correct_option TEXT NOT NULL,
+      explanation TEXT,
+      marks INTEGER NOT NULL DEFAULT 1
+    )`,
+    `CREATE TABLE IF NOT EXISTS student_chapter_progress (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      student_id INTEGER NOT NULL,
+      chapter_id INTEGER NOT NULL,
+      attempts INTEGER NOT NULL DEFAULT 0,
+      best_score INTEGER NOT NULL DEFAULT 0,
+      total_marks INTEGER NOT NULL DEFAULT 0,
+      passed INTEGER NOT NULL DEFAULT 0,
+      materials_completed INTEGER NOT NULL DEFAULT 0,
+      completed_at DATETIME,
+      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      UNIQUE(student_id, chapter_id)
+    )`,
+    `CREATE TABLE IF NOT EXISTS learning_quiz_attempts (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      student_id INTEGER NOT NULL,
+      chapter_id INTEGER NOT NULL,
+      score INTEGER NOT NULL,
+      total_marks INTEGER NOT NULL,
+      passed INTEGER NOT NULL,
+      answers_json TEXT NOT NULL,
+      submitted_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    )`,
   ];
 
   for (const sql of statements) {
@@ -269,6 +323,28 @@ async function initSchema() {
   const courseColumns = await client.execute('PRAGMA table_info(courses)');
   if (!courseColumns.rows.some(column => column.name === 'fee')) {
     await client.execute('ALTER TABLE courses ADD COLUMN fee REAL');
+  }
+  const hadCourseDuration = courseColumns.rows.some(column => column.name === 'duration_weeks');
+  if (!hadCourseDuration) {
+    await client.execute('ALTER TABLE courses ADD COLUMN duration_weeks INTEGER NOT NULL DEFAULT 8');
+    const knownDurations = {
+      SC001: 3, SC002: 2, SC003: 3, SC004: 4, SC005: 3, SC006: 6, SC007: 4, SC008: 2,
+      SC009: 6, SC010: 3, SC011: 4, SC012: 4, SC013: 3, SC014: 3, SC015: 4, SC016: 6,
+      SC017: 2, SC018: 2, SC019: 3, SC020: 2, SC021: 2, SC022: 4, SC023: 4, SC024: 4,
+      SC025: 4, SC026: 4, BIZ101: 8, MKT201: 6, FIN301: 8, ENT401: 10, LDR501: 6,
+      ELE101: 12, WEB101: 10, DB201: 8, JS301: 8, PY101: 10, NET210: 8,
+    };
+    for (const [code, weeks] of Object.entries(knownDurations)) {
+      await client.execute({ sql: 'UPDATE courses SET duration_weeks = ? WHERE code = ?', args: [weeks, code] });
+    }
+  }
+  const enrollmentColumns = await client.execute('PRAGMA table_info(enrollments)');
+  if (!enrollmentColumns.rows.some(column => column.name === 'learning_mode')) {
+    await client.execute("ALTER TABLE enrollments ADD COLUMN learning_mode TEXT NOT NULL DEFAULT 'classroom'");
+  }
+  const progressColumns = await client.execute('PRAGMA table_info(student_chapter_progress)');
+  if (!progressColumns.rows.some(column => column.name === 'materials_completed')) {
+    await client.execute('ALTER TABLE student_chapter_progress ADD COLUMN materials_completed INTEGER NOT NULL DEFAULT 0');
   }
   const materialColumns = await client.execute('PRAGMA table_info(materials)');
   for (const [name, definition] of [
@@ -336,9 +412,11 @@ async function seed() {
       ['NET210', 'Networking Essentials', 'Mr. Brian W.', '8 weeks', 'Technical'],
     ];
     for (const c of courses) {
+      const durationValues = String(c[3] || '').match(/\d+/g)?.map(Number) || [8];
+      const durationWeeks = Math.max(1, Math.round(durationValues.reduce((sum, value) => sum + value, 0) / durationValues.length));
       await client.execute({
-        sql: 'INSERT OR IGNORE INTO courses (code, title, trainer, description) VALUES (?, ?, ?, ?)',
-        args: [c[0], c[1], c[2], c[4]],
+        sql: 'INSERT OR IGNORE INTO courses (code, title, trainer, description, duration_weeks) VALUES (?, ?, ?, ?, ?)',
+        args: [c[0], c[1], c[2], c[4], durationWeeks],
       });
     }
 

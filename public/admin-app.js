@@ -532,6 +532,7 @@ if (bulkBtn) bulkBtn.addEventListener('click', openBulkAssignModal);
     { name: 'code',        label: 'Code', required: true },
     { name: 'title',       label: 'Title', required: true },
     { name: 'trainer',     label: 'Trainer (text, used if no lecturer assigned)' },
+    { name: 'duration_weeks', label: 'Course duration (weeks)', type: 'number', value: 8, required: true },
     { name: 'fee',          label: 'Course fee (KES; blank uses catalog price or KES 3,000 admission fee)', type: 'number' },
     { name: 'lecturer_id', label: 'Assigned Lecturer', type: 'select',
       options: [{ value: '', label: '— None —' }].concat(
@@ -543,6 +544,7 @@ if (bulkBtn) bulkBtn.addEventListener('click', openBulkAssignModal);
       code: d.code,
       title: d.title,
       trainer: d.trainer || 'Unassigned',
+      duration_weeks: Number(d.duration_weeks),
       fee: d.fee ? Number(d.fee) : null,
       description: d.description,
     };
@@ -946,6 +948,7 @@ if (addLectBtn) {
         <tr>
           <td>${esc(c.code)}</td>
           <td>${esc(c.title)}</td>
+          <td>${Number(c.duration_weeks) || 8} weeks</td>
           <td>${lecturerNames} ${lecturerBadge}</td>
           <td>${c.enrolled_count}</td>
           <td>
@@ -955,7 +958,7 @@ if (addLectBtn) {
             <button class="btn-xs danger" data-act="del-course" data-id="${c.id}" type="button">Delete</button>
           </td>
         </tr>`;
-    }).join('') || '<tr><td colspan="5" class="empty">No courses found.</td></tr>';
+    }).join('') || '<tr><td colspan="6" class="empty">No courses found.</td></tr>';
 
     wireTableActions(tb);
   }
@@ -1133,6 +1136,7 @@ async function openBulkAssignModal() {
       { name: 'code',        label: 'Code',    value: c.code,    required: true },
       { name: 'title',       label: 'Title',   value: c.title,   required: true },
       { name: 'trainer',     label: 'Trainer', value: c.trainer, required: true },
+      { name: 'duration_weeks', label: 'Course duration (weeks)', type: 'number', value: c.duration_weeks || 8, required: true },
       { name: 'description', label: 'Description', type: 'textarea', value: c.description || '' }
     ], async d => {
       await api(`/api/admin/courses/${id}`, { method: 'PUT', body: d });
