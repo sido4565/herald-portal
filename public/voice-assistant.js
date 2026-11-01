@@ -8,6 +8,46 @@
   root.hidden = true;
   const log=root.querySelector('.va-log'), form=root.querySelector('form'), input=form.querySelector('input'), actions=root.querySelector('.va-actions');
   let draft=null, waiting=null;
+  const adminAreas={
+    students:['students','#addStudentBtn'], admissions:['admissions',null], lecturers:['lecturers','#addLecturerBtn'],
+    'password requests':['password-resets',null], courses:['courses','#addCourseBtn'], announcements:['announcements','#addAnnBtn'],
+    jobs:['jobs','#addJobBtn'], results:['results','#addResultBtn'], fees:['fees','#addFeeBtn'], timetable:['timetable','#addTTBtn'],
+    assignments:['assignments','#addAsgBtn'], attendance:['attendance','#takeAttendanceBtn'],
+    'lecturer attendance':['lecturer-attendance',null], materials:['materials','#adminAddMaterialBtn'],
+    'books and materials':['materials','#adminAddMaterialBtn'], 'live classes':['liveclasses','#addLiveClassBtn'], exams:['exams',null]
+  };
+  function startAdminForm(text){
+    const normalized=normalize(text);
+    const area=Object.keys(adminAreas).sort((a,b)=>b.length-a.length).find(name=>{const key=normalize(name);return normalized.includes(key)||normalized.includes(key.replace(/s$/,''));});
+    if(!area)return false;
+    const [panel,button]=adminAreas[area];
+    if(panel==='exams'){
+      if(/\b(open|show|go to)\b/.test(normalized)){location.href='admin-exams.html';return true;}
+      say('Assistant','Open Exams first, then say “create exam” or “publish [exam title]”.');return true;
+    }
+    document.querySelector(`.admin-tab[data-panel="${panel}"]`)?.click();
+    if(!button){say('Assistant',`I opened ${area}. Use a command such as “approve [name]” or “load today” and I’ll guide the action.`);return true;}
+    if(!/\b(add|new|create|post|publish|upload|schedule|take|record|enter)\b/.test(normalized)){
+      say('Assistant',`I opened ${area}. To make a change, say “create ${area}” or “publish a ${area==='jobs'?'job':'new announcement'}”.`);return true;
+    }
+    document.querySelector(button)?.click();
+    setTimeout(()=>beginModalVoice(text),100);
+    return true;
+  }
+  function beginModalVoice(command){
+    const form=document.querySelector('#modalForm');
+    if(!form||!form.elements.length){say('Assistant','That action uses a custom form. I opened it; please complete it and save.');return;}
+    const fields=[...form.elements].filter(el=>el.name&&!el.disabled);
+    draft={kind:'admin-form',form,fields,index:0,values:{},command};
+    askModalField();
+  }
+  function askModalField(){
+    if(!draft||draft.kind!=='admin-form')return;
+    while(draft.index<draft.fields.length){const el=draft.fields[draft.index];if(el.value){draft.values[el.name]=el.value;draft.index++;continue;}break;}
+    if(draft.index>=draft.fields.length){clearActions();const b=document.createElement('button');b.textContent='Confirm and save';b.onclick=submitVoiceForm;const c=document.createElement('button');c.className='secondary';c.textContent='Cancel';c.onclick=()=>{document.querySelector('#modalCancel')?.click();draft=null;clearActions();say('Assistant','Cancelled.');};actions.append(b,c);const preview=draft.fields.map(field=>`${field.labels?.[0]?.textContent||field.name}: ${draft.values[field.name]||'—'}`).join('; ');say('Assistant',`Review before saving: ${preview}. Say “confirm” to submit or “cancel”.`);return;}
+    const field=draft.fields[draft.index];const hint=field.type==='date'?' Use YYYY-MM-DD.':field.type==='email'?' Say the complete email address.':'';say('Assistant',`${field.labels?.[0]?.textContent||field.name}${field.required?' (required)':''}?${hint} Say “skip” for an optional field.`);
+  }
+  async function submitVoiceForm(){const btn=actions.querySelector('button');if(btn)btn.disabled=true;try{for(const [key,value] of Object.entries(draft.values)){const el=[...draft.form.elements].find(item=>item.name===key);if(el)el.value=value;}if(!draft.form.reportValidity())throw Error('A required field is still missing.');draft.form.requestSubmit();draft=null;clearActions();window.heraldVoiceTaskActive=false;say('Assistant','Submitted. The admin form is saving your change.');}catch(e){if(btn)btn.disabled=false;say('Assistant',e.message);}}
   const MEETING_LINK_KEY='herald_voice_last_meeting_link';
   let lastMeetingUrl='';
   try{lastMeetingUrl=sessionStorage.getItem(MEETING_LINK_KEY)||'';}catch{}
@@ -41,9 +81,16 @@
   function review(){clearActions();if(!draft)return;const confirm=document.createElement('button');confirm.textContent='Confirm and save';confirm.onclick=save;const cancel=document.createElement('button');cancel.className='secondary';cancel.textContent='Cancel';cancel.onclick=()=>{draft=null;clearActions();say('Assistant','Draft cancelled.');};actions.append(confirm,cancel);say('Assistant',summary());}
   const summary=()=>draft.kind==='class'?`Schedule “${draft.title}” for ${draft.course.title} on ${new Date(draft.scheduled_at).toLocaleString()} (${draft.duration_minutes} min), link ${draft.meeting_url}.` : draft.kind==='assign'?`Assign ${draft.lecturer.name} to ${draft.course.code} — ${draft.course.title}.`:`Mark ${draft.records.length} student(s) ${draft.records[0]?.status} in ${draft.course.title} for ${draft.date}.`;
   async function save(){const btn=actions.querySelector('button');btn.disabled=true;try{if(draft.kind==='class'){if(!draft.course?.id||!draft.title||!draft.meeting_url||!draft.scheduled_at)throw Error('I still need the course, class title, start date and time, and meeting link.');await api(role==='admin'?'/api/admin/live-classes':'/api/lecturer/live-classes',{method:'POST',body:{course_id:draft.course.id,title:draft.title,description:draft.description||'',meeting_url:draft.meeting_url,scheduled_at:draft.scheduled_at,duration_minutes:draft.duration_minutes||60,notify:draft.notify!==false}});}else if(draft.kind==='assign'){await api(`/api/admin/courses/${draft.course.id}/assign-lecturer`,{method:'POST',body:{lecturer_id:draft.lecturer.id}});}else{await api(role==='admin'?'/api/admin/attendance':'/api/lecturer/attendance',{method:'POST',body:{course_id:draft.course.id,date:draft.date,records:draft.records}});}say('Assistant','Done. The portal saved that change.');draft=null;clearActions();window.heraldVoiceTaskActive=false;}catch(e){btn.disabled=false;say('Assistant',e.message);}}
-  async function process(raw){const text=raw.trim();if(!text)return;window.heraldVoiceTaskActive=true;say('You',text);const low=text.toLowerCase();if(/^(no|cancel|never mind|stop)$/i.test(low)){draft=null;waiting=null;clearActions();window.heraldVoiceTaskActive=false;say('Assistant','Cancelled.');return;}if(draft&&/\b(go ahead|proceed|yes|confirm|save|do it|schedule it|create it)\b/i.test(low)){await save();return;}if(draft?.kind==='class'&&/\b(schedule|create|plan)\b/i.test(low)&&/\b(class|session|live)\b/i.test(low)){await askClassField();return;}
+  async function process(raw){const text=raw.trim();if(!text)return;window.heraldVoiceTaskActive=true;say('You',text);const low=text.toLowerCase();if(/^(no|cancel|never mind|stop)$/i.test(low)){draft=null;waiting=null;clearActions();document.querySelector('#modalCancel')?.click();window.heraldVoiceTaskActive=false;say('Assistant','Cancelled.');return;}if(draft?.kind==='admin-form'){
+      if(/^(go ahead|proceed|yes|confirm|save|do it|publish it|create it)$/i.test(low)){await submitVoiceForm();return;}
+      if(/^(skip|next)$/i.test(low)){const field=draft.fields[draft.index];if(field?.required){say('Assistant','That field is required. Please provide a value.');return;}draft.index++;askModalField();return;}
+      const field=draft.fields[draft.index];if(!field){askModalField();return;}let value=text;
+      if(field.tagName==='SELECT'){const option=[...field.options].find(o=>normalize(o.textContent)===normalize(text)||normalize(o.textContent).includes(normalize(text)));if(!option){say('Assistant',`Please choose one of: ${[...field.options].filter(o=>o.value).map(o=>o.textContent).join(', ')}.`);return;}value=option.value;}
+      draft.values[field.name]=value;draft.index++;askModalField();return;
+    }if(draft&&/\b(go ahead|proceed|yes|confirm|save|do it|schedule it|create it)\b/i.test(low)){await save();return;}if(draft?.kind==='class'&&/\b(schedule|create|plan)\b/i.test(low)&&/\b(class|session|live)\b/i.test(low)){await askClassField();return;}
     try{
       if(waiting){const step=waiting;waiting=null;await step(text);return;}
+      if(role==='admin'&&startAdminForm(text))return;
       const [courses,lecturers]=await getData();
       if(/assign|allocate/.test(low)&&role==='admin'){
         let course=match(courses,text),lecturer=match(lecturers,text,'name');
@@ -64,7 +111,7 @@
         await askClassField();return;
       }
       window.heraldVoiceTaskActive=false;
-      say('Assistant',role==='admin'?'Try “schedule a live class”, “assign [course] to [lecturer]”, or “mark [course] attendance present”.':'Try “schedule a live class” or “mark [course] attendance present”.');
+      say('Assistant',role==='admin'?'Say “open students”, “create a course”, “publish an announcement”, “publish a job”, or “open exams”.':'Try “schedule a live class” or “mark [course] attendance present”.');
     }catch(e){window.heraldVoiceTaskActive=false;say('Assistant',e.message);}
   }
   window.addEventListener('herald-help-command', event => { process(String(event.detail || '')); });

@@ -196,7 +196,8 @@
       return 'Your lecturer dashboard lets you view assigned courses and enrolment counts; add or edit results; manage attendance; post announcements; post, edit, or delete study materials; schedule or delete live classes; manage and publish exams; and update your profile. In this chat, I can directly schedule a live class for a course or mark one attendance status for that course roster. I will show the details for confirmation before saving. A scheduled class is available to students enrolled in that course.';
     }
     const classCommand = /\b(schedule|create|plan)\b/.test(query) && /\b(class|session|live)\b/.test(query);
-    if (role && (window.heraldVoiceTaskActive || classCommand || /\b(assign|allocate|attendance|register|mark present|mark absent|mark late|mark excused)\b/.test(query))) {
+    const adminCommand = role === 'admin' && /\b(open|show|go to|add|new|create|post|publish|upload|schedule|take|record|enter|approve|reject|suspend|reactivate|reset|delete|remove|edit|update|assign|mark|pay|review|load|save|generate)\b/.test(query) && /\b(students?|admissions?|lecturers?|password requests?|courses?|announcements?|jobs?|results?|fees?|timetable|assignments?|attendance|materials?|books?|live classes|exams?)\b/.test(query);
+    if (role && (window.heraldVoiceTaskActive || classCommand || adminCommand || /\b(assign|allocate|attendance|register|mark present|mark absent|mark late|mark excused)\b/.test(query))) {
       window.dispatchEvent(new CustomEvent('herald-help-command', { detail: text }));
       return true;
     }
