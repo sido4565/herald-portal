@@ -52,6 +52,7 @@
             <div class="hh-header-title">💬 Herald Help</div>
             <div class="hh-header-sub">Ask me anything about the portal</div>
           </div>
+          <button class="hh-voice-toggle" id="hhVoiceToggle" type="button" aria-pressed="false" title="Turn on spoken replies">🔇</button>
           <button class="hh-close" id="hhClose" aria-label="Close chat" type="button">×</button>
         </div>
         <div class="hh-messages" id="hhMessages"></div>
@@ -152,6 +153,24 @@
   function hideTyping() {
     const t = document.getElementById('hhTyping');
     if (t) t.remove();
+  }
+
+  let voiceRepliesEnabled = false;
+  function speakReply(text) {
+    if (!voiceRepliesEnabled || !('speechSynthesis' in window) || !text) return;
+    window.speechSynthesis.cancel();
+    const spokenText = String(text).replace(/https?:\/\/\S+/g, ' link ').replace(/[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}]/gu, ' ').trim();
+    if (!spokenText) return;
+    const utterance = new SpeechSynthesisUtterance(spokenText);
+    utterance.lang = 'en-KE';
+    window.speechSynthesis.speak(utterance);
+  }
+
+  function addBotMessage(container, messages, msg) {
+    messages.push(msg);
+    renderMessage(container, msg);
+    saveHistory(messages);
+    speakReply(msg.text);
   }
 
   let pendingStudentAction = null;
@@ -264,6 +283,8 @@
 
   // ─── Send message ───
   async function sendMessage(text, messages, container) {
+    if (sendMessage.inFlight) return;
+    sendMessage.inFlight = true;
     const userMsg = { role: 'user', text };
     messages.push(userMsg);
     renderMessage(container, userMsg);
@@ -280,6 +301,7 @@
     try {
       const taskAnswer = await handlePortalTask(text);
       if (taskAnswer === true) {
+        sendMessage.inFlight = false;
         sendBtn.disabled = false;
         input.disabled = false;
         input.focus();
@@ -287,9 +309,8 @@
       }
       if (taskAnswer) {
         const botMsg = { role: 'bot', text: taskAnswer, source: 'portal' };
-        messages.push(botMsg);
-        renderMessage(container, botMsg);
-        saveHistory(messages);
+        addBotMessage(container, messages, botMsg);
+        sendMessage.inFlight = false;
         sendBtn.disabled = false;
         input.disabled = false;
         input.focus();
@@ -297,9 +318,8 @@
       }
     } catch (err) {
       const botMsg = { role: 'bot', text: err.message || 'I could not complete that portal request.', source: 'error' };
-      messages.push(botMsg);
-      renderMessage(container, botMsg);
-      saveHistory(messages);
+      addBotMessage(container, messages, botMsg);
+      sendMessage.inFlight = false;
       sendBtn.disabled = false;
       input.disabled = false;
       input.focus();
@@ -321,8 +341,7 @@
       if (!res.ok) {
         const errText = data.error || 'Something went wrong.';
         const botMsg = { role: 'bot', text: errText, source: 'error' };
-        messages.push(botMsg);
-        renderMessage(container, botMsg);
+        addBotMessage(container, messages, botMsg);
       } else {
         const botMsg = {
           role: 'bot',
@@ -330,10 +349,8 @@
           links: data.links || [],
           source: data.source || 'faq',
         };
-        messages.push(botMsg);
-        renderMessage(container, botMsg);
+        addBotMessage(container, messages, botMsg);
       }
-      saveHistory(messages);
     } catch (err) {
       hideTyping();
       const botMsg = {
@@ -341,9 +358,9 @@
         text: 'Network error. Please check your connection and try again.',
         source: 'error',
       };
-      messages.push(botMsg);
-      renderMessage(container, botMsg);
+      addBotMessage(container, messages, botMsg);
     } finally {
+      sendMessage.inFlight = false;
       sendBtn.disabled = false;
       input.disabled = false;
       input.focus();
@@ -362,6 +379,7 @@
     const bubble = document.getElementById('hhBubble');
     const panel = document.getElementById('hhPanel');
     const closeBtn = document.getElementById('hhClose');
+    const voiceToggle = document.getElementById('hhVoiceToggle');
     const form = document.getElementById('hhForm');
     const input = document.getElementById('hhInput');
     const messagesEl = document.getElementById('hhMessages');
@@ -370,6 +388,17 @@
     // Web Speech API is available in Chromium based browsers. Typed input
     // stays available everywhere, and spoken requests enter the same chat.
     const mic = document.getElementById('hhMic');
+    if (!('speechSynthesis' in window)) {
+      voiceToggle.disabled = true;
+      voiceToggle.title = 'Spoken replies are not available in this browser';
+    }
+    voiceToggle.addEventListener('click', () => {
+      voiceRepliesEnabled = !voiceRepliesEnabled;
+      voiceToggle.textContent = voiceRepliesEnabled ? '🔊' : '🔇';
+      voiceToggle.setAttribute('aria-pressed', String(voiceRepliesEnabled));
+      voiceToggle.title = voiceRepliesEnabled ? 'Turn off spoken replies' : 'Turn on spoken replies';
+      if (!voiceRepliesEnabled && 'speechSynthesis' in window) window.speechSynthesis.cancel();
+    });
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
     if (SpeechRecognition) {
       mic.addEventListener('click', () => {
@@ -377,6 +406,10 @@
         recognition.lang = 'en-KE';
         recognition.interimResults = false;
         recognition.onresult = event => {
+          voiceRepliesEnabled = true;
+          voiceToggle.textContent = '🔊';
+          voiceToggle.setAttribute('aria-pressed', 'true');
+          voiceToggle.title = 'Turn off spoken replies';
           input.value = event.results[0][0].transcript;
           form.requestSubmit();
         };
@@ -397,9 +430,7 @@
     window.addEventListener('herald-help-bot-reply', event => {
       if (event.detail?.who !== 'Assistant') return;
       const msg = { role: 'bot', text: event.detail.msg, source: 'portal' };
-      messages.push(msg);
-      renderMessage(messagesEl, msg);
-      saveHistory(messages);
+      addBotMessage(messagesEl, messages, msg);
     });
 
     // Render existing history

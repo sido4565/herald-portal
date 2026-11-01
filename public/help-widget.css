@@ -133,6 +133,19 @@ body.dark .herald-help-root {
   margin-top: 2px;
 }
 
+.hh-voice-toggle {
+  margin-left: auto;
+  margin-right: 8px;
+  width: 32px;
+  height: 30px;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.12);
+  color: #fff;
+  cursor: pointer;
+}
+.hh-voice-toggle:disabled { opacity: .55; cursor: not-allowed; }
+
 .hh-close {
   background: rgba(255, 255, 255, 0.15);
   border: none;
