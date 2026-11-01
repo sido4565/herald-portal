@@ -709,6 +709,8 @@ if (addLectBtn) {
       });
     });
     $('#generateCatBtn')?.addEventListener('click', () => {
+      const helpPanel = document.querySelector('#hhPanel');
+      if (helpPanel && !helpPanel.classList.contains('open')) document.querySelector('#hhBubble')?.click();
       window.dispatchEvent(new CustomEvent('herald-help-command', { detail: 'generate CAT' }));
     });
 
