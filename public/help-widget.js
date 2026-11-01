@@ -192,7 +192,11 @@
   async function handlePortalTask(text) {
     const query = text.trim().toLowerCase();
     const role = document.getElementById('adminName') ? 'admin' : document.getElementById('lecturerName') ? 'lecturer' : null;
-    if (role && (window.heraldVoiceTaskActive || /\b(schedule|assign|allocate|attendance|register|mark present|mark absent|mark late|mark excused)\b/.test(query))) {
+    if (role === 'lecturer' && /\bwhat can you (?:actually )?do\b|\bwhat can i do (?:with|on) (?:my )?dashboard\b|\blecturer dashboard (?:help|features)\b/.test(query)) {
+      return 'Your lecturer dashboard lets you view assigned courses and enrolment counts; add or edit results; manage attendance; post announcements; post, edit, or delete study materials; schedule or delete live classes; manage and publish exams; and update your profile. In this chat, I can directly schedule a live class for a course or mark one attendance status for that course roster. I will show the details for confirmation before saving. A scheduled class is available to students enrolled in that course.';
+    }
+    const classCommand = /\b(schedule|create|plan)\b/.test(query) && /\b(class|session|live)\b/.test(query);
+    if (role && (window.heraldVoiceTaskActive || classCommand || /\b(assign|allocate|attendance|register|mark present|mark absent|mark late|mark excused)\b/.test(query))) {
       window.dispatchEvent(new CustomEvent('herald-help-command', { detail: text }));
       return true;
     }
