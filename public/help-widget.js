@@ -404,18 +404,28 @@
       mic.addEventListener('click', () => {
         const recognition = new SpeechRecognition();
         recognition.lang = 'en-KE';
-        recognition.interimResults = false;
+        recognition.interimResults = true;
+        let transcript = '';
+        let failed = false;
         recognition.onresult = event => {
+          for (let i = event.resultIndex; i < event.results.length; i += 1) {
+            if (event.results[i].isFinal) transcript += `${event.results[i][0].transcript} `;
+          }
+        };
+        recognition.onerror = () => {
+          failed = true;
+          const msg = { role: 'bot', text: 'I could not access speech recognition. Check microphone permission or type your request.', source: 'error' };
+          messages.push(msg); renderMessage(messagesEl, msg);
+        };
+        recognition.onend = () => {
+          const spokenRequest = transcript.trim();
+          if (failed || !spokenRequest || sendMessage.inFlight) return;
           voiceRepliesEnabled = true;
           voiceToggle.textContent = '🔊';
           voiceToggle.setAttribute('aria-pressed', 'true');
           voiceToggle.title = 'Turn off spoken replies';
-          input.value = event.results[0][0].transcript;
+          input.value = spokenRequest;
           form.requestSubmit();
-        };
-        recognition.onerror = () => {
-          const msg = { role: 'bot', text: 'I could not access speech recognition. Check microphone permission or type your request.', source: 'error' };
-          messages.push(msg); renderMessage(messagesEl, msg);
         };
         recognition.start();
       });

@@ -10,12 +10,33 @@
   let draft=null, waiting=null;
   const say=(who,msg)=>{const p=document.createElement('p');p.className='va-msg';const b=document.createElement('b');b.textContent=who;const span=document.createElement('span');span.textContent=msg;p.append(b,span);log.append(p);log.scrollTop=log.scrollHeight;window.dispatchEvent(new CustomEvent('herald-help-bot-reply',{detail:{who,msg}}));};
   const api=async(url,opts={})=>{const r=await fetch(url,{credentials:'same-origin',headers:{'Content-Type':'application/json'},...opts,body:opts.body?JSON.stringify(opts.body):undefined});let x={};try{x=await r.json()}catch{}if(!r.ok)throw Error(x.error||`Request failed (${r.status})`);return x;};
-  const match=(list,text,key='title')=>list.find(x=>text.toLowerCase().includes(String(x[key]||'').toLowerCase()))||list.find(x=>String(x.code||'').toLowerCase()&&text.toLowerCase().includes(String(x.code).toLowerCase()));
+  const normalize=value=>String(value||'').toLowerCase().replace(/&/g,' and ').replace(/[^a-z0-9]+/g,' ').trim().replace(/\s+/g,' ');
+  const match=(list,text,key='title')=>{
+    const query=normalize(text).replace(/\b(schedule|create|plan|a|the|live|class|session|in|for|course)\b/g,' ').replace(/\s+/g,' ').trim();
+    const exact=list.find(x=>{const title=normalize(x[key]);const code=normalize(x.code);return (title&&query.includes(title))||(code&&query.split(' ').includes(code));});
+    if(exact)return exact;
+    const ranked=list.map(item=>({item,score:normalize(item[key]).split(' ').filter(word=>word.length>2&&query.split(' ').includes(word)).length})).sort((a,b)=>b.score-a.score);
+    return ranked[0]?.score>=2?ranked[0].item:null;
+  };
+  function parseStartTime(value){
+    const text=value.trim();
+    const direct=new Date(text);
+    if(!Number.isNaN(direct.getTime())&&/\d/.test(text))return direct;
+    const clock=text.match(/\b(\d{1,2})(?::(\d{2}))?\s*(am|pm)\b/i);
+    if(!clock)return null;
+    const date=new Date();
+    if(/\btom+o?r+ow\b/i.test(text))date.setDate(date.getDate()+1);
+    else if(!/\btoday\b/i.test(text))return null;
+    let hour=Number(clock[1])%12;
+    if(clock[3].toLowerCase()==='pm')hour+=12;
+    date.setHours(hour,Number(clock[2]||0),0,0);
+    return date;
+  }
   const getData=async()=>role==='admin'?Promise.all([api('/api/admin/courses'),api('/api/admin/lecturers')]):Promise.all([api('/api/lecturer/my-courses'),Promise.resolve([])]);
   const clearActions=()=>actions.replaceChildren();
   function review(){clearActions();if(!draft)return;const confirm=document.createElement('button');confirm.textContent='Confirm and save';confirm.onclick=save;const cancel=document.createElement('button');cancel.className='secondary';cancel.textContent='Cancel';cancel.onclick=()=>{draft=null;clearActions();say('Assistant','Draft cancelled.');};actions.append(confirm,cancel);say('Assistant',summary());}
   const summary=()=>draft.kind==='class'?`Schedule “${draft.title}” for ${draft.course.title} on ${new Date(draft.scheduled_at).toLocaleString()} (${draft.duration_minutes} min), link ${draft.meeting_url}.` : draft.kind==='assign'?`Assign ${draft.lecturer.name} to ${draft.course.code} — ${draft.course.title}.`:`Mark ${draft.records.length} student(s) ${draft.records[0]?.status} in ${draft.course.title} for ${draft.date}.`;
-  async function save(){const btn=actions.querySelector('button');btn.disabled=true;try{if(draft.kind==='class'){await api(role==='admin'?'/api/admin/live-classes':'/api/lecturer/live-classes',{method:'POST',body:draft});}else if(draft.kind==='assign'){await api(`/api/admin/courses/${draft.course.id}/assign-lecturer`,{method:'POST',body:{lecturer_id:draft.lecturer.id}});}else{await api(role==='admin'?'/api/admin/attendance':'/api/lecturer/attendance',{method:'POST',body:{course_id:draft.course.id,date:draft.date,records:draft.records}});}say('Assistant','Done. The portal saved that change.');draft=null;clearActions();window.heraldVoiceTaskActive=false;}catch(e){btn.disabled=false;say('Assistant',e.message);}}
+  async function save(){const btn=actions.querySelector('button');btn.disabled=true;try{if(draft.kind==='class'){if(!draft.course?.id||!draft.title||!draft.meeting_url||!draft.scheduled_at)throw Error('I still need the course, class title, start date and time, and meeting link.');await api(role==='admin'?'/api/admin/live-classes':'/api/lecturer/live-classes',{method:'POST',body:{course_id:draft.course.id,title:draft.title,description:draft.description||'',meeting_url:draft.meeting_url,scheduled_at:draft.scheduled_at,duration_minutes:draft.duration_minutes||60,notify:draft.notify!==false}});}else if(draft.kind==='assign'){await api(`/api/admin/courses/${draft.course.id}/assign-lecturer`,{method:'POST',body:{lecturer_id:draft.lecturer.id}});}else{await api(role==='admin'?'/api/admin/attendance':'/api/lecturer/attendance',{method:'POST',body:{course_id:draft.course.id,date:draft.date,records:draft.records}});}say('Assistant','Done. The portal saved that change.');draft=null;clearActions();window.heraldVoiceTaskActive=false;}catch(e){btn.disabled=false;say('Assistant',e.message);}}
   async function process(raw){const text=raw.trim();if(!text)return;window.heraldVoiceTaskActive=true;say('You',text);const low=text.toLowerCase();if(/^(cancel|never mind|stop)$/i.test(low)){draft=null;waiting=null;clearActions();window.heraldVoiceTaskActive=false;say('Assistant','Cancelled.');return;}if(draft&&/^(yes|confirm|save|do it)$/i.test(low)){await save();return;}
     try{
       if(waiting){const step=waiting;waiting=null;await step(text);return;}
@@ -31,7 +52,8 @@
         if(!course){const selectCourse=async answer=>{course=match(courses,answer);if(!course){say('Assistant','I could not find that course. Say its code or title.');waiting=selectCourse;return;}await prepareRoster(course,date,status);};waiting=selectCourse;say('Assistant','Which course is this attendance for?');return;}await prepareRoster(course,date,status);return;
       }
       if(/schedule|create|plan/.test(low)&&/class|session|live/.test(low)){
-        const course=match(courses,text),title=text.replace(/\b(schedule|create|plan|a|the|live|class|session|for|on|at)\b/gi,'').trim()||'Live Class';
+        const course=match(courses,text),named=text.match(/\b(?:called|named|titled)\s+(.+?)(?:\s+for\s+|\s+in\s+|$)/i);
+        const title=named?.[1]?.trim()||'Live Class';
         draft={kind:'class',course,title,scheduled_at:'',meeting_url:'',duration_minutes:60,description:'',notify:true};
         await askClassField();return;
       }
@@ -44,7 +66,7 @@
   let waitingCourse=()=>{};
   async function askLecturer(){const lecturers=await api('/api/admin/lecturers');waiting=answer=>{draft.lecturer=match(lecturers,answer,'name')||match(lecturers,answer,'staff_no');if(!draft.lecturer){say('Assistant','I could not find that lecturer. Please say their full name.');waiting=askLecturer;return;}review();};say('Assistant','Which lecturer? Say their name.');}
   async function prepareRoster(course,date,status){const roster=await api(role==='admin'?`/api/admin/courses/${course.id}/students`:`/api/lecturer/courses/${course.id}/students`);if(!roster.length){say('Assistant','There are no enrolled students in that course.');return;}draft={kind:'attendance',course,date,records:roster.map(s=>({student_id:s.id,status,notes:''}))};review();}
-  async function askClassField(){if(!draft.course){let coursesCache=[];const data=await getData();coursesCache=data[0];waiting=async answer=>{draft.course=match(coursesCache,answer);if(!draft.course){say('Assistant','I could not find that course. Please repeat its title or code.');await askClassField();return;}await askClassField();};say('Assistant','Which course is the live class for?');return;}if(!draft.scheduled_at){waiting=async answer=>{const d=new Date(answer);if(Number.isNaN(d.getTime())){say('Assistant','Please give a date and time I can read, such as 2026-11-05 14:30.');await askClassField();return;}draft.scheduled_at=d.toISOString();await askClassField();};say('Assistant','When should it start? Include date and time.');return;}if(!draft.meeting_url){waiting=async answer=>{draft.meeting_url=answer.match(/https?:\/\/\S+/)?.[0]||'';if(!draft.meeting_url){say('Assistant','Please provide a full meeting URL beginning with https://');await askClassField();return;}await askClassField();};say('Assistant','What meeting link should students use?');return;}review();}
+  async function askClassField(){if(!draft.course){let coursesCache=[];const data=await getData();coursesCache=data[0];waiting=async answer=>{draft.course=match(coursesCache,answer);if(!draft.course){say('Assistant','I could not match that course. Please say its course code or a few words from its title.');await askClassField();return;}await askClassField();};say('Assistant','Which course is the live class for? Say its course code or title.');return;}if(!draft.scheduled_at){waiting=async answer=>{const d=parseStartTime(answer);if(!d){say('Assistant','Please include a date and time, such as “tomorrow at 4 pm” or “2026-11-05 14:30”.');await askClassField();return;}draft.scheduled_at=d.toISOString();await askClassField();};say('Assistant','When should it start? You can say “tomorrow at 4 pm” or give a date and time.');return;}if(!draft.meeting_url){waiting=async answer=>{draft.meeting_url=answer.match(/https?:\/\/\S+/)?.[0]||'';if(!draft.meeting_url){say('Assistant','Please provide a full meeting URL beginning with https://');await askClassField();return;}await askClassField();};say('Assistant','What meeting link should students use?');return;}review();}
   form.addEventListener('submit',e=>{e.preventDefault();const v=input.value;input.value='';process(v);});
   const SR=window.SpeechRecognition||window.webkitSpeechRecognition;const mic=form.querySelector('.va-mic');if(!SR){mic.disabled=true;mic.title='Speech recognition is unavailable in this browser';}else mic.onclick=()=>{const rec=new SR();rec.lang='en-KE';rec.interimResults=false;rec.onresult=e=>{input.value=e.results[0][0].transcript;process(input.value);input.value='';};rec.onerror=()=>say('Assistant','I could not access speech recognition. Check microphone permission or type your request.');rec.start();};
   say('Assistant',`I’m ready. Tell me what you need to do${role==='admin'?'—schedule a class, assign a course, or mark attendance.':'—schedule a class or mark attendance.'}`);
