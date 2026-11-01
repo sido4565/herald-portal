@@ -196,8 +196,9 @@
       return 'Your lecturer dashboard lets you view assigned courses and enrolment counts; add or edit results; manage attendance; post announcements; post, edit, or delete study materials; schedule or delete live classes; manage and publish exams; and update your profile. In this chat, I can directly schedule a live class for a course or mark one attendance status for that course roster. I will show the details for confirmation before saving. A scheduled class is available to students enrolled in that course.';
     }
     const classCommand = /\b(schedule|create|plan)\b/.test(query) && /\b(class|session|live)\b/.test(query);
-    const adminCommand = role === 'admin' && /\b(open|show|go to|add|new|create|post|publish|upload|schedule|take|record|enter|approve|reject|suspend|reactivate|reset|delete|remove|edit|update|assign|mark|pay|review|load|save|generate)\b/.test(query) && /\b(students?|admissions?|lecturers?|password requests?|courses?|announcements?|jobs?|results?|fees?|timetable|assignments?|attendance|materials?|books?|live classes|exams?)\b/.test(query);
-    if (role && (window.heraldVoiceTaskActive || classCommand || adminCommand || /\b(assign|allocate|attendance|register|mark present|mark absent|mark late|mark excused)\b/.test(query))) {
+    const adminCommand = role === 'admin' && /\b(open|show|go to|add|new|create|post|publish|upload|schedule|take|record|enter|approve|reject|suspend|reactivate|reset|delete|remove|edit|update|assign|mark|pay|review|load|save|generate|send|issue|present|absent|late|excused)\b/.test(query) && /\b(students?|admissions?|lecturers?|password requests?|courses?|announcements?|jobs?|results?|fees?|timetable|assignments?|attendance|materials?|books?|live classes|exams?)\b/.test(query);
+    const namedApproval = role === 'admin' && /\b(approve|reject)\b/.test(query);
+    if (role && (window.heraldVoiceTaskActive || classCommand || adminCommand || namedApproval || /\b(assign|allocate|attendance|register|mark present|mark absent|mark late|mark excused)\b/.test(query))) {
       window.dispatchEvent(new CustomEvent('herald-help-command', { detail: text }));
       return true;
     }
@@ -455,7 +456,7 @@
       // First-time greeting
       const greeting = {
         role: 'bot',
-      text: "Hi! 👋 I’m Herald Help. Ask portal questions, speak using the microphone, or ask me to check your timetable, assignments, fees, results, attendance, materials, live classes, and exams. Students can also request course enrollment. Admins and lecturers can schedule classes, assign courses, and mark attendance.",
+      text: "Hi! 👋 I’m Herald Help. Ask portal questions, speak using the microphone, or ask me to check your timetable, assignments, fees, results, attendance, materials, live classes, and exams. Students can also request course enrollment. Admins can open dashboard sections, create and publish announcements or jobs, and use voice guided forms for supported admin entries. Admins and lecturers can also schedule classes, assign courses, and mark attendance.",
         source: 'faq',
       };
       messages.push(greeting);

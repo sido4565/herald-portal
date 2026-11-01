@@ -21,33 +21,49 @@
     const area=Object.keys(adminAreas).sort((a,b)=>b.length-a.length).find(name=>{const key=normalize(name);return normalized.includes(key)||normalized.includes(key.replace(/s$/,''));});
     if(!area)return false;
     const [panel,button]=adminAreas[area];
+    if(panel==='courses'&&/\b(assign|allocate)\b/.test(normalized))return false;
+    if(panel==='liveclasses'&&/\b(schedule|create|plan)\b/.test(normalized)&&/\b(class|session|live)\b/.test(normalized))return false;
+    if(panel==='attendance'&&/\b(mark|register)\b/.test(normalized)&&/\b(present|absent|late|excused)\b/.test(normalized))return false;
     if(panel==='exams'){
       if(/\b(open|show|go to)\b/.test(normalized)){location.href='admin-exams.html';return true;}
-      say('Assistant','Open Exams first, then say “create exam” or “publish [exam title]”.');return true;
+      say('Assistant','Open Exams first, then say “create exam” or “publish [exam title]”.');window.heraldVoiceTaskActive=false;return true;
     }
+    const openDialog=[...document.querySelectorAll('.modal-overlay')].find(node=>node.id==='modal'?!node.classList.contains('hidden'):node.isConnected);
+    if(openDialog){say('Assistant','A form is already open. Save or close that form first; I will not submit it as a different action.');window.heraldVoiceTaskActive=false;return true;}
     document.querySelector(`.admin-tab[data-panel="${panel}"]`)?.click();
-    if(!button){say('Assistant',`I opened ${area}. Use a command such as “approve [name]” or “load today” and I’ll guide the action.`);return true;}
-    if(!/\b(add|new|create|post|publish|upload|schedule|take|record|enter)\b/.test(normalized)){
-      say('Assistant',`I opened ${area}. To make a change, say “create ${area}” or “publish a ${area==='jobs'?'job':'new announcement'}”.`);return true;
+    if(!button){say('Assistant',`I opened ${area}. Use a command such as “approve [name]” or “load today” and I’ll guide the action.`);window.heraldVoiceTaskActive=false;return true;}
+    const formAction=/\b(add|new|create|post|publish|upload|schedule|take|record|enter)\b/.test(normalized);
+    const attendanceAction=panel==='attendance'&&/\b(present|absent|late)\b/.test(normalized);
+    if(!formAction&&!attendanceAction){
+      say('Assistant',`I opened ${area}. To make a change, say “create ${area}” or “publish a ${area==='jobs'?'job':'new announcement'}”.`);window.heraldVoiceTaskActive=false;return true;
     }
     document.querySelector(button)?.click();
-    setTimeout(()=>beginModalVoice(text),100);
+    waitForAdminForm(area,text);
     return true;
   }
-  function beginModalVoice(command){
+  async function waitForAdminForm(area,command){const expected=modalTitles[area];for(let i=0;i<60;i++){if(area==='attendance'&&document.querySelector('#attForm')){beginAttendanceVoice(command);return;}if(expected&&document.querySelector('#modalTitle')?.textContent.trim()===expected&&document.querySelector('#modalForm')?.elements.length){beginModalVoice(command,area);return;}await new Promise(resolve=>setTimeout(resolve,100));}say('Assistant','The requested form did not open. Please open it in the dashboard and try again.');window.heraldVoiceTaskActive=false;}
+  const modalTitles={students:'Add Student',lecturers:'Add Lecturer',courses:'Add Course',announcements:'New Announcement',jobs:'Post a Job',results:'Add Result',fees:'Add Fee Record',timetable:'Add Timetable Slot',assignments:'New Assignment','live classes':'Schedule Live Class'};
+  function fieldLabel(field){return field.labels?.[0]?.textContent||field.previousElementSibling?.tagName==='LABEL'&&field.previousElementSibling.textContent||field.name.replace(/_/g,' ');}
+  function beginModalVoice(command,area){
     const form=document.querySelector('#modalForm');
-    if(!form||!form.elements.length){say('Assistant','That action uses a custom form. I opened it; please complete it and save.');return;}
+    const expected=modalTitles[area];
+    if(!form||!form.elements.length||!expected||document.querySelector('#modalTitle')?.textContent.trim()!==expected){say('Assistant','I could not verify the form for that action. Close any open dialog, then repeat the command.');window.heraldVoiceTaskActive=false;return;}
     const fields=[...form.elements].filter(el=>el.name&&!el.disabled);
-    draft={kind:'admin-form',form,fields,index:0,values:{},command};
+    if(!fields.length){say('Assistant','I could not find any fields in that form. I will not submit it.');window.heraldVoiceTaskActive=false;return;}
+    draft={kind:'admin-form',form,fields,index:0,values:{},command,area};
     askModalField();
   }
+  function beginAttendanceVoice(){const form=document.querySelector('#attForm');if(!form){say('Assistant','I could not open the attendance form. Close any open dialog and try again.');window.heraldVoiceTaskActive=false;return;}draft={kind:'admin-attendance',form,step:0,course:form.querySelector('#attFormCourse'),date:form.querySelector('#attFormDate'),status:''};say('Assistant','Which course should I take attendance for? Say the course code or title.');}
   function askModalField(){
     if(!draft||draft.kind!=='admin-form')return;
     while(draft.index<draft.fields.length){const el=draft.fields[draft.index];if(el.value){draft.values[el.name]=el.value;draft.index++;continue;}break;}
-    if(draft.index>=draft.fields.length){clearActions();const b=document.createElement('button');b.textContent='Confirm and save';b.onclick=submitVoiceForm;const c=document.createElement('button');c.className='secondary';c.textContent='Cancel';c.onclick=()=>{document.querySelector('#modalCancel')?.click();draft=null;clearActions();say('Assistant','Cancelled.');};actions.append(b,c);const preview=draft.fields.map(field=>`${field.labels?.[0]?.textContent||field.name}: ${draft.values[field.name]||'—'}`).join('; ');say('Assistant',`Review before saving: ${preview}. Say “confirm” to submit or “cancel”.`);return;}
-    const field=draft.fields[draft.index];const hint=field.type==='date'?' Use YYYY-MM-DD.':field.type==='email'?' Say the complete email address.':'';say('Assistant',`${field.labels?.[0]?.textContent||field.name}${field.required?' (required)':''}?${hint} Say “skip” for an optional field.`);
+    if(draft.index>=draft.fields.length){clearActions();const b=document.createElement('button');b.textContent='Confirm and save';b.onclick=submitVoiceForm;const c=document.createElement('button');c.className='secondary';c.textContent='Cancel';c.onclick=()=>{document.querySelector('#modalCancel')?.click();draft=null;clearActions();say('Assistant','Cancelled.');};actions.append(b,c);const preview=draft.fields.map(field=>`${fieldLabel(field)}: ${draft.values[field.name]||'—'}`).join('; ');say('Assistant',`Review before saving: ${preview}. Say “confirm” to submit or “cancel”.`);return;}
+    const field=draft.fields[draft.index];const hint=field.type==='date'?' Use YYYY-MM-DD.':field.type==='datetime-local'?' Use YYYY-MM-DDTHH:MM, for example 2026-11-05T14:30.':field.type==='email'?' Say the complete email address.':field.tagName==='TEXTAREA'?' You can type long text into the Help box if that is easier.':'';say('Assistant',`${fieldLabel(field)}${field.required?' (required)':''}?${hint} Say “skip” for an optional field.`);
   }
-  async function submitVoiceForm(){const btn=actions.querySelector('button');if(btn)btn.disabled=true;try{for(const [key,value] of Object.entries(draft.values)){const el=[...draft.form.elements].find(item=>item.name===key);if(el)el.value=value;}if(!draft.form.reportValidity())throw Error('A required field is still missing.');draft.form.requestSubmit();draft=null;clearActions();window.heraldVoiceTaskActive=false;say('Assistant','Submitted. The admin form is saving your change.');}catch(e){if(btn)btn.disabled=false;say('Assistant',e.message);}}
+  async function submitVoiceForm(){const btn=actions.querySelector('button');if(btn)btn.disabled=true;try{for(const [key,value] of Object.entries(draft.values)){const el=[...draft.form.elements].find(item=>item.name===key);if(el)el.value=value;}if(!draft.form.reportValidity())throw Error('A required field or value is invalid. Please correct it before saving.');draft.form.requestSubmit();draft=null;clearActions();window.heraldVoiceTaskActive=false;say('Assistant','Submitted. The admin form is saving your change.');}catch(e){if(btn)btn.disabled=false;say('Assistant',e.message);}}
+  async function submitAttendance(){const btn=actions.querySelector('button');if(btn)btn.disabled=true;try{draft.form.querySelectorAll('.att-status').forEach(select=>select.value=draft.status);draft.form.querySelector('#attSaveBtn').click();draft=null;clearActions();window.heraldVoiceTaskActive=false;say('Assistant','Attendance submitted for the selected course.');}catch(e){if(btn)btn.disabled=false;say('Assistant',e.message);}}
+  function attendanceReview(){clearActions();const confirm=document.createElement('button');confirm.textContent='Confirm and save';confirm.onclick=submitAttendance;const cancel=document.createElement('button');cancel.textContent='Cancel';cancel.className='secondary';cancel.onclick=()=>{draft.form.closest('.modal-overlay')?.remove();draft=null;clearActions();window.heraldVoiceTaskActive=false;say('Assistant','Attendance cancelled.');};actions.append(confirm,cancel);say('Assistant',`Review: mark ${draft.studentCount} enrolled student(s) ${draft.status} in ${draft.courseLabel} for ${draft.date.value}. Confirm to save.`);}
+  async function waitForAttendanceRows(){for(let i=0;i<40;i++){if(draft?.form.querySelectorAll('.att-status').length)return true;await new Promise(resolve=>setTimeout(resolve,100));}return false;}
   const MEETING_LINK_KEY='herald_voice_last_meeting_link';
   let lastMeetingUrl='';
   try{lastMeetingUrl=sessionStorage.getItem(MEETING_LINK_KEY)||'';}catch{}
@@ -79,17 +95,26 @@
   const getData=async()=>role==='admin'?Promise.all([api('/api/admin/courses'),api('/api/admin/lecturers')]):Promise.all([api('/api/lecturer/my-courses'),Promise.resolve([])]);
   const clearActions=()=>actions.replaceChildren();
   function review(){clearActions();if(!draft)return;const confirm=document.createElement('button');confirm.textContent='Confirm and save';confirm.onclick=save;const cancel=document.createElement('button');cancel.className='secondary';cancel.textContent='Cancel';cancel.onclick=()=>{draft=null;clearActions();say('Assistant','Draft cancelled.');};actions.append(confirm,cancel);say('Assistant',summary());}
-  const summary=()=>draft.kind==='class'?`Schedule “${draft.title}” for ${draft.course.title} on ${new Date(draft.scheduled_at).toLocaleString()} (${draft.duration_minutes} min), link ${draft.meeting_url}.` : draft.kind==='assign'?`Assign ${draft.lecturer.name} to ${draft.course.code} — ${draft.course.title}.`:`Mark ${draft.records.length} student(s) ${draft.records[0]?.status} in ${draft.course.title} for ${draft.date}.`;
-  async function save(){const btn=actions.querySelector('button');btn.disabled=true;try{if(draft.kind==='class'){if(!draft.course?.id||!draft.title||!draft.meeting_url||!draft.scheduled_at)throw Error('I still need the course, class title, start date and time, and meeting link.');await api(role==='admin'?'/api/admin/live-classes':'/api/lecturer/live-classes',{method:'POST',body:{course_id:draft.course.id,title:draft.title,description:draft.description||'',meeting_url:draft.meeting_url,scheduled_at:draft.scheduled_at,duration_minutes:draft.duration_minutes||60,notify:draft.notify!==false}});}else if(draft.kind==='assign'){await api(`/api/admin/courses/${draft.course.id}/assign-lecturer`,{method:'POST',body:{lecturer_id:draft.lecturer.id}});}else{await api(role==='admin'?'/api/admin/attendance':'/api/lecturer/attendance',{method:'POST',body:{course_id:draft.course.id,date:draft.date,records:draft.records}});}say('Assistant','Done. The portal saved that change.');draft=null;clearActions();window.heraldVoiceTaskActive=false;}catch(e){btn.disabled=false;say('Assistant',e.message);}}
-  async function process(raw){const text=raw.trim();if(!text)return;window.heraldVoiceTaskActive=true;say('You',text);const low=text.toLowerCase();if(/^(no|cancel|never mind|stop)$/i.test(low)){draft=null;waiting=null;clearActions();document.querySelector('#modalCancel')?.click();window.heraldVoiceTaskActive=false;say('Assistant','Cancelled.');return;}if(draft?.kind==='admin-form'){
+  const summary=()=>draft.kind==='class'?`Schedule “${draft.title}” for ${draft.course.title} on ${new Date(draft.scheduled_at).toLocaleString()} (${draft.duration_minutes} min), link ${draft.meeting_url}.` : draft.kind==='assign'?`Assign ${draft.lecturer.name} to ${draft.course.code} — ${draft.course.title}.` : draft.kind==='lecturer-attendance'?`Mark ${draft.records.length} lecturer(s) ${draft.records[0]?.status} for ${draft.date}${draft.records[0]?.name?`: ${draft.records[0].name}`:''}.` : draft.kind==='admin-action'?`${draft.verb==='approve'?'Approve':'Reject'} ${draft.type} application for ${draft.person.name}.` : draft.kind==='admin-reminders'?'Send fee reminder emails to all students with outstanding balances.':`Mark ${draft.records.length} student(s) ${draft.records[0]?.status} in ${draft.course.title} for ${draft.date}.`;
+  async function save(){const btn=actions.querySelector('button');btn.disabled=true;try{let result;if(draft.kind==='class'){if(!draft.course?.id||!draft.title||!draft.meeting_url||!draft.scheduled_at)throw Error('I still need the course, class title, start date and time, and meeting link.');await api(role==='admin'?'/api/admin/live-classes':'/api/lecturer/live-classes',{method:'POST',body:{course_id:draft.course.id,title:draft.title,description:draft.description||'',meeting_url:draft.meeting_url,scheduled_at:draft.scheduled_at,duration_minutes:draft.duration_minutes||60,notify:draft.notify!==false}});}else if(draft.kind==='assign'){await api(`/api/admin/courses/${draft.course.id}/assign-lecturer`,{method:'POST',body:{lecturer_id:draft.lecturer.id}});}else if(draft.kind==='lecturer-attendance'){await api('/api/admin/lecturer-attendance',{method:'POST',body:{date:draft.date,records:draft.records}});}else if(draft.kind==='admin-action'){await api(draft.endpoint,{method:'POST'});}else if(draft.kind==='admin-reminders'){result=await api('/api/admin/send-fee-reminders',{method:'POST'});}else{await api(role==='admin'?'/api/admin/attendance':'/api/lecturer/attendance',{method:'POST',body:{course_id:draft.course.id,date:draft.date,records:draft.records}});}say('Assistant',draft.kind==='admin-reminders'?`Sent ${result.sent} of ${result.total} fee reminder email(s).`:'Done. The portal saved that change.');draft=null;clearActions();window.heraldVoiceTaskActive=false;}catch(e){btn.disabled=false;say('Assistant',e.message);}}
+  async function process(raw){const text=raw.trim();if(!text)return;window.heraldVoiceTaskActive=true;say('You',text);const low=text.toLowerCase();if(/^(no|cancel|never mind|stop)$/i.test(low)){const active=draft?.form;draft=null;waiting=null;clearActions();if(active?.id==='attForm')active.closest('.modal-overlay')?.remove();else document.querySelector('#modalCancel')?.click();window.heraldVoiceTaskActive=false;say('Assistant','Cancelled.');return;}if(role==='admin'&&!draft){const openDialog=[...document.querySelectorAll('.modal-overlay')].find(node=>node.id==='modal'?!node.classList.contains('hidden'):node.isConnected);if(openDialog){say('Assistant','A form is already open. Save or close it first, then repeat the voice command.');window.heraldVoiceTaskActive=false;return;}}if(draft?.kind==='admin-attendance'){
+      if(draft.step===0){const query=normalize(text);const option=[...draft.course.options].find(item=>item.value&&(normalize(item.textContent)===query||normalize(item.textContent).includes(query)||query.includes(normalize(item.textContent))));if(!option){say('Assistant',`I couldn't match that course. Choose from: ${[...draft.course.options].filter(item=>item.value).map(item=>item.textContent).join('; ')}.`);return;}draft.course.value=option.value;draft.courseLabel=option.textContent;draft.course.dispatchEvent(new Event('change',{bubbles:true}));if(!await waitForAttendanceRows()){say('Assistant','No enrolled students were found for that course.');return;}draft.studentCount=draft.form.querySelectorAll('.att-status').length;draft.step=1;say('Assistant',`I found ${draft.studentCount} enrolled student(s). Which status should I apply: present, absent, or late?`);return;}
+      if(draft.step===1){const status=(low.match(/\b(present|absent|late)\b/)||[])[1];if(!status){say('Assistant','Please choose present, absent, or late.');return;}draft.status=status;draft.step=2;attendanceReview();return;}
+      if(/\b(confirm|save|yes|proceed|go ahead)\b/i.test(low)){await submitAttendance();return;}say('Assistant','Say “confirm” to save or “cancel” to discard.');return;
+    }if(draft?.kind==='admin-form'){
       if(/^(go ahead|proceed|yes|confirm|save|do it|publish it|create it)$/i.test(low)){await submitVoiceForm();return;}
       if(/^(skip|next)$/i.test(low)){const field=draft.fields[draft.index];if(field?.required){say('Assistant','That field is required. Please provide a value.');return;}draft.index++;askModalField();return;}
       const field=draft.fields[draft.index];if(!field){askModalField();return;}let value=text;
       if(field.tagName==='SELECT'){const option=[...field.options].find(o=>normalize(o.textContent)===normalize(text)||normalize(o.textContent).includes(normalize(text)));if(!option){say('Assistant',`Please choose one of: ${[...field.options].filter(o=>o.value).map(o=>o.textContent).join(', ')}.`);return;}value=option.value;}
-      draft.values[field.name]=value;draft.index++;askModalField();return;
+      if(field.type==='date'&&!/^\d{4}-\d{2}-\d{2}$/.test(value)){say('Assistant','Please say the full date as YYYY-MM-DD, or say “skip” if it is optional.');return;}
+      if(field.type==='datetime-local'&&!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(value)){say('Assistant','Please say the date and time as YYYY-MM-DDTHH:MM.');return;}
+      const original=field.value;field.value=value;const valid=field.checkValidity();field.value=original;if(!valid){say('Assistant',field.type==='date'?'Please say a full date as YYYY-MM-DD.':'That value is not valid for this field. Please try again.');return;}draft.values[field.name]=value;draft.index++;askModalField();return;
     }if(draft&&/\b(go ahead|proceed|yes|confirm|save|do it|schedule it|create it)\b/i.test(low)){await save();return;}if(draft?.kind==='class'&&/\b(schedule|create|plan)\b/i.test(low)&&/\b(class|session|live)\b/i.test(low)){await askClassField();return;}
     try{
       if(waiting){const step=waiting;waiting=null;await step(text);return;}
+      if(role==='admin'&&/\b(send|issue)\b/.test(low)&&/\bfee\b/.test(low)&&/\b(reminder|reminders)\b/.test(low)){if([...document.querySelectorAll('.modal-overlay')].some(node=>node.id==='modal'?!node.classList.contains('hidden'):node.isConnected)){say('Assistant','A form is already open. Save or close it before sending fee reminders.');window.heraldVoiceTaskActive=false;return;}draft={kind:'admin-reminders'};review();return;}
+      if(role==='admin'&&/\b(approve|reject)\b/i.test(text)){if(await prepareNamedApproval(text))return;}
+      if(role==='admin'&&(/\blecturers?\b|\b(?:dr|mr|mrs|ms)\b/i.test(text))&&/\b(attendance|present|absent|late|excused)\b/.test(low)){if(await prepareLecturerAttendance(text))return;}
       if(role==='admin'&&startAdminForm(text))return;
       const [courses,lecturers]=await getData();
       if(/assign|allocate/.test(low)&&role==='admin'){
@@ -118,6 +143,46 @@
   window.heraldVoiceTaskActive = false;
   let waitingCourse=()=>{};
   async function askLecturer(){const lecturers=await api('/api/admin/lecturers');waiting=answer=>{draft.lecturer=match(lecturers,answer,'name')||match(lecturers,answer,'staff_no');if(!draft.lecturer){say('Assistant','I could not find that lecturer. Please say their full name.');waiting=askLecturer;return;}review();};say('Assistant','Which lecturer? Say their name.');}
+  async function prepareLecturerAttendance(command){
+    const openDialog=[...document.querySelectorAll('.modal-overlay')].find(node=>node.id==='modal'?!node.classList.contains('hidden'):node.isConnected);
+    if(openDialog){say('Assistant','A form is already open. Save or close that form first; I will not submit it as a different action.');window.heraldVoiceTaskActive=false;return true;}
+    const lecturers=await api('/api/admin/lecturers');
+    const status=(command.toLowerCase().match(/\b(present|absent|late|excused)\b/)||[])[1];
+    const date=(command.match(/\b\d{4}-\d{2}-\d{2}\b/)||[])[0]||new Date().toISOString().slice(0,10);
+    const approved=lecturers.filter(item=>item.approved&&item.status!=='rejected');
+    let selected=[];
+    if(/\b(all|every|everyone)\b/.test(command.toLowerCase()))selected=approved;
+    else{
+      const query=normalize(command).replace(/\b(attendance|mark|present|absent|late|excused|today|lecturer|lecturers|please|dr|mr|mrs|ms)\b/g,' ').trim();
+      const ranked=approved.map(item=>({item,score:normalize(item.name).split(' ').filter(word=>word.length>1&&query.split(' ').includes(word)).length})).sort((a,b)=>b.score-a.score);
+      if(!ranked[0]?.score){say('Assistant','Say a lecturer’s name, for example “mark Dr Obara lecturer attendance present”.');return true;}
+      if(ranked[1]?.score===ranked[0].score){say('Assistant',`I found more than one match. Please say the lecturer’s full name. Matches: ${ranked.filter(item=>item.score===ranked[0].score).map(item=>item.item.name).join(', ')}.`);return true;}
+      selected=[ranked[0].item];
+    }
+    if(!selected.length){say('Assistant','There are no approved lecturers to mark.');return true;}
+    const makeDraft=value=>{draft={kind:'lecturer-attendance',date,records:selected.map(item=>({lecturer_id:Number(item.id),name:item.name,status:value,notes:''}))};review();};
+    if(status)makeDraft(status);else{const askStatus=()=>{waiting=answer=>{const value=(answer.toLowerCase().match(/\b(present|absent|late|excused)\b/)||[])[1];if(!value){say('Assistant','Please say present, absent, late, or excused.');askStatus();return;}makeDraft(value);};say('Assistant','Which status should I record: present, absent, late, or excused?');};askStatus();}
+    return true;
+  }
+  async function prepareNamedApproval(command){
+    const openDialog=[...document.querySelectorAll('.modal-overlay')].find(node=>node.id==='modal'?!node.classList.contains('hidden'):node.isConnected);
+    if(openDialog){say('Assistant','A form is already open. Save or close that form first, then repeat the approval request.');window.heraldVoiceTaskActive=false;return true;}
+    const reject=/\breject\b/i.test(command),verb=reject?'reject':'approve';
+    const explicitLecturer=/\blemploy(?:ee)?|lecturer\b/i.test(command),explicitStudent=/\bstudent|admission|application\b/i.test(command);
+    const target=normalize(command).replace(/\b(approve|reject|the|student|lecturer|admission|application|applicant|please)\b/g,' ').trim();
+    if(!target){say('Assistant',`Say “${verb}” followed by the student or lecturer name.`);return true;}
+    const [lecturers,students]=await Promise.all([api('/api/admin/lecturers'),api('/api/admin/students')]);
+    const score=(person)=>normalize(person.name).split(' ').filter(word=>word.length>1&&target.split(' ').includes(word)).length;
+    let choices=[];
+    if(!explicitStudent)choices.push(...lecturers.filter(person=>!person.approved&&person.status!=='rejected').map(person=>({person,type:'lecturer',score:score(person)})));
+    if(!explicitLecturer)choices.push(...students.filter(person=>person.status==='pending').map(person=>({person,type:'student',score:score(person)})));
+    choices=choices.filter(item=>item.score>0).sort((a,b)=>b.score-a.score);
+    if(!choices.length){say('Assistant',`I couldn't find a pending student or lecturer matching “${target}”.`);return true;}
+    const best=choices[0].score,matches=choices.filter(item=>item.score===best);
+    if(matches.length>1){say('Assistant',`I found multiple pending applications. Please specify student or lecturer, and say the full name.`);return true;}
+    const {person,type}=matches[0],endpoint=type==='lecturer'?`/api/admin/lecturers/${person.id}/${verb}`:`/api/admin/students/${person.id}/${verb}`;
+    draft={kind:'admin-action',person,type,verb,endpoint};review();return true;
+  }
   async function prepareRoster(course,date,status){const roster=await api(role==='admin'?`/api/admin/courses/${course.id}/students`:`/api/lecturer/courses/${course.id}/students`);if(!roster.length){say('Assistant','There are no enrolled students in that course.');return;}draft={kind:'attendance',course,date,records:roster.map(s=>({student_id:s.id,status,notes:''}))};review();}
   async function askClassField(){if(!draft.course){let coursesCache=[];const data=await getData();coursesCache=data[0];waiting=async answer=>{draft.course=match(coursesCache,answer);if(!draft.course){say('Assistant','I could not match that course. Please say its course code or a few words from its title.');await askClassField();return;}if(draft.title==='Live Class')draft.title=`${draft.course.title} Live Class`;const start=parseStartTime(answer);if(start)draft.scheduled_at=start.toISOString();const link=answer.match(/https?:\/\/\S+/)?.[0];if(link){draft.meeting_url=link;rememberMeetingUrl(link);}await askClassField();};say('Assistant','Which course is the live class for? Say its course code or title.');return;}if(!draft.scheduled_at){waiting=async answer=>{const d=parseStartTime(answer);if(!d){say('Assistant','Please include a date and time, such as “today at 6:00 p.m.” or “tomorrow at 4 pm”.');await askClassField();return;}draft.scheduled_at=d.toISOString();const link=answer.match(/https?:\/\/\S+/)?.[0];if(link){draft.meeting_url=link;rememberMeetingUrl(link);}await askClassField();};say('Assistant','When should it start? You can say “today at 6:00 p.m.” or give a date and time.');return;}if(!draft.meeting_url){waiting=async answer=>{draft.meeting_url=answer.match(/https?:\/\/\S+/)?.[0]||'';if(!draft.meeting_url){say('Assistant','Please provide a full meeting URL beginning with https://');await askClassField();return;}rememberMeetingUrl(draft.meeting_url);await askClassField();};say('Assistant','What meeting link should students use?');return;}review();}
   form.addEventListener('submit',e=>{e.preventDefault();const v=input.value;input.value='';process(v);});
