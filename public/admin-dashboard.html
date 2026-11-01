@@ -251,8 +251,14 @@
     <section class="admin-panel" id="panel-assignments">
       <div class="panel-head">
         <h2>Assignments</h2>
-        <button class="btn-primary" id="addAsgBtn" type="button">New Assignment</button>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;">
+          <button class="btn-ghost dark" id="generateCatBtn" type="button">Generate 5-question CAT</button>
+          <button class="btn-primary" id="addAsgBtn" type="button">New Assignment</button>
+        </div>
       </div>
+      <p style="color:var(--muted);margin:-8px 0 14px;">Generate a CAT from course materials. The voice assistant will ask which topics to cover. The CAT stays a draft until reviewed and published in Exams.</p>
+      <label for="assignmentCatCourse" style="display:block;font-size:12px;font-weight:600;color:var(--muted);margin-bottom:6px;">Current course for CAT</label>
+      <select id="assignmentCatCourse" class="term-filter" style="width:100%;max-width:420px;margin-bottom:16px;"><option value="">Choose a course or select it by voice</option></select>
       <div class="table-wrap">
         <table id="asgTable">
           <thead><tr><th>Course</th><th>Title</th><th>Due</th><th>Submissions</th><th>Graded</th><th>Actions</th></tr></thead>

@@ -708,6 +708,9 @@ if (addLectBtn) {
         await loadAssignments();
       });
     });
+    $('#generateCatBtn')?.addEventListener('click', () => {
+      window.dispatchEvent(new CustomEvent('herald-help-command', { detail: 'generate CAT' }));
+    });
 
     // ---- Attendance ----
     const attFilter = $('#attCourseFilter');
@@ -1547,7 +1550,13 @@ async function openBulkAssignModal() {
 
   // ---------------- Assignments ----------------
   async function loadAssignments() {
-    const rows = await api('/api/admin/assignments');
+    const [rows, courses] = await Promise.all([api('/api/admin/assignments'), api('/api/admin/courses')]);
+    const courseSelect = $('#assignmentCatCourse');
+    if (courseSelect) {
+      const current = courseSelect.value;
+      courseSelect.innerHTML = '<option value="">Choose a course or select it by voice</option>' + courses.map(course => `<option value="${course.id}">${esc(course.code)} — ${esc(course.title)}</option>`).join('');
+      if (courses.some(course => String(course.id) === current)) courseSelect.value = current;
+    }
     const tb = $('#asgTable tbody');
 
     tb.innerHTML = rows.map(a => {

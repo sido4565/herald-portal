@@ -31,6 +31,7 @@
       <button class="admin-tab" data-panel="profile" type="button">My Profile</button>
       <button class="admin-tab" data-panel="courses" type="button">My Courses</button>
       <button class="admin-tab" data-panel="results" type="button">Results</button>
+      <button class="admin-tab" data-panel="assignments" type="button">Assignments</button>
       <button class="admin-tab" data-panel="attendance" type="button">Attendance</button>
       <button class="admin-tab" data-panel="announcements" type="button">Announcements</button>
       <button class="admin-tab" data-panel="materials" type="button">Study Materials</button>
@@ -204,6 +205,15 @@
 
   <div id="materialsList"></div>
 </section>
+<section class="admin-panel" id="panel-assignments">
+  <div class="panel-head">
+    <h2>Assignments &amp; CATs</h2>
+    <button class="btn-primary" id="generateCatBtn" type="button">Generate 5-question CAT</button>
+  </div>
+  <p style="color:var(--muted);margin:-8px 0 14px;">Select a course, then generate a CAT from its readable materials. The voice assistant will ask which topics to cover. Draft CATs must be reviewed and published in Exams.</p>
+  <label for="assignmentCatCourse" style="display:block;font-size:12px;font-weight:600;color:var(--muted);margin-bottom:6px;">Current course for CAT</label>
+  <select id="assignmentCatCourse" style="width:100%;max-width:420px;padding:9px 12px;border:1px solid var(--border);border-radius:6px;background:var(--card);color:var(--text);"><option value="">Choose a course or select it by voice</option></select>
+</section>
   </main>
 
   <div class="modal-overlay hidden" id="modal">
@@ -282,6 +292,9 @@
       if (e.target && e.target.id === 'addLiveClassBtn') {
         openScheduleLiveClassModal();
       }
+    });
+    $('#generateCatBtn').addEventListener('click', () => {
+      window.dispatchEvent(new CustomEvent('herald-help-command', { detail: 'generate CAT' }));
     });
 
     // Tabs
@@ -584,10 +597,20 @@
       if (name === 'profile') return loadProfile();
       if (name === 'courses') return loadCourses();
       if (name === 'results') return loadResults();
+      if (name === 'assignments') return loadCatCourses();
       if (name === 'attendance') return loadAttendance();
       if (name === 'announcements') return loadAnnouncements();
       if (name === 'materials') return loadMaterials();
       if (name === 'live-classes') return loadLiveClasses();
+    }
+
+    async function loadCatCourses() {
+      const courses = await api('/api/lecturer/my-courses');
+      coursesCache = courses;
+      const select = $('#assignmentCatCourse');
+      const current = select.value;
+      select.innerHTML = '<option value="">Choose a course or select it by voice</option>' + courses.map(course => `<option value="${course.id}">${esc(course.code)} — ${esc(course.title)}</option>`).join('');
+      if (courses.some(course => String(course.id) === current)) select.value = current;
     }
 
     async function loadOverview() {
