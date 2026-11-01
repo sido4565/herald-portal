@@ -302,6 +302,17 @@ body.dark .herald-help-root {
   font-family: inherit;
 }
 
+.hh-mic {
+  min-width: 38px;
+  border: 1px solid var(--hh-border);
+  border-radius: 10px;
+  color: var(--hh-text);
+  background: var(--hh-bg-alt);
+  cursor: pointer;
+  font-size: 16px;
+}
+.hh-mic:disabled { opacity: .5; cursor: not-allowed; }
+
 .hh-send:hover:not(:disabled) {
   background: #1d405e;
 }

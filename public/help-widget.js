@@ -18,6 +18,8 @@
     'Which KNEC exams can I prepare for?',
     'How do I pay fees?',
     'Exam schedule',
+    'Show my timetable',
+    'What assignments are due?',
   ];
 
   // ─── Load chat history ───
@@ -64,6 +66,7 @@
             aria-label="Your message"
           />
           <button class="hh-send" id="hhSend" type="submit">Send</button>
+          <button class="hh-mic" id="hhMic" type="button" aria-label="Speak to Herald Help" title="Speak">🎙️</button>
         </form>
         <div class="hh-footer">
           Need a human? <a href="mailto:support@heraldtrainer.co.ke">Email support</a>
@@ -151,6 +154,89 @@
     if (t) t.remove();
   }
 
+  let pendingStudentAction = null;
+
+  async function portalRequest(url, options = {}) {
+    const response = await fetch(url, { credentials: 'same-origin', ...options });
+    let data = {};
+    try { data = await response.json(); } catch (_) {}
+    if (!response.ok) throw new Error(data.error || 'Please sign in to use this student feature.');
+    return data;
+  }
+  const portalGet = url => portalRequest(url);
+
+  function isStudentPortal() {
+    return !document.getElementById('adminName') && !document.getElementById('lecturerName') &&
+      /dashboard\.html|student-exams\.html|exam\.html/.test(location.pathname);
+  }
+
+  async function handlePortalTask(text) {
+    const query = text.trim().toLowerCase();
+    const role = document.getElementById('adminName') ? 'admin' : document.getElementById('lecturerName') ? 'lecturer' : null;
+    if (role && (window.heraldVoiceTaskActive || /\b(schedule|assign|allocate|attendance|register|mark present|mark absent|mark late|mark excused)\b/.test(query))) {
+      window.dispatchEvent(new CustomEvent('herald-help-command', { detail: text }));
+      return true;
+    }
+    if (!isStudentPortal()) return null;
+    if (pendingStudentAction && /^(yes|confirm|enroll|do it|save)$/i.test(query)) {
+      const course = pendingStudentAction;
+      pendingStudentAction = null;
+      await portalRequest(`/api/enroll/${course.id}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' });
+      return `You are now enrolled in ${course.code} — ${course.title}.`;
+    }
+    if (pendingStudentAction && /^(no|cancel|never mind)$/i.test(query)) {
+      pendingStudentAction = null;
+      return 'Enrollment cancelled.';
+    }
+
+    if (/\b(enrol|enroll|sign up)\b/.test(query)) {
+      const courses = await portalGet('/api/courses');
+      const course = courses.find(c => query.includes(String(c.title || '').toLowerCase()) || query.includes(String(c.code || '').toLowerCase()));
+      if (!course) return 'I could not identify the course. Tell me its course code or full title, for example “enroll in Python Programming”.';
+      if (course.enrolled) return `You are already enrolled in ${course.code} — ${course.title}.`;
+      pendingStudentAction = course;
+      return `This will enroll you in ${course.code} — ${course.title}. Reply “confirm” to continue or “cancel” to stop.`;
+    }
+
+    if (/\b(timetable|class schedule|my schedule)\b/.test(query)) {
+      const rows = await portalGet('/api/my-timetable');
+      return rows.length ? rows.map(r => `${r.day}: ${r.code} ${r.title}, ${r.start_time}–${r.end_time}${r.room ? ` (${r.room})` : ''}`).join('\n') : 'There are no timetable entries for your courses yet.';
+    }
+    if (/\b(assignment|assignments|due)\b/.test(query)) {
+      const rows = await portalGet('/api/my-assignments');
+      return rows.length ? rows.map(r => `${r.title} (${r.code}) — due ${r.due_date || 'date not set'}${r.submission_id ? ', submitted' : ', not submitted'}`).join('\n') : 'You have no assignments listed for your courses.';
+    }
+    if (/\b(attendance|register)\b/.test(query)) {
+      const data = await portalGet('/api/my-attendance');
+      return data.summary?.length ? data.summary.map(r => `${r.code} ${r.title}: ${r.present || 0} present of ${r.total} recorded`).join('\n') : 'I could not find attendance records for your courses yet.';
+    }
+    if (/\b(fees?|balance|payment)\b/.test(query)) {
+      const rows = await portalGet('/api/my-fees');
+      return rows.length ? rows.map(r => `${r.term || 'Fee'}: amount due ${r.amount_due}, paid ${r.amount_paid || 0}, balance ${Math.max(0, Number(r.amount_due || 0) - Number(r.amount_paid || 0))} (${r.status || 'unpaid'})`).join('\n') : 'There are no fee records to show yet.';
+    }
+    if (/\b(my results|grades|marks|results)\b/.test(query)) {
+      const rows = await portalGet('/api/results');
+      return rows.length ? rows.map(r => `${r.code} ${r.title}: ${r.marks} marks, grade ${r.grade} (${r.term})`).join('\n') : 'No results have been published for your account yet.';
+    }
+    if (/\b(live classes?|class links?)\b/.test(query)) {
+      const rows = await portalGet('/api/my-live-classes');
+      return rows.length ? rows.map(r => `${r.title} (${r.code}) — ${new Date(r.scheduled_at).toLocaleString()} [${r.status}] ${r.meeting_url}`).join('\n') : 'There are no live classes scheduled for your courses.';
+    }
+    if (/\b(materials?|notes|books)\b/.test(query)) {
+      const rows = await portalGet('/api/my-materials');
+      return rows.length ? rows.map(r => `${r.title} (${r.code || r.course_code || 'course'})${r.release_date ? ` — available ${r.release_date}` : ''}`).join('\n') : 'There are no study materials listed for your courses yet.';
+    }
+    if (/\b(exams?|exam schedule)\b/.test(query)) {
+      const rows = await portalGet('/api/student/exams');
+      return rows.length ? rows.map(r => `${r.title} (${r.code || r.course_title}) — ${r.submitted_attempt ? 'completed' : r.in_progress ? 'in progress' : 'available'}`).join('\n') : 'There are no active exams available for your enrolled courses.';
+    }
+    if (/\b(my courses|course list|available courses)\b/.test(query)) {
+      const rows = await portalGet('/api/courses');
+      return rows.length ? rows.map(r => `${r.code} — ${r.title}${r.enrolled ? ' (enrolled)' : ` (not enrolled, ${r.fee_type || ''} ${r.fee || ''})`}`).join('\n') : 'No courses are listed right now.';
+    }
+    return null;
+  }
+
   // ─── Render suggestion chips (once, at start) ───
   function renderSuggestions(container) {
     const wrap = document.createElement('div');
@@ -184,12 +270,42 @@
     saveHistory(messages);
 
     removeSuggestions();
-    showTyping(container);
-
     const sendBtn = document.getElementById('hhSend');
     const input = document.getElementById('hhInput');
     sendBtn.disabled = true;
     input.disabled = true;
+
+    // Signed-in portal tasks use the authenticated portal APIs. The FAQ bot
+    // remains the fallback for general questions and public pages.
+    try {
+      const taskAnswer = await handlePortalTask(text);
+      if (taskAnswer === true) {
+        sendBtn.disabled = false;
+        input.disabled = false;
+        input.focus();
+        return;
+      }
+      if (taskAnswer) {
+        const botMsg = { role: 'bot', text: taskAnswer, source: 'portal' };
+        messages.push(botMsg);
+        renderMessage(container, botMsg);
+        saveHistory(messages);
+        sendBtn.disabled = false;
+        input.disabled = false;
+        input.focus();
+        return;
+      }
+    } catch (err) {
+      const botMsg = { role: 'bot', text: err.message || 'I could not complete that portal request.', source: 'error' };
+      messages.push(botMsg);
+      renderMessage(container, botMsg);
+      saveHistory(messages);
+      sendBtn.disabled = false;
+      input.disabled = false;
+      input.focus();
+      return;
+    }
+    showTyping(container);
 
     try {
       const res = await fetch(API_URL, {
@@ -251,8 +367,40 @@
     const messagesEl = document.getElementById('hhMessages');
     const badge = document.getElementById('hhBadge');
 
+    // Web Speech API is available in Chromium based browsers. Typed input
+    // stays available everywhere, and spoken requests enter the same chat.
+    const mic = document.getElementById('hhMic');
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (SpeechRecognition) {
+      mic.addEventListener('click', () => {
+        const recognition = new SpeechRecognition();
+        recognition.lang = 'en-KE';
+        recognition.interimResults = false;
+        recognition.onresult = event => {
+          input.value = event.results[0][0].transcript;
+          form.requestSubmit();
+        };
+        recognition.onerror = () => {
+          const msg = { role: 'bot', text: 'I could not access speech recognition. Check microphone permission or type your request.', source: 'error' };
+          messages.push(msg); renderMessage(messagesEl, msg);
+        };
+        recognition.start();
+      });
+    } else {
+      mic.disabled = true;
+      mic.title = 'Speech recognition is not available in this browser. You can type your request.';
+    }
+
     let messages = loadHistory() || [];
     let opened = false;
+
+    window.addEventListener('herald-help-bot-reply', event => {
+      if (event.detail?.who !== 'Assistant') return;
+      const msg = { role: 'bot', text: event.detail.msg, source: 'portal' };
+      messages.push(msg);
+      renderMessage(messagesEl, msg);
+      saveHistory(messages);
+    });
 
     // Render existing history
     if (messages.length) {
@@ -261,7 +409,7 @@
       // First-time greeting
       const greeting = {
         role: 'bot',
-        text: "Hi! 👋 I'm the Herald help bot. Ask about courses, monthly tuition, exams, registration, or payments. I’ll include direct links to the relevant pages.",
+      text: "Hi! 👋 I’m Herald Help. Ask portal questions, speak using the microphone, or ask me to check your timetable, assignments, fees, results, attendance, materials, live classes, and exams. Students can also request course enrollment. Admins and lecturers can schedule classes, assign courses, and mark attendance.",
         source: 'faq',
       };
       messages.push(greeting);
