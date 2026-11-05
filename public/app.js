@@ -365,7 +365,7 @@ async function loadDashboard() {
     const credentials = await response.json();
     const target = document.getElementById('studentCredentials');
     if (target) target.innerHTML = `<h4 style="margin:16px 0 8px">Course certificates and awards</h4>${credentials.length ? `<ul class="list">${credentials.map(c => `<li><strong>${esc(c.code)} — ${esc(c.title)}</strong><br>${esc(c.credential_type[0].toUpperCase()+c.credential_type.slice(1))} · ${c.available ? `<a href="/api/student/credentials/${c.course_id}/pdf">Download ${esc(c.credential_type)}</a>` : (Number(c.balance)>0 ? `Blocked: outstanding balance KES ${Number(c.balance).toLocaleString()}` : !c.course_completed ? 'Awaiting admin course completion approval' : !c.fees_completed ? 'Awaiting admin fee completion approval' : c.credential_type==='degree' && !c.award_name ? 'Degree recipient name pending admin entry' : 'Credential setup pending')}</li>`).join('')}</ul>` : '<p>No enrolled courses yet.</p>'}`;
-  } catch (e) { console.error(e); }
+  } catch (e) { console.error(e); const target=document.getElementById('studentCredentials'); if(target) target.innerHTML='<p>Credentials could not be loaded. Refresh the page or contact the administrator.</p>'; }
 
   // ─── Fees ───
   try {
