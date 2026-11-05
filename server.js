@@ -1460,8 +1460,9 @@ app.get('/api/student/credentials', authStudent, async (req, res) => {
     LEFT JOIN course_credentials cc ON cc.course_id=c.id
     LEFT JOIN student_credentials sc ON sc.student_id=e.student_id AND sc.course_id=c.id
     WHERE e.student_id=? GROUP BY c.id ORDER BY c.title`, args: [req.user.id] });
-  res.json(rows.rows.map(row => ({ ...row, available: Number(row.course_completed)===1 && Number(row.fees_completed)===1 && Number(row.balance)<=0 &&
-    (row.credential_type !== 'degree' || !!row.award_name) })));
+  res.json(rows.rows.map(row => ({ ...row, available: Number(row.course_completed)===1 && Number(row.balance)<=0 &&
+    (row.credential_type !== 'degree' || (!!row.award_name && Number(row.fees_completed)===1)) &&
+    (!Number(row.approval_required) || Number(row.approved)) })));
 });
 
 app.get('/api/admin/credentials', authAdmin, async (req, res) => {
@@ -1498,7 +1499,8 @@ app.get('/api/student/credentials/:courseId/pdf', authStudent, async (req, res) 
     LEFT JOIN course_credentials cc ON cc.course_id=c.id LEFT JOIN credential_approvals ca ON ca.student_id=e.student_id AND ca.course_id=c.id LEFT JOIN student_credentials sc ON sc.student_id=e.student_id AND sc.course_id=c.id
     WHERE e.student_id=? AND c.id=? GROUP BY c.id`, args: [req.user.id, req.params.courseId] });
   const row = q.rows[0];
-  if (!row || Number(row.course_completed)!==1 || Number(row.fees_completed)!==1 || Number(row.balance)>0 || !row.award_name || (Number(row.approval_required) && !Number(row.approved))) return res.status(403).json({ error: 'Credential requires admin approval of course completion and fee completion, and a zero fee balance.' });
+  const degreeNeedsSetup=row?.credential_type==='degree' && (!row.award_name || Number(row.fees_completed)!==1);
+  if (!row || Number(row.course_completed)!==1 || Number(row.balance)>0 || degreeNeedsSetup || (Number(row.approval_required) && !Number(row.approved))) return res.status(403).json({ error: 'Credential requires course completion approval, zero fee balance, and any required degree or partner setup.' });
   const doc = new PDFDocument({ margin: 60, size: 'A4', layout: 'landscape' });
   res.setHeader('Content-Type','application/pdf');
   res.setHeader('Content-Disposition', `attachment; filename="Herald-${row.credential_type}-${row.code}-${row.reg_no}.pdf"`);
