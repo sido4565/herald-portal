@@ -163,6 +163,7 @@ if ($('#adminName')) {
       case 'announcements': return loadAnnouncements();
       case 'jobs':          return loadJobs();
       case 'results':       return loadResults();
+      case 'credentials':   return loadCredentials();
       case 'fees':          return loadFees();
       case 'timetable':     return loadTimetable();
       case 'assignments':   return loadAssignments();
@@ -1339,6 +1340,14 @@ async function openBulkAssignModal() {
   }
 
   // ---------------- Results ----------------
+  async function loadCredentials() {
+    const rows = await api('/api/admin/credentials');
+    const body = $('#credentialsTable tbody');
+    body.innerHTML = rows.map(c => `<tr data-course="${c.course_id}"><td>${esc(c.code)} — ${esc(c.title)}</td><td><select class="cred-type"><option value="certificate" ${c.credential_type==='certificate'?'selected':''}>Certificate</option><option value="diploma" ${c.credential_type==='diploma'?'selected':''}>Diploma</option><option value="degree" ${c.credential_type==='degree'?'selected':''}>Degree</option></select></td><td><input class="cred-name" value="${esc(c.qualification_name)}" placeholder="e.g. Bachelor of …" /></td><td><input type="checkbox" class="cred-partner" ${c.partner_course?'checked':''}></td><td><input type="checkbox" class="cred-approval" ${c.approval_required?'checked':''}></td><td><button class="btn-primary cred-save">Save</button> <button class="btn-ghost cred-students">Students</button></td></tr>`).join('');
+    body.querySelectorAll('.cred-save').forEach(btn => btn.onclick = async () => { const tr=btn.closest('tr'); await api(`/api/admin/credentials/${tr.dataset.course}`,{method:'PUT',body:{credential_type:tr.querySelector('.cred-type').value,qualification_name:tr.querySelector('.cred-name').value,partner_course:tr.querySelector('.cred-partner').checked,approval_required:tr.querySelector('.cred-approval').checked}}); toast('Credential settings saved'); });
+    body.querySelectorAll('.cred-students').forEach(btn => btn.onclick = async () => { const tr=btn.closest('tr'); const list=await api(`/api/admin/credentials/${tr.dataset.course}/students`); $('#credentialStudents').innerHTML=`<h3>${esc(tr.cells[0].textContent)}: student approvals</h3><div class="table-wrap"><table><thead><tr><th>Student</th><th>Completion result</th><th>Approved</th></tr></thead><tbody>${list.map(s=>`<tr><td>${esc(s.name)} (${esc(s.reg_no)})</td><td>${s.marks==null?'Not recorded':'Recorded'}</td><td><input type="checkbox" data-student="${s.student_id}" ${s.approved?'checked':''} ${s.marks==null?'disabled':''}></td></tr>`).join('')}</tbody></table></div>`; $('#credentialStudents').querySelectorAll('[data-student]').forEach(input=>input.onchange=async()=>{await api(`/api/admin/credentials/${tr.dataset.course}/students/${input.dataset.student}`,{method:'PUT',body:{approved:input.checked}});toast('Approval updated')}); });
+  }
+
   async function loadResults() {
     const rows = await api('/api/admin/results');
     const tb = $('#resultsTable tbody');

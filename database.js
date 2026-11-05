@@ -90,6 +90,21 @@ async function initSchema() {
       grade TEXT NOT NULL,
       term TEXT NOT NULL
     )`,
+    `CREATE TABLE IF NOT EXISTS course_credentials (
+      course_id INTEGER PRIMARY KEY,
+      credential_type TEXT NOT NULL DEFAULT 'certificate',
+      qualification_name TEXT NOT NULL DEFAULT '',
+      partner_course INTEGER NOT NULL DEFAULT 0,
+      approval_required INTEGER NOT NULL DEFAULT 0
+    )`,
+    `CREATE TABLE IF NOT EXISTS credential_approvals (
+      student_id INTEGER NOT NULL,
+      course_id INTEGER NOT NULL,
+      approved INTEGER NOT NULL DEFAULT 0,
+      approved_by INTEGER,
+      approved_at DATETIME,
+      PRIMARY KEY(student_id, course_id)
+    )`,
     `CREATE TABLE IF NOT EXISTS announcements (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       title TEXT NOT NULL,

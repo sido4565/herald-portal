@@ -1442,6 +1442,66 @@ app.get('/api/my-transcript', authStudent, async (req, res) => {
   });
 });
 
+// Course credential availability is tied to course results. Admins configure
+// the credential name/type and approve partner course awards.
+app.get('/api/student/credentials', authStudent, async (req, res) => {
+  const rows = await db.execute({ sql: `SELECT c.id AS course_id, c.code, c.title,
+      COALESCE(cc.credential_type, 'certificate') AS credential_type,
+      COALESCE(cc.qualification_name, '') AS qualification_name,
+      COALESCE(cc.partner_course, 0) AS partner_course,
+      COALESCE(cc.approval_required, 0) AS approval_required,
+      MAX(r.marks) AS marks,
+      COALESCE(ca.approved, 0) AS approved
+    FROM enrollments e JOIN courses c ON c.id=e.course_id
+    LEFT JOIN results r ON r.student_id=e.student_id AND r.course_id=e.course_id
+    LEFT JOIN course_credentials cc ON cc.course_id=c.id
+    LEFT JOIN credential_approvals ca ON ca.student_id=e.student_id AND ca.course_id=c.id
+    WHERE e.student_id=? GROUP BY c.id ORDER BY c.title`, args: [req.user.id] });
+  res.json(rows.rows.map(row => ({ ...row, available: row.marks != null &&
+    (!Number(row.approval_required) || Number(row.approved)) &&
+    (row.credential_type !== 'degree' || !!row.qualification_name) })));
+});
+
+app.get('/api/admin/credentials', authAdmin, async (req, res) => {
+  const q = await db.execute({ sql: `SELECT c.id course_id,c.code,c.title,COALESCE(cc.credential_type,'certificate') credential_type,COALESCE(cc.qualification_name,'') qualification_name,COALESCE(cc.partner_course,0) partner_course,COALESCE(cc.approval_required,0) approval_required FROM courses c LEFT JOIN course_credentials cc ON cc.course_id=c.id ORDER BY c.title` });
+  res.json(q.rows);
+});
+app.put('/api/admin/credentials/:courseId', authAdmin, async (req, res) => {
+  const { credential_type='certificate', qualification_name='', partner_course=0, approval_required=0 } = req.body || {};
+  if (!['certificate','diploma','degree'].includes(credential_type)) return res.status(400).json({error:'Choose certificate, diploma, or degree.'});
+  await db.execute({ sql:`INSERT INTO course_credentials(course_id,credential_type,qualification_name,partner_course,approval_required) VALUES(?,?,?,?,?) ON CONFLICT(course_id) DO UPDATE SET credential_type=excluded.credential_type,qualification_name=excluded.qualification_name,partner_course=excluded.partner_course,approval_required=excluded.approval_required`, args:[req.params.courseId,credential_type,String(qualification_name).trim(),partner_course?1:0,approval_required?1:0] });
+  res.json({ok:true});
+});
+app.get('/api/admin/credentials/:courseId/students', authAdmin, async (req,res) => {
+  const q=await db.execute({sql:`SELECT s.id student_id,s.name,s.reg_no,MAX(r.marks) marks,COALESCE(ca.approved,0) approved FROM enrollments e JOIN students s ON s.id=e.student_id LEFT JOIN results r ON r.student_id=s.id AND r.course_id=e.course_id LEFT JOIN credential_approvals ca ON ca.student_id=s.id AND ca.course_id=e.course_id WHERE e.course_id=? GROUP BY s.id ORDER BY s.name`,args:[req.params.courseId]}); res.json(q.rows);
+});
+app.put('/api/admin/credentials/:courseId/students/:studentId', authAdmin, async(req,res)=>{
+  await db.execute({sql:`INSERT INTO credential_approvals(student_id,course_id,approved,approved_by,approved_at) VALUES(?,?,?,?,CASE WHEN ?=1 THEN CURRENT_TIMESTAMP ELSE NULL END) ON CONFLICT(student_id,course_id) DO UPDATE SET approved=excluded.approved,approved_by=excluded.approved_by,approved_at=excluded.approved_at`,args:[req.params.studentId,req.params.courseId,req.body.approved?1:0,req.admin.id,req.body.approved?1:0]}); res.json({ok:true});
+});
+
+app.get('/api/student/credentials/:courseId/pdf', authStudent, async (req, res) => {
+  const q = await db.execute({ sql: `SELECT c.id,c.code,c.title,s.name,s.reg_no,
+      COALESCE(cc.credential_type,'certificate') credential_type, COALESCE(cc.qualification_name,'') qualification_name,
+      COALESCE(cc.approval_required,0) approval_required, COALESCE(ca.approved,0) approved, MAX(r.marks) marks
+    FROM enrollments e JOIN students s ON s.id=e.student_id JOIN courses c ON c.id=e.course_id
+    LEFT JOIN results r ON r.student_id=e.student_id AND r.course_id=e.course_id
+    LEFT JOIN course_credentials cc ON cc.course_id=c.id LEFT JOIN credential_approvals ca ON ca.student_id=e.student_id AND ca.course_id=c.id
+    WHERE e.student_id=? AND c.id=? GROUP BY c.id`, args: [req.user.id, req.params.courseId] });
+  const row = q.rows[0];
+  if (!row || row.marks == null || (Number(row.approval_required) && !Number(row.approved)) || (row.credential_type === 'degree' && !row.qualification_name)) return res.status(403).json({ error: 'Credential is not available yet.' });
+  const doc = new PDFDocument({ margin: 60, size: 'A4', layout: 'landscape' });
+  res.setHeader('Content-Type','application/pdf');
+  res.setHeader('Content-Disposition', `attachment; filename="Herald-${row.credential_type}-${row.code}-${row.reg_no}.pdf"`);
+  doc.pipe(res); doc.rect(0,0,doc.page.width,doc.page.height).fill('#fcf8f2');
+  doc.fillColor('#10294a').fontSize(30).text('HERALD TRAINER & CONSULTANT', { align:'center', margin:40 });
+  doc.moveDown(2).fontSize(18).text(row.credential_type.toUpperCase(), { align:'center' });
+  doc.moveDown().fontSize(16).text('This certifies that', { align:'center' });
+  doc.moveDown().fontSize(28).text(row.name, { align:'center' });
+  doc.moveDown().fontSize(16).text(`has successfully completed ${row.title}`, { align:'center' });
+  doc.moveDown().fontSize(18).text(row.qualification_name || `${row.title} ${row.credential_type}`, { align:'center' });
+  doc.moveDown(3).fontSize(12).text(`Registration: ${row.reg_no}   •   Course: ${row.code}`, { align:'center' }); doc.end();
+});
+
 
 // ---------- Download PDF Transcript ----------
 

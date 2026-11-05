@@ -43,6 +43,7 @@
       <button class="admin-tab" data-panel="announcements" type="button">Announcements</button>
       <button class="admin-tab" data-panel="jobs" type="button">Jobs</button>
       <button class="admin-tab" data-panel="results" type="button">Results</button>
+      <button class="admin-tab" data-panel="credentials" type="button">Credentials</button>
       <button class="admin-tab" data-panel="fees" type="button">Fees</button>
       <button class="admin-tab" data-panel="timetable" type="button">Timetable</button>
       <button class="admin-tab" data-panel="assignments" type="button">Assignments</button>
@@ -78,6 +79,13 @@
         <div class="stat-card"><div class="stat-num" id="statEnrollments">0</div><div class="stat-lbl">Enrollments</div></div>
         <div class="stat-card"><div class="stat-num" id="statAnnouncements">0</div><div class="stat-lbl">Announcements</div></div>
       </div>
+    </section>
+
+    <section class="admin-panel" id="panel-credentials">
+      <div class="panel-head"><h2>Certificates, Diplomas &amp; Degrees</h2></div>
+      <p>Set the award for each course. Degree qualifications need an admin-entered name. Partner course awards can require individual approval.</p>
+      <div class="table-wrap"><table id="credentialsTable"><thead><tr><th>Course</th><th>Credential</th><th>Qualification name</th><th>Partner course</th><th>Require approval</th><th>Action</th></tr></thead><tbody></tbody></table></div>
+      <div id="credentialStudents" style="margin-top:24px"></div>
     </section>
      
     <!-- Lecturers -->

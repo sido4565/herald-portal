@@ -359,6 +359,14 @@ async function loadDashboard() {
     renderResults();
   } catch (e) { console.error(e); }
 
+  // ─── Course credentials ───
+  try {
+    const response = await fetch('/api/student/credentials', { credentials: 'same-origin' });
+    const credentials = await response.json();
+    const target = document.getElementById('studentCredentials');
+    if (target) target.innerHTML = `<h4 style="margin:16px 0 8px">Course certificates and awards</h4>${credentials.length ? `<ul class="list">${credentials.map(c => `<li><strong>${esc(c.code)} — ${esc(c.title)}</strong><br>${esc(c.qualification_name || (c.credential_type[0].toUpperCase()+c.credential_type.slice(1)))} · ${c.available ? `<a href="/api/student/credentials/${c.course_id}/pdf">Download ${esc(c.credential_type)}</a>` : (c.approval_required && !c.approved ? 'Awaiting admin approval' : c.credential_type==='degree' && !c.qualification_name ? 'Qualification name pending admin setup' : 'Available after course results are recorded')}</li>`).join('')}</ul>` : '<p>No enrolled courses yet.</p>'}`;
+  } catch (e) { console.error(e); }
+
   // ─── Fees ───
   try {
     const feeRes = await fetch('/api/my-fees');
