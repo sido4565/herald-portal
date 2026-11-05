@@ -105,6 +105,16 @@ async function initSchema() {
       approved_at DATETIME,
       PRIMARY KEY(student_id, course_id)
     )`,
+    `CREATE TABLE IF NOT EXISTS student_credentials (
+      student_id INTEGER NOT NULL,
+      course_id INTEGER NOT NULL,
+      award_name TEXT NOT NULL DEFAULT '',
+      qualification_name TEXT NOT NULL DEFAULT '',
+      approved INTEGER NOT NULL DEFAULT 0,
+      approved_by INTEGER,
+      approved_at DATETIME,
+      PRIMARY KEY(student_id, course_id)
+    )`,
     `CREATE TABLE IF NOT EXISTS announcements (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       title TEXT NOT NULL,
