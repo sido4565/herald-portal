@@ -1492,14 +1492,30 @@ app.get('/api/student/credentials/:courseId/pdf', authStudent, async (req, res) 
   const doc = new PDFDocument({ margin: 60, size: 'A4', layout: 'landscape' });
   res.setHeader('Content-Type','application/pdf');
   res.setHeader('Content-Disposition', `attachment; filename="Herald-${row.credential_type}-${row.code}-${row.reg_no}.pdf"`);
-  doc.pipe(res); doc.rect(0,0,doc.page.width,doc.page.height).fill('#fcf8f2');
-  doc.fillColor('#10294a').fontSize(30).text('HERALD TRAINER & CONSULTANT', { align:'center', margin:40 });
-  doc.moveDown(2).fontSize(18).text(row.credential_type.toUpperCase(), { align:'center' });
-  doc.moveDown().fontSize(16).text('This certifies that', { align:'center' });
-  doc.moveDown().fontSize(28).text(row.name, { align:'center' });
-  doc.moveDown().fontSize(16).text(`has successfully completed ${row.title}`, { align:'center' });
-  doc.moveDown().fontSize(18).text(row.qualification_name || `${row.title} ${row.credential_type}`, { align:'center' });
-  doc.moveDown(3).fontSize(12).text(`Registration: ${row.reg_no}   •   Course: ${row.code}`, { align:'center' }); doc.end();
+  doc.pipe(res);
+  const navy='#10294a', gold='#b8860b', ink='#253858', paper='#fffdf8';
+  const w=doc.page.width, h=doc.page.height;
+  doc.rect(0,0,w,h).fill(paper);
+  // Double frame and corner accents give each award a formal certificate look.
+  doc.lineWidth(5).strokeColor(navy).rect(22,22,w-44,h-44).stroke();
+  doc.lineWidth(1.5).strokeColor(gold).rect(31,31,w-62,h-62).stroke();
+  [[45,45],[w-45,45],[45,h-45],[w-45,h-45]].forEach(([x,y])=>doc.circle(x,y,5).fill(gold));
+  // Low contrast watermark uses the specific course code for each credential.
+  doc.save().rotate(-28,{origin:[w/2,h/2]}).fillColor(navy,0.055).font('Helvetica-Bold').fontSize(82)
+    .text(String(row.code).toUpperCase(),70,h/2-40,{width:w-140,align:'center'}).restore();
+  doc.fillColor(gold).font('Helvetica-Bold').fontSize(11).text('HERALD TRAINER & CONSULTANT',0,64,{width:w,align:'center',characterSpacing:2});
+  doc.moveTo(w/2-48,88).lineTo(w/2+48,88).lineWidth(2).strokeColor(gold).stroke();
+  doc.fillColor(navy).font('Helvetica-Bold').fontSize(30).text(row.credential_type.toUpperCase(),60,111,{width:w-120,align:'center',characterSpacing:3});
+  doc.fillColor(ink).font('Helvetica').fontSize(15).text('This is proudly presented to',60,165,{width:w-120,align:'center'});
+  doc.fillColor(navy).font('Helvetica-Bold').fontSize(31).text(row.name,70,195,{width:w-140,align:'center'});
+  doc.moveTo(w/2-115,239).lineTo(w/2+115,239).lineWidth(1).strokeColor(gold).stroke();
+  doc.fillColor(ink).font('Helvetica').fontSize(15).text('for successfully completing',60,256,{width:w-120,align:'center'});
+  doc.fillColor(navy).font('Helvetica-Bold').fontSize(21).text(row.title,75,282,{width:w-150,align:'center'});
+  doc.fillColor(gold).font('Helvetica-Bold').fontSize(14).text(row.qualification_name || `${row.title} ${row.credential_type}`,70,321,{width:w-140,align:'center'});
+  doc.fillColor(ink).font('Helvetica').fontSize(10).text(`COURSE ${row.code}     •     REGISTRATION ${row.reg_no}`,60,h-105,{width:w-120,align:'center'});
+  doc.moveTo(w/2-95,h-78).lineTo(w/2+95,h-78).lineWidth(1).strokeColor(navy).stroke();
+  doc.fillColor(ink).fontSize(9).text('AUTHORIZED SIGNATURE',w/2-95,h-67,{width:190,align:'center'});
+  doc.end();
 });
 
 
