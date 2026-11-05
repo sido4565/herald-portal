@@ -281,9 +281,11 @@ async function loadStudentCredentials() {
     if (!response.ok) throw new Error(`Request failed (${response.status})`);
     const credentials = await response.json();
     target.innerHTML = credentials.length ? `<ul class="list">${credentials.map(c => `<li><strong>${esc(c.code)} — ${esc(c.title)}</strong><br>${esc(c.credential_type[0].toUpperCase()+c.credential_type.slice(1))} · ${c.available ? `<a href="/api/student/credentials/${c.course_id}/pdf">Download ${esc(c.credential_type)}</a>` : `Available after fee completion${Number(c.balance)>0 ? ` · outstanding balance KES ${Number(c.balance).toLocaleString()}` : ''}`}</li>`).join('')}</ul>` : '<p>No enrolled courses yet.</p>';
+    target.querySelector('[data-retry-credentials]')?.addEventListener('click', loadStudentCredentials);
   } catch (e) {
     console.error('Could not load student credentials:', e);
-    target.innerHTML = '<p>Credentials could not be loaded. <button type="button" class="btn-ghost" onclick="loadStudentCredentials()">Retry</button></p>';
+    target.innerHTML = '<p>Credentials could not be loaded. <button type="button" class="btn-ghost" data-retry-credentials>Retry</button></p>';
+    target.querySelector('[data-retry-credentials]').addEventListener('click', loadStudentCredentials);
   }
 }
 

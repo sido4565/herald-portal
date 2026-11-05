@@ -1455,7 +1455,7 @@ app.get('/api/student/credentials', authStudent, async (req, res) => {
       CASE WHEN COALESCE(cc.credential_type,'certificate')='degree' THEN COALESCE(sc.award_name,'') ELSE s.name END AS award_name,
       COALESCE(sc.qualification_name,'') AS student_qualification,
       COALESCE((SELECT SUM(f.amount_due-COALESCE(f.amount_paid,0)) FROM fees f WHERE f.student_id=e.student_id),0) AS balance
-    FROM enrollments e JOIN courses c ON c.id=e.course_id
+    FROM enrollments e JOIN courses c ON c.id=e.course_id JOIN students s ON s.id=e.student_id
     LEFT JOIN results r ON r.student_id=e.student_id AND r.course_id=e.course_id
     LEFT JOIN course_credentials cc ON cc.course_id=c.id
     LEFT JOIN student_credentials sc ON sc.student_id=e.student_id AND sc.course_id=c.id
