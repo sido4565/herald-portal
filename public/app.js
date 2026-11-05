@@ -266,7 +266,25 @@ if (document.getElementById('announcements')) {
   const themeBtn = document.getElementById('themeToggle');
   if (themeBtn) themeBtn.addEventListener('click', toggleTheme);
 
+  loadStudentCredentials();
   loadDashboard();
+}
+
+async function loadStudentCredentials() {
+  const target = document.getElementById('studentCredentials');
+  if (!target) return;
+  try {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 12000);
+    const response = await fetch('/api/student/credentials', { credentials: 'same-origin', signal: controller.signal });
+    clearTimeout(timeout);
+    if (!response.ok) throw new Error(`Request failed (${response.status})`);
+    const credentials = await response.json();
+    target.innerHTML = credentials.length ? `<ul class="list">${credentials.map(c => `<li><strong>${esc(c.code)} — ${esc(c.title)}</strong><br>${esc(c.credential_type[0].toUpperCase()+c.credential_type.slice(1))} · ${c.available ? `<a href="/api/student/credentials/${c.course_id}/pdf">Download ${esc(c.credential_type)}</a>` : `Available after fee completion${Number(c.balance)>0 ? ` · outstanding balance KES ${Number(c.balance).toLocaleString()}` : ''}`}</li>`).join('')}</ul>` : '<p>No enrolled courses yet.</p>';
+  } catch (e) {
+    console.error('Could not load student credentials:', e);
+    target.innerHTML = '<p>Credentials could not be loaded. <button type="button" class="btn-ghost" onclick="loadStudentCredentials()">Retry</button></p>';
+  }
 }
 
 async function loadDashboard() {
@@ -358,14 +376,6 @@ async function loadDashboard() {
     semesterSelect.addEventListener('change', renderResults);
     renderResults();
   } catch (e) { console.error(e); }
-
-  // ─── Course credentials ───
-  try {
-    const response = await fetch('/api/student/credentials', { credentials: 'same-origin' });
-    const credentials = await response.json();
-    const target = document.getElementById('studentCredentials');
-    if (target) target.innerHTML = `<h4 style="margin:16px 0 8px">Course certificates and awards</h4>${credentials.length ? `<ul class="list">${credentials.map(c => `<li><strong>${esc(c.code)} — ${esc(c.title)}</strong><br>${esc(c.credential_type[0].toUpperCase()+c.credential_type.slice(1))} · ${c.available ? `<a href="/api/student/credentials/${c.course_id}/pdf">Download ${esc(c.credential_type)}</a>` : `Available after fee completion${Number(c.balance)>0 ? ` · outstanding balance KES ${Number(c.balance).toLocaleString()}` : ''}`}</li>`).join('')}</ul>` : '<p>No enrolled courses yet.</p>'}`;
-  } catch (e) { console.error(e); const target=document.getElementById('studentCredentials'); if(target) target.innerHTML='<p>Credentials could not be loaded. Refresh the page or contact the administrator.</p>'; }
 
   // ─── Fees ───
   try {
