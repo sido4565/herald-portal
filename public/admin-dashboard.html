@@ -82,9 +82,23 @@
     </section>
 
     <section class="admin-panel" id="panel-credentials">
-      <div class="panel-head"><h2>Certificates, Diplomas &amp; Degrees</h2></div>
-      <p>Set the award for each course. Degree qualifications need an admin-entered name. Partner course awards can require individual approval.</p>
-      <div class="table-wrap"><table id="credentialsTable"><thead><tr><th>Course</th><th>Credential</th><th>Qualification name</th><th>Partner course</th><th>Require approval</th><th>Action</th></tr></thead><tbody></tbody></table></div>
+      <div class="panel-head"><div><h2>Credential Desk</h2><p>Configure course awards, find a student, and approve fee completion.</p></div></div>
+      <style>
+        #panel-credentials .cred-intro{padding:18px 20px;border-radius:14px;background:linear-gradient(115deg,#10294a,#1e4968);color:#fff;margin:0 0 20px}
+        #panel-credentials .cred-intro h3{font:600 22px Georgia,'Times New Roman',serif;margin:0 0 5px}
+        #panel-credentials .cred-intro p{margin:0;color:#dce7f0}
+        #panel-credentials .cred-search{max-width:420px;padding:11px 14px;border:1px solid #ccd5df;border-radius:9px;font-size:14px}
+        #panel-credentials #credentialsTable{min-width:820px}
+        #panel-credentials #credentialsTable input,#panel-credentials #credentialsTable select{padding:8px 10px;border:1px solid #d6dce4;border-radius:8px;background:#fff;max-width:210px}
+        #panel-credentials #credentialStudents{padding:20px;border:1px solid #e2e7ed;border-radius:14px;background:#fbfcfe}
+        #panel-credentials #credentialStudents h3{font:600 21px Georgia,'Times New Roman',serif;color:#10294a}
+        #panel-credentials #credentialStudents table input[type=text]{min-width:210px;padding:9px;border:1px solid #d6dce4;border-radius:8px}
+        #panel-credentials .cred-section-label{font-size:11px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;color:#758398;margin:22px 0 9px}
+        #panel-credentials .cred-type-pill{display:inline-block;padding:5px 9px;border-radius:999px;background:#edf3f8;color:#183a59;font-size:12px;font-weight:700}
+      </style>
+      <div class="cred-intro"><h3>Award setup &amp; fee clearance</h3><p>Search the student list within a course. Approve fee completion only after confirming the account is cleared. Degree recipients also need their certificate name entered.</p></div>
+      <div class="cred-section-label">Course award settings</div>
+      <div class="table-wrap"><table id="credentialsTable"><thead><tr><th>Course</th><th>Award type</th><th>Degree qualification</th><th>Partner course</th><th>Require approval</th><th>Actions</th></tr></thead><tbody></tbody></table></div>
       <div id="credentialStudents" style="margin-top:24px"></div>
     </section>
      

@@ -1460,7 +1460,7 @@ app.get('/api/student/credentials', authStudent, async (req, res) => {
     LEFT JOIN course_credentials cc ON cc.course_id=c.id
     LEFT JOIN student_credentials sc ON sc.student_id=e.student_id AND sc.course_id=c.id
     WHERE e.student_id=? GROUP BY c.id ORDER BY c.title`, args: [req.user.id] });
-  res.json(rows.rows.map(row => ({ ...row, available: Number(row.balance)<=0 })));
+  res.json(rows.rows.map(row => ({ ...row, available: Number(row.balance)<=0 && Number(row.fees_completed)===1 })));
 });
 
 app.get('/api/admin/credentials', authAdmin, async (req, res) => {
@@ -1497,7 +1497,7 @@ app.get('/api/student/credentials/:courseId/pdf', authStudent, async (req, res) 
     LEFT JOIN course_credentials cc ON cc.course_id=c.id LEFT JOIN credential_approvals ca ON ca.student_id=e.student_id AND ca.course_id=c.id LEFT JOIN student_credentials sc ON sc.student_id=e.student_id AND sc.course_id=c.id
     WHERE e.student_id=? AND c.id=? GROUP BY c.id`, args: [req.user.id, req.params.courseId] });
   const row = q.rows[0];
-  if (!row || Number(row.balance)>0) return res.status(403).json({ error: 'A zero fee balance is required to download this credential.' });
+  if (!row || Number(row.balance)>0 || Number(row.fees_completed)!==1) return res.status(403).json({ error: 'Admin fee approval and a zero fee balance are required to download this credential.' });
   const doc = new PDFDocument({ margin: 60, size: 'A4', layout: 'landscape' });
   res.setHeader('Content-Type','application/pdf');
   res.setHeader('Content-Disposition', `attachment; filename="Herald-${row.credential_type}-${row.code}-${row.reg_no}.pdf"`);
@@ -1512,19 +1512,19 @@ app.get('/api/student/credentials/:courseId/pdf', authStudent, async (req, res) 
   doc.lineWidth(1.5).strokeColor(gold).rect(31,31,w-62,h-62).stroke();
   [[45,45],[w-45,45],[45,h-45],[w-45,h-45]].forEach(([x,y])=>doc.circle(x,y,5).fill(gold));
   // Low contrast watermark uses the specific course code for each credential.
-  const typeStyle={certificate:{color:gold,watermark:'CERTIFIED'},diploma:{color:'#146c6a',watermark:'DIPLOMA'},degree:{color:'#65358b',watermark:'DEGREE'}}[row.credential_type];
+  const typeStyle={certificate:{color:gold,watermark:'CERTIFIED',display:'Times-Bold',name:'Times-Italic'},diploma:{color:'#146c6a',watermark:'DIPLOMA',display:'Times-Roman',name:'Times-Bold'},degree:{color:'#65358b',watermark:'DEGREE',display:'Times-Bold',name:'Times-Bold'}}[row.credential_type];
   doc.save().rotate(-28,{origin:[w/2,h/2]}).fillColor(typeStyle.color,0.07).font('Helvetica-Bold').fontSize(74)
     .text(`${typeStyle.watermark}  •  ${String(row.code).toUpperCase()}`,30,h/2-40,{width:w-60,align:'center'}).restore();
   doc.lineWidth(row.credential_type==='degree'?8:5).strokeColor(typeStyle.color).rect(37,37,w-74,h-74).stroke();
   doc.save().rotate(-35,{origin:[w/2,h/2]}).fillColor(typeStyle.color,0.035).font('Helvetica-Bold').fontSize(18).text(`${row.code} · ${row.reg_no}`,50,h/2+55,{width:w-100,align:'center'}).restore();
   doc.fillColor(gold).font('Helvetica-Bold').fontSize(11).text('HERALD TRAINER & CONSULTANT',0,64,{width:w,align:'center',characterSpacing:2});
   doc.moveTo(w/2-48,88).lineTo(w/2+48,88).lineWidth(2).strokeColor(gold).stroke();
-  doc.fillColor(typeStyle.color).font('Helvetica-Bold').fontSize(row.credential_type==='degree'?34:30).text(row.credential_type.toUpperCase(),60,111,{width:w-120,align:'center',characterSpacing:3});
+  doc.fillColor(typeStyle.color).font(typeStyle.display).fontSize(row.credential_type==='degree'?34:30).text(row.credential_type.toUpperCase(),60,111,{width:w-120,align:'center',characterSpacing:3});
   doc.fillColor(ink).font('Helvetica').fontSize(15).text('This is proudly presented to',60,165,{width:w-120,align:'center'});
-  doc.fillColor(navy).font('Helvetica-Bold').fontSize(31).text(row.name,70,195,{width:w-140,align:'center'});
+  doc.fillColor(navy).font(typeStyle.name).fontSize(31).text(row.name,70,195,{width:w-140,align:'center'});
   doc.moveTo(w/2-115,239).lineTo(w/2+115,239).lineWidth(1).strokeColor(gold).stroke();
   doc.fillColor(ink).font('Helvetica').fontSize(15).text('for successfully completing',60,256,{width:w-120,align:'center'});
-  doc.fillColor(navy).font('Helvetica-Bold').fontSize(21).text(row.title,75,282,{width:w-150,align:'center'});
+  doc.fillColor(navy).font('Times-Italic').fontSize(21).text(row.title,75,282,{width:w-150,align:'center'});
   doc.fillColor(gold).font('Helvetica-Bold').fontSize(14).text(row.qualification_name || `${row.title} ${row.credential_type}`,70,321,{width:w-140,align:'center'});
   doc.fillColor(ink).font('Helvetica').fontSize(10).text(`COURSE ${row.code}     •     REGISTRATION ${row.reg_no}`,60,h-105,{width:w-120,align:'center'});
   doc.moveTo(w/2-95,h-78).lineTo(w/2+95,h-78).lineWidth(1).strokeColor(navy).stroke();
