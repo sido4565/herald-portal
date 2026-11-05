@@ -111,6 +111,8 @@ async function initSchema() {
       award_name TEXT NOT NULL DEFAULT '',
       qualification_name TEXT NOT NULL DEFAULT '',
       approved INTEGER NOT NULL DEFAULT 0,
+      course_completed INTEGER NOT NULL DEFAULT 0,
+      fees_completed INTEGER NOT NULL DEFAULT 0,
       approved_by INTEGER,
       approved_at DATETIME,
       PRIMARY KEY(student_id, course_id)
@@ -345,6 +347,10 @@ async function initSchema() {
 
   for (const sql of statements) {
     await client.execute(sql);
+  }
+  const studentCredentialColumns = await client.execute('PRAGMA table_info(student_credentials)');
+  for (const [name, definition] of [['course_completed','INTEGER NOT NULL DEFAULT 0'],['fees_completed','INTEGER NOT NULL DEFAULT 0']]) {
+    if (!studentCredentialColumns.rows.some(column => column.name === name)) await client.execute(`ALTER TABLE student_credentials ADD COLUMN ${name} ${definition}`);
   }
   const courseColumns = await client.execute('PRAGMA table_info(courses)');
   if (!courseColumns.rows.some(column => column.name === 'fee')) {

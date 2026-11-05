@@ -1451,7 +1451,8 @@ app.get('/api/student/credentials', authStudent, async (req, res) => {
       COALESCE(cc.partner_course, 0) AS partner_course,
       COALESCE(cc.approval_required, 0) AS approval_required,
       MAX(r.marks) AS marks,
-      COALESCE(sc.approved, 0) AS approved, COALESCE(sc.award_name,'') AS award_name,
+      COALESCE(sc.approved, 0) AS approved, COALESCE(sc.course_completed,0) AS course_completed, COALESCE(sc.fees_completed,0) AS fees_completed,
+      CASE WHEN COALESCE(cc.credential_type,'certificate')='degree' THEN COALESCE(sc.award_name,'') ELSE s.name END AS award_name,
       COALESCE(sc.qualification_name,'') AS student_qualification,
       COALESCE((SELECT SUM(f.amount_due-COALESCE(f.amount_paid,0)) FROM fees f WHERE f.student_id=e.student_id),0) AS balance
     FROM enrollments e JOIN courses c ON c.id=e.course_id
@@ -1459,9 +1460,8 @@ app.get('/api/student/credentials', authStudent, async (req, res) => {
     LEFT JOIN course_credentials cc ON cc.course_id=c.id
     LEFT JOIN student_credentials sc ON sc.student_id=e.student_id AND sc.course_id=c.id
     WHERE e.student_id=? GROUP BY c.id ORDER BY c.title`, args: [req.user.id] });
-  res.json(rows.rows.map(row => ({ ...row, available: row.marks != null && Number(row.balance)<=0 && !!row.award_name &&
-    (!Number(row.approval_required) || Number(row.approved)) &&
-    (row.credential_type !== 'degree' || !!row.student_qualification) })));
+  res.json(rows.rows.map(row => ({ ...row, available: Number(row.course_completed)===1 && Number(row.fees_completed)===1 && Number(row.balance)<=0 &&
+    (row.credential_type !== 'degree' || !!row.award_name) })));
 });
 
 app.get('/api/admin/credentials', authAdmin, async (req, res) => {
@@ -1475,27 +1475,30 @@ app.put('/api/admin/credentials/:courseId', authAdmin, async (req, res) => {
   res.json({ok:true});
 });
 app.get('/api/admin/credentials/:courseId/students', authAdmin, async (req,res) => {
-  const q=await db.execute({sql:`SELECT s.id student_id,s.name,s.reg_no,MAX(r.marks) marks,COALESCE(sc.approved,0) approved,COALESCE(sc.award_name,'') award_name,COALESCE(sc.qualification_name,'') student_qualification FROM enrollments e JOIN students s ON s.id=e.student_id LEFT JOIN results r ON r.student_id=s.id AND r.course_id=e.course_id LEFT JOIN student_credentials sc ON sc.student_id=s.id AND sc.course_id=e.course_id WHERE e.course_id=? GROUP BY s.id ORDER BY s.name`,args:[req.params.courseId]}); res.json(q.rows);
+  const q=await db.execute({sql:`SELECT s.id student_id,s.name,s.reg_no,MAX(r.marks) marks,COALESCE(sc.approved,0) approved,COALESCE(sc.course_completed,0) course_completed,COALESCE(sc.fees_completed,0) fees_completed,COALESCE(sc.award_name,'') award_name,COALESCE(sc.qualification_name,'') student_qualification,COALESCE((SELECT SUM(f.amount_due-COALESCE(f.amount_paid,0)) FROM fees f WHERE f.student_id=s.id),0) balance FROM enrollments e JOIN students s ON s.id=e.student_id LEFT JOIN results r ON r.student_id=s.id AND r.course_id=e.course_id LEFT JOIN student_credentials sc ON sc.student_id=s.id AND sc.course_id=e.course_id WHERE e.course_id=? GROUP BY s.id ORDER BY s.name`,args:[req.params.courseId]}); res.json(q.rows);
 });
 app.put('/api/admin/credentials/:courseId/students/:studentId', authAdmin, async(req,res)=>{
-  const award=String(req.body.award_name||'').trim(), qualification=String(req.body.qualification_name||'').trim();
-  if(!award) return res.status(400).json({error:'Enter the award recipient name.'});
-  const cfg=await db.execute({sql:'SELECT credential_type,approval_required FROM course_credentials WHERE course_id=?',args:[req.params.courseId]});
-  if(cfg.rows[0]?.credential_type==='degree'&&!qualification) return res.status(400).json({error:'Enter the student degree qualification.'});
-  await db.execute({sql:`INSERT INTO student_credentials(student_id,course_id,award_name,qualification_name,approved,approved_by,approved_at) VALUES(?,?,?,?,?,?,CASE WHEN ?=1 THEN CURRENT_TIMESTAMP ELSE NULL END) ON CONFLICT(student_id,course_id) DO UPDATE SET award_name=excluded.award_name,qualification_name=excluded.qualification_name,approved=excluded.approved,approved_by=excluded.approved_by,approved_at=excluded.approved_at`,args:[req.params.studentId,req.params.courseId,award,qualification,req.body.approved?1:0,req.admin.id,req.body.approved?1:0]}); res.json({ok:true});
+  const award=String(req.body.award_name||'').trim();
+  const cfg=await db.execute({sql:'SELECT credential_type FROM course_credentials WHERE course_id=?',args:[req.params.courseId]});
+  if(!cfg.rows.length) return res.status(404).json({error:'Course credential settings were not found.'});
+  if(cfg.rows[0].credential_type==='degree'&&!award) return res.status(400).json({error:'Enter the degree recipient name.'});
+  const student=await db.execute({sql:'SELECT id FROM enrollments WHERE student_id=? AND course_id=? LIMIT 1',args:[req.params.studentId,req.params.courseId]});
+  if(!student.rows.length) return res.status(404).json({error:'Student is not enrolled in this course.'});
+  const courseCompleted=req.body.course_completed?1:0, feesCompleted=req.body.fees_completed?1:0;
+  await db.execute({sql:`INSERT INTO student_credentials(student_id,course_id,award_name,qualification_name,approved,course_completed,fees_completed,approved_by,approved_at) VALUES(?,?,?,'',?, ?,?,?,CASE WHEN ?=1 OR ?=1 THEN CURRENT_TIMESTAMP ELSE NULL END) ON CONFLICT(student_id,course_id) DO UPDATE SET award_name=excluded.award_name,approved=excluded.approved,course_completed=excluded.course_completed,fees_completed=excluded.fees_completed,approved_by=excluded.approved_by,approved_at=excluded.approved_at`,args:[req.params.studentId,req.params.courseId,award,courseCompleted&&feesCompleted?1:0,courseCompleted,feesCompleted,req.admin.id,courseCompleted,feesCompleted]}); res.json({ok:true});
 });
 
 app.get('/api/student/credentials/:courseId/pdf', authStudent, async (req, res) => {
   const q = await db.execute({ sql: `SELECT c.id,c.code,c.title,s.name,s.reg_no,
       COALESCE(cc.credential_type,'certificate') credential_type, COALESCE(cc.qualification_name,'') qualification_name,
-      COALESCE(cc.approval_required,0) approval_required, COALESCE(sc.approved,0) approved, MAX(r.marks) marks, COALESCE(sc.award_name,'') award_name, COALESCE(sc.qualification_name,'') student_qualification,
+      COALESCE(cc.approval_required,0) approval_required, COALESCE(sc.approved,0) approved,COALESCE(sc.course_completed,0) course_completed,COALESCE(sc.fees_completed,0) fees_completed, MAX(r.marks) marks, CASE WHEN COALESCE(cc.credential_type,'certificate')='degree' THEN COALESCE(sc.award_name,'') ELSE s.name END award_name, COALESCE(sc.award_name,'') student_qualification,
       COALESCE((SELECT SUM(f.amount_due-COALESCE(f.amount_paid,0)) FROM fees f WHERE f.student_id=s.id),0) balance
     FROM enrollments e JOIN students s ON s.id=e.student_id JOIN courses c ON c.id=e.course_id
     LEFT JOIN results r ON r.student_id=e.student_id AND r.course_id=e.course_id
     LEFT JOIN course_credentials cc ON cc.course_id=c.id LEFT JOIN credential_approvals ca ON ca.student_id=e.student_id AND ca.course_id=c.id LEFT JOIN student_credentials sc ON sc.student_id=e.student_id AND sc.course_id=c.id
     WHERE e.student_id=? AND c.id=? GROUP BY c.id`, args: [req.user.id, req.params.courseId] });
   const row = q.rows[0];
-  if (!row || row.marks == null || Number(row.balance)>0 || !row.award_name || (Number(row.approval_required) && !Number(row.approved)) || (row.credential_type === 'degree' && !row.student_qualification)) return res.status(403).json({ error: 'Credential requires course completion, admin award setup/approval, and a zero fee balance.' });
+  if (!row || Number(row.course_completed)!==1 || Number(row.fees_completed)!==1 || Number(row.balance)>0 || !row.award_name || (Number(row.approval_required) && !Number(row.approved))) return res.status(403).json({ error: 'Credential requires admin approval of course completion and fee completion, and a zero fee balance.' });
   const doc = new PDFDocument({ margin: 60, size: 'A4', layout: 'landscape' });
   res.setHeader('Content-Type','application/pdf');
   res.setHeader('Content-Disposition', `attachment; filename="Herald-${row.credential_type}-${row.code}-${row.reg_no}.pdf"`);
