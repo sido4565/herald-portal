@@ -1460,9 +1460,7 @@ app.get('/api/student/credentials', authStudent, async (req, res) => {
     LEFT JOIN course_credentials cc ON cc.course_id=c.id
     LEFT JOIN student_credentials sc ON sc.student_id=e.student_id AND sc.course_id=c.id
     WHERE e.student_id=? GROUP BY c.id ORDER BY c.title`, args: [req.user.id] });
-  res.json(rows.rows.map(row => ({ ...row, available: Number(row.course_completed)===1 && Number(row.balance)<=0 &&
-    (row.credential_type !== 'degree' || (!!row.award_name && Number(row.fees_completed)===1)) &&
-    (!Number(row.approval_required) || Number(row.approved)) })));
+  res.json(rows.rows.map(row => ({ ...row, available: Number(row.balance)<=0 })));
 });
 
 app.get('/api/admin/credentials', authAdmin, async (req, res) => {
@@ -1492,15 +1490,14 @@ app.put('/api/admin/credentials/:courseId/students/:studentId', authAdmin, async
 app.get('/api/student/credentials/:courseId/pdf', authStudent, async (req, res) => {
   const q = await db.execute({ sql: `SELECT c.id,c.code,c.title,s.name,s.reg_no,
       COALESCE(cc.credential_type,'certificate') credential_type, COALESCE(cc.qualification_name,'') qualification_name,
-      COALESCE(cc.approval_required,0) approval_required, COALESCE(sc.approved,0) approved,COALESCE(sc.course_completed,0) course_completed,COALESCE(sc.fees_completed,0) fees_completed, MAX(r.marks) marks, CASE WHEN COALESCE(cc.credential_type,'certificate')='degree' THEN COALESCE(sc.award_name,'') ELSE s.name END award_name, COALESCE(sc.award_name,'') student_qualification,
+      COALESCE(cc.approval_required,0) approval_required, COALESCE(sc.approved,0) approved,COALESCE(sc.course_completed,0) course_completed,COALESCE(sc.fees_completed,0) fees_completed, MAX(r.marks) marks, CASE WHEN COALESCE(cc.credential_type,'certificate')='degree' THEN COALESCE(NULLIF(sc.award_name,''),s.name) ELSE s.name END award_name, COALESCE(sc.award_name,'') student_qualification,
       COALESCE((SELECT SUM(f.amount_due-COALESCE(f.amount_paid,0)) FROM fees f WHERE f.student_id=s.id),0) balance
     FROM enrollments e JOIN students s ON s.id=e.student_id JOIN courses c ON c.id=e.course_id
     LEFT JOIN results r ON r.student_id=e.student_id AND r.course_id=e.course_id
     LEFT JOIN course_credentials cc ON cc.course_id=c.id LEFT JOIN credential_approvals ca ON ca.student_id=e.student_id AND ca.course_id=c.id LEFT JOIN student_credentials sc ON sc.student_id=e.student_id AND sc.course_id=c.id
     WHERE e.student_id=? AND c.id=? GROUP BY c.id`, args: [req.user.id, req.params.courseId] });
   const row = q.rows[0];
-  const degreeNeedsSetup=row?.credential_type==='degree' && (!row.award_name || Number(row.fees_completed)!==1);
-  if (!row || Number(row.course_completed)!==1 || Number(row.balance)>0 || degreeNeedsSetup || (Number(row.approval_required) && !Number(row.approved))) return res.status(403).json({ error: 'Credential requires course completion approval, zero fee balance, and any required degree or partner setup.' });
+  if (!row || Number(row.balance)>0) return res.status(403).json({ error: 'A zero fee balance is required to download this credential.' });
   const doc = new PDFDocument({ margin: 60, size: 'A4', layout: 'landscape' });
   res.setHeader('Content-Type','application/pdf');
   res.setHeader('Content-Disposition', `attachment; filename="Herald-${row.credential_type}-${row.code}-${row.reg_no}.pdf"`);
@@ -1508,7 +1505,7 @@ app.get('/api/student/credentials/:courseId/pdf', authStudent, async (req, res) 
   const navy='#10294a', gold='#b8860b', ink='#253858', paper='#fffdf8';
   const w=doc.page.width, h=doc.page.height;
   row.name=row.award_name;
-  if(row.credential_type==='degree') row.qualification_name=row.student_qualification;
+  if(row.credential_type==='degree') row.qualification_name=row.student_qualification || row.qualification_name || `${row.title} Degree`;
   doc.rect(0,0,w,h).fill(paper);
   // Double frame and corner accents give each award a formal certificate look.
   doc.lineWidth(5).strokeColor(navy).rect(22,22,w-44,h-44).stroke();
