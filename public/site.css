@@ -157,7 +157,7 @@ img { max-width: 100%; height: auto; }
 /* ---------- Hero ---------- */
 .hero {
   position: relative;
-  background-image: linear-gradient(135deg, rgba(10, 23, 48, 0.88) 0%, rgba(22, 51, 88, 0.75) 100%), url('images/login-background.png');
+  background-image: linear-gradient(135deg, rgba(10, 23, 48, 0.88) 0%, rgba(22, 51, 88, 0.75) 100%), url('images/hero-login.jpg');
   background-size: cover;
   background-position: center;
   color: #ffffff;
@@ -217,7 +217,7 @@ img { max-width: 100%; height: auto; }
 /* Page banner (for interior pages) */
 .page-banner {
   position: relative;
-  background-image: linear-gradient(135deg, rgba(10, 23, 48, 0.9) 0%, rgba(22, 51, 88, 0.75) 100%), url('images/login-background.png');
+  background-image: linear-gradient(135deg, rgba(10, 23, 48, 0.9) 0%, rgba(22, 51, 88, 0.75) 100%), url('images/hero-login.jpg');
   background-size: cover;
   background-position: center;
   color: #ffffff;
@@ -419,7 +419,7 @@ section { padding: 80px 24px; }
 }
 .why-list span { color: var(--muted); font-size: 14px; }
 .why-visual {
-  background-image: url('images/login-background.png');
+  background-image: url('images/hero-login.jpg');
   background-size: cover;
   background-position: center;
   border-radius: var(--radius-lg);
