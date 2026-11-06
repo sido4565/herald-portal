@@ -8,6 +8,9 @@
     body { background: #f7f6f2; font-family: 'DM Sans', sans-serif; }
     .container { max-width: 900px; margin: 40px auto; padding: 0 20px; }
     h1 { color: #10243a; margin-bottom: 24px; }
+    .student-exam-card { display:flex;align-items:center;gap:18px;padding:18px 22px;margin-bottom:24px;background:#10243a;color:#fff;border-radius:12px;box-shadow:0 4px 12px rgba(16,36,58,.12) }
+    .student-exam-card img { width:82px;height:104px;object-fit:cover;border:2px solid #d8b765;border-radius:7px;background:#fff }
+    .student-exam-card p { margin:5px 0 0;color:#e2e8f0;font-size:13px }
     .exam-card {
       background: #fff; border: 1px solid #e6e9ed; border-radius: 12px;
       padding: 20px; margin-bottom: 16px;
@@ -33,14 +36,26 @@
 <body>
   <div class="container">
     <h1>My Exams</h1>
+    <section class="student-exam-card" aria-label="Student exam card">
+      <img id="examCardPhoto" src="/api/student/passport-photo" alt="Student passport photo" />
+      <div><strong id="examCardName">Loading student details…</strong><p>Registration No: <span id="examCardReg"></span></p><p id="examCardCourse"></p></div>
+    </section>
     <div id="examsList"><p class="empty">Loading...</p></div>
   </div>
 
   <script>
+    fetch('/api/me', { credentials: 'same-origin' }).then(r => r.ok ? r.json() : Promise.reject(new Error('Please sign in to view your student exam card.'))).then(student => {
+      document.getElementById('examCardName').textContent = student.name;
+      document.getElementById('examCardReg').textContent = student.reg_no;
+      document.getElementById('examCardCourse').textContent = student.course;
+    }).catch(error => { document.getElementById('examCardName').textContent = error.message; });
+    document.getElementById('examCardPhoto').addEventListener('error', function () { this.style.display = 'none'; });
+
     fetch('/api/student/exams', { credentials: 'same-origin' })
       .then(r => r.json())
       .then(exams => {
         const wrap = document.getElementById('examsList');
+        if (!Array.isArray(exams)) throw new Error(exams.error || 'Upload your passport photo from the dashboard to activate exam access.');
         if (!exams.length) {
           wrap.innerHTML = '<p class="empty">No exams available yet. Check back later.</p>';
           return;

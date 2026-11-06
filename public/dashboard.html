@@ -89,7 +89,7 @@
     <section id="passportPhotoGate" class="card wide" style="display:none;max-width:680px;margin:8vh auto;padding:28px;border-top:5px solid #b77b16;">
       <p style="margin:0 0 6px;color:#9a6710;font-size:11px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;">Required to activate your dashboard</p>
       <h1 style="margin:0 0 8px;font-size:24px;">Upload your passport photo</h1>
-      <p style="color:var(--muted);">Your photo will be kept private and used on your academic certificates. Upload a clear, recent JPEG or PNG image (maximum 5 MB).</p>
+      <p style="color:var(--muted);">Your photo will be kept private, shown on your dashboard and exam card, and included on certificates. Upload a clear, recent JPEG or PNG image (maximum 5 MB).</p>
       <form id="passportPhotoForm">
         <label for="passportPhotoInput">Passport photo</label>
         <input id="passportPhotoInput" name="photo" type="file" accept="image/jpeg,image/png" required />
@@ -117,8 +117,11 @@
   position: relative;
   overflow: hidden;
 ">
-  <h2 style="margin: 0 0 8px; font-size: 26px;">Welcome, <span id="welcomeName"></span></h2>
-  <p style="margin: 0; opacity: 0.92;">Reg No <strong id="regNo"></strong> &middot; <span id="studentCourse"></span></p>
+  <div style="display:flex;align-items:center;justify-content:space-between;gap:18px;flex-wrap:wrap;">
+    <div><h2 style="margin: 0 0 8px; font-size: 26px;">Welcome, <span id="welcomeName"></span></h2>
+      <p style="margin: 0; opacity: 0.92;">Reg No <strong id="regNo"></strong> &middot; <span id="studentCourse"></span></p></div>
+    <img id="studentPassportPhoto" src="/api/student/passport-photo" alt="Your passport photo" style="width:92px;height:116px;object-fit:cover;border:3px solid rgba(255,255,255,.85);border-radius:8px;background:#fff;" />
+  </div>
 </section>
 
     <section class="card wide" aria-labelledby="distanceLearningTitle" style="margin-bottom:24px; border-left:5px solid #0f766e;">

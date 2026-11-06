@@ -534,8 +534,8 @@ async function notifyActiveStudentsMissingPassportPhotos() {
         await mailer.sendMail({
           to: student.email,
           subject: 'Action required: Upload your passport photo',
-          text: `Hello ${student.name || 'Student'}, please upload a recent passport photo to your Herald Portal dashboard. Your dashboard functions will remain locked until the photo is uploaded. Sign in at ${baseUrl}/login.html.`,
-          html: `<p>Hello ${name},</p><p>Please upload a recent passport photo to your Herald Portal dashboard. Your dashboard functions will remain locked until the photo is uploaded. The photo will be kept private and used on your academic certificates.</p><p><a href="${baseUrl}/login.html">Sign in to upload your photo</a></p>`,
+          text: `Hello ${student.name || 'Student'}, please upload a recent passport photo to your Herald Portal dashboard. Your dashboard functions will remain locked until the photo is uploaded. It is needed for your exam card and certificates. Sign in at ${baseUrl}/login.html.`,
+          html: `<p>Hello ${name},</p><p>Please upload a recent passport photo to your Herald Portal dashboard. Your dashboard functions will remain locked until the photo is uploaded. It will appear on your exam card and certificates.</p><p><a href="${baseUrl}/login.html">Sign in to upload your photo</a></p>`,
         });
         await db.execute({ sql: 'UPDATE students SET passport_notice_sent = 1 WHERE id = ? AND passport_photo_key IS NULL', args: [student.id] });
       } catch (err) {
@@ -1537,6 +1537,7 @@ app.get('/api/student/credentials', authStudent, async (req, res) => {
       COALESCE(sc.approved, 0) AS approved, COALESCE(sc.course_completed,0) AS course_completed,
       COALESCE(sc.fees_completed,0) AS fees_completed, COALESCE(sc.award_name,'') AS award_name,
       COALESCE(sc.partner_university,'') AS partner_university,
+      (SELECT passport_photo_key FROM students WHERE id=e.student_id) AS passport_photo_key,
       MAX(r.marks) AS marks,
       MAX(CASE WHEN UPPER(COALESCE(r.grade,'')) IN ('A','A-','B+','B','B-','C+','C','D','PASS','PASSED') OR COALESCE(r.marks,0)>=45 THEN 1 ELSE 0 END) AS academic_complete,
       COALESCE((SELECT SUM(f.amount_due-COALESCE(f.amount_paid,0)) FROM fees f WHERE f.student_id=e.student_id),0) AS balance
@@ -1545,7 +1546,7 @@ app.get('/api/student/credentials', authStudent, async (req, res) => {
     LEFT JOIN course_credentials cc ON cc.course_id=c.id
     LEFT JOIN student_credentials sc ON sc.student_id=e.student_id AND sc.course_id=e.course_id
     WHERE e.student_id=? GROUP BY c.id ORDER BY c.title`, args: [req.user.id] });
-  res.json(rows.rows.map(row => ({ ...row, available: Number(row.balance)<=0 && Number(row.fees_completed)===1 && Number(row.course_completed)===1 && Number(row.approved)===1 && Number(row.academic_complete)===1 })));
+  res.json(rows.rows.map(row => ({ ...row, available: Number(row.balance)<=0 && Number(row.fees_completed)===1 && Number(row.course_completed)===1 && Number(row.approved)===1 && Number(row.academic_complete)===1 && (row.credential_type!=='certificate' || Boolean(row.passport_photo_key)) })));
 });
 
 app.get('/api/admin/credentials', authAdmin, async (req, res) => {
@@ -1591,6 +1592,10 @@ app.put('/api/admin/credentials/:courseId/students/:studentId', authAdmin, async
   const cfg=await db.execute({sql:`SELECT cc.credential_type,cc.qualification_name,cc.partner_course,cc.partner_university,c.title,c.code
     FROM courses c LEFT JOIN course_credentials cc ON cc.course_id=c.id WHERE c.id=?`,args:[courseId]});
   if(!cfg.rows.length) return res.status(404).json({error:'Programme not found.'});
+  if(cfg.rows[0].credential_type==='certificate' && req.body?.fees_completed===true && req.body?.course_completed===true){
+    const photo=await db.execute({sql:'SELECT passport_photo_key FROM students WHERE id=?',args:[studentId]});
+    if(!photo.rows[0]?.passport_photo_key) return res.status(409).json({error:'A passport photo is required before issuing a certificate.'});
+  }
   const enrollment=await db.execute({sql:'SELECT 1 FROM enrollments WHERE student_id=? AND course_id=? LIMIT 1',args:[studentId,courseId]});
   if(!enrollment.rows.length) return res.status(404).json({error:'Student is not enrolled in this programme.'});
   const c=cfg.rows[0], isDegree=c.credential_type==='degree';
@@ -1664,7 +1669,7 @@ async function getIssuedCredential(studentId,courseId) {
     LEFT JOIN course_credentials cc ON cc.course_id=c.id LEFT JOIN results r ON r.student_id=e.student_id AND r.course_id=c.id
     WHERE e.student_id=? AND c.id=? GROUP BY s.id,c.id`,args:[studentId,courseId]});
   const row=q.rows[0];
-  if(!row || Number(row.approved)!==1 || Number(row.course_completed)!==1 || Number(row.fees_completed)!==1 || Number(row.academic_complete)!==1 || Number(row.balance)>0 || !row.certificate_id) return null;
+  if(!row || Number(row.approved)!==1 || Number(row.course_completed)!==1 || Number(row.fees_completed)!==1 || Number(row.academic_complete)!==1 || Number(row.balance)>0 || !row.certificate_id || (row.credential_type==='certificate' && !row.passport_photo_key)) return null;
   const degree=row.credential_type==='degree';
   const studentName=degree?row.award_name:row.student_name;
   const courseName=degree?(row.qualification_name||row.title):row.title;
@@ -1672,7 +1677,8 @@ async function getIssuedCredential(studentId,courseId) {
   const qrDataUrl=await QRCode.toDataURL(verificationUrl,{errorCorrectionLevel:'H',margin:1,width:240,color:{dark:'#20242b',light:'#ffffff'}});
   const courseCategory=row.course_category==='general'?inferCredentialCategory(row.title):row.course_category;
   const design=credentialDesign(row.code,courseCategory);
-  const photoBytes = await getPrivateMaterialBytes({ storage_key: row.passport_photo_key, storage_type: row.passport_photo_storage });
+  const needsPhoto = row.credential_type === 'certificate';
+  const photoBytes = needsPhoto ? await getPrivateMaterialBytes({ storage_key: row.passport_photo_key, storage_type: row.passport_photo_storage }) : null;
   const photoDataUrl = photoBytes ? `data:${row.passport_photo_mime || 'image/jpeg'};base64,${photoBytes.toString('base64')}` : '';
   return {...row,studentName,courseName,completionDate:row.completion_date,instructorName:row.instructor_name,certificateId:row.certificate_id,courseCategory,templateFamily:design.family,theme:design,verificationUrl,qrDataUrl,photoDataUrl,photoBytes};
 }
@@ -1734,13 +1740,15 @@ async function renderCredentialPdf(row) {
   const detail=`Awarded ${dateLabel}${row.instructorName?` · Instructor: ${row.instructorName}`:''}`;
   doc.fillColor(theme.ink).font('HeraldSans').fontSize(9.5).text(detail,55,294,{width:w-110,align:'center',lineBreak:false,ellipsis:true});
   if(row.credential_type==='degree'&&row.partner_university) doc.font('HeraldSans').fontSize(9).text(`In partnership with ${row.partner_university}`,55,311,{width:w-110,align:'center',lineBreak:false,ellipsis:true});
-  if(family==='formal'){
+  if(row.credential_type==='certificate'){
     doc.save().fillColor('#fffaf0').strokeColor(theme.accent).lineWidth(1.2).rect(w-116,55,62,78).fillAndStroke().restore();
     if(row.photoBytes){
       doc.save();
       try { doc.rect(w-113,58,56,72).clip();doc.image(row.photoBytes,w-113,58,{fit:[56,72],align:'center',valign:'center'}); }
       finally { doc.restore(); }
     } else doc.fillColor(theme.ink).font('HeraldSans').fontSize(6.5).text('STUDENT PHOTO',w-112,89,{width:54,align:'center',lineBreak:false});
+  }
+  if(family==='formal'){
     doc.fillColor(theme.brand).font('HeraldSerif').fontSize(9).text('In testimony whereof, this credential is issued by the Institute.',100,335,{width:w-200,align:'center',lineBreak:false,ellipsis:true});
   }
   // Course-specific medal/seal, with a distinct silhouette in each design family.
