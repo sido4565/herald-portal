@@ -96,7 +96,8 @@ async function initSchema() {
       qualification_name TEXT NOT NULL DEFAULT '',
       partner_course INTEGER NOT NULL DEFAULT 0,
       approval_required INTEGER NOT NULL DEFAULT 0,
-      partner_university TEXT NOT NULL DEFAULT ''
+      partner_university TEXT NOT NULL DEFAULT '',
+      course_category TEXT NOT NULL DEFAULT 'general'
     )`,
     `CREATE TABLE IF NOT EXISTS credential_approvals (
       student_id INTEGER NOT NULL,
@@ -115,6 +116,7 @@ async function initSchema() {
       course_completed INTEGER NOT NULL DEFAULT 0,
       fees_completed INTEGER NOT NULL DEFAULT 0,
       partner_university TEXT NOT NULL DEFAULT '',
+      certificate_id TEXT,
       approved_by INTEGER,
       approved_at DATETIME,
       PRIMARY KEY(student_id, course_id)
@@ -358,6 +360,14 @@ async function initSchema() {
   if (!courseCredentialColumns.rows.some(column => column.name === 'partner_university')) {
     await client.execute("ALTER TABLE course_credentials ADD COLUMN partner_university TEXT NOT NULL DEFAULT ''");
   }
+  if (!courseCredentialColumns.rows.some(column => column.name === 'course_category')) {
+    await client.execute("ALTER TABLE course_credentials ADD COLUMN course_category TEXT NOT NULL DEFAULT 'general'");
+  }
+  if (!studentCredentialColumns.rows.some(column => column.name === 'certificate_id')) {
+    await client.execute('ALTER TABLE student_credentials ADD COLUMN certificate_id TEXT');
+  }
+  await client.execute("UPDATE student_credentials SET certificate_id=upper(hex(randomblob(16))) WHERE approved=1 AND certificate_id IS NULL");
+  await client.execute('CREATE UNIQUE INDEX IF NOT EXISTS student_credentials_certificate_id_uq ON student_credentials(certificate_id) WHERE certificate_id IS NOT NULL');
   const courseColumns = await client.execute('PRAGMA table_info(courses)');
   if (!courseColumns.rows.some(column => column.name === 'fee')) {
     await client.execute('ALTER TABLE courses ADD COLUMN fee REAL');

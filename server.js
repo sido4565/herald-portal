@@ -102,6 +102,8 @@ async function ensureStudentCourseFees(studentId) {
   }
 }
 const PDFDocument = require('pdfkit');
+const puppeteer = require('puppeteer-core');
+const QRCode = require('qrcode');
 const { sendSMS } = require('./sms');
 
 // ---------- Global BigInt JSON fix ----------
@@ -1464,18 +1466,20 @@ app.get('/api/student/credentials', authStudent, async (req, res) => {
 });
 
 app.get('/api/admin/credentials', authAdmin, async (req, res) => {
-  const q = await db.execute({ sql: `SELECT c.id course_id,c.code,c.title,COALESCE(cc.credential_type,'certificate') credential_type,COALESCE(cc.qualification_name,'') qualification_name,COALESCE(cc.partner_course,0) partner_course,COALESCE(cc.approval_required,0) approval_required,COALESCE(cc.partner_university,'') partner_university FROM courses c LEFT JOIN course_credentials cc ON cc.course_id=c.id ORDER BY c.title` });
+  const q = await db.execute({ sql: `SELECT c.id course_id,c.code,c.title,COALESCE(cc.credential_type,'certificate') credential_type,COALESCE(cc.qualification_name,'') qualification_name,COALESCE(cc.partner_course,0) partner_course,COALESCE(cc.approval_required,0) approval_required,COALESCE(cc.partner_university,'') partner_university,COALESCE(cc.course_category,'general') course_category FROM courses c LEFT JOIN course_credentials cc ON cc.course_id=c.id ORDER BY c.title` });
   res.json(q.rows);
 });
+const credentialCategories=['technology','business','short-course','arts','humanities','secondary','engineering','medical','membership','general'];
 app.put('/api/admin/credentials/:courseId', authAdmin, async (req, res) => {
-  const { credential_type='certificate', qualification_name='', partner_course=0, approval_required=0, partner_university='' } = req.body || {};
+  const { credential_type='certificate', qualification_name='', partner_course=0, approval_required=0, partner_university='', course_category='general' } = req.body || {};
   if (!['certificate','diploma','degree'].includes(credential_type)) return res.status(400).json({error:'Choose certificate, diploma, or degree.'});
+  if(!credentialCategories.includes(course_category)) return res.status(400).json({error:'Choose a supported programme category.'});
   const course = await db.execute({sql:`SELECT c.id,c.title,COALESCE(cc.credential_type,'certificate') credential_type
     FROM courses c LEFT JOIN course_credentials cc ON cc.course_id=c.id WHERE c.id=?`,args:[req.params.courseId]});
   if (!course.rows.length) return res.status(404).json({error:'Programme not found.'});
   const issued=await db.execute({sql:'SELECT COUNT(*) AS issued_count FROM student_credentials WHERE course_id=? AND approved=1',args:[req.params.courseId]});
   if(Number(issued.rows[0]?.issued_count)>0 && course.rows[0].credential_type!==credential_type) return res.status(409).json({error:'The document type cannot change after issuance.'});
-  await db.execute({ sql:`INSERT INTO course_credentials(course_id,credential_type,qualification_name,partner_course,approval_required,partner_university) VALUES(?,?,?,?,?,?) ON CONFLICT(course_id) DO UPDATE SET credential_type=excluded.credential_type,qualification_name=excluded.qualification_name,partner_course=excluded.partner_course,approval_required=excluded.approval_required,partner_university=excluded.partner_university`, args:[req.params.courseId,credential_type,credential_type==='degree'?course.rows[0].title:String(course.rows[0].title),partner_course?1:0,approval_required?1:0,String(partner_university||'').trim()] });
+  await db.execute({ sql:`INSERT INTO course_credentials(course_id,credential_type,qualification_name,partner_course,approval_required,partner_university,course_category) VALUES(?,?,?,?,?,?,?) ON CONFLICT(course_id) DO UPDATE SET credential_type=excluded.credential_type,qualification_name=excluded.qualification_name,partner_course=excluded.partner_course,approval_required=excluded.approval_required,partner_university=excluded.partner_university,course_category=excluded.course_category`, args:[req.params.courseId,credential_type,String(course.rows[0].title),partner_course?1:0,approval_required?1:0,String(partner_university||'').trim(),course_category] });
   res.json({ok:true});
 });
 app.get('/api/admin/credentials/students', authAdmin, async (req,res) => {
@@ -1484,12 +1488,12 @@ app.get('/api/admin/credentials/students', authAdmin, async (req,res) => {
   const like=`%${term}%`;
   const q=await db.execute({sql:`SELECT s.id student_id,s.name,s.reg_no,s.course programme,
       c.id course_id,c.code,c.title,COALESCE(cc.credential_type,'certificate') credential_type,
-      c.title qualification_name,COALESCE(cc.partner_course,0) partner_course,
-      COALESCE(cc.partner_university,'') partner_university,
+      c.title qualification_name,c.trainer instructor_name,COALESCE(cc.course_category,'general') course_category,
+      COALESCE(cc.partner_course,0) partner_course,COALESCE(cc.partner_university,'') partner_university,
       MAX(r.marks) marks,MAX(CASE WHEN UPPER(COALESCE(r.grade,'')) IN ('A','A-','B+','B','B-','C+','C','D','PASS','PASSED') OR COALESCE(r.marks,0)>=45 THEN 1 ELSE 0 END) academic_complete,
       COALESCE(sc.approved,0) approved,COALESCE(sc.course_completed,0) course_completed,
       COALESCE(sc.fees_completed,0) fees_completed,COALESCE(sc.award_name,'') award_name,
-      COALESCE(sc.partner_university,'') issued_partner,
+      COALESCE(sc.partner_university,'') issued_partner,COALESCE(sc.certificate_id,'') certificate_id,sc.approved_at completion_date,
       COALESCE((SELECT SUM(f.amount_due-COALESCE(f.amount_paid,0)) FROM fees f WHERE f.student_id=s.id),0) balance
     FROM students s JOIN enrollments e ON e.student_id=s.id JOIN courses c ON c.id=e.course_id
     LEFT JOIN course_credentials cc ON cc.course_id=c.id
@@ -1523,77 +1527,136 @@ app.put('/api/admin/credentials/:courseId/students/:studentId', authAdmin, async
   const existing=await db.execute({sql:'SELECT approved FROM student_credentials WHERE student_id=? AND course_id=?',args:[studentId,courseId]});
   if(Number(existing.rows[0]?.approved)===1) return res.status(409).json({error:'This document has already been issued; duplicate issuance is blocked.'});
   const qualification=isDegree ? String(c.title||'').trim() : '';
-  const saved=await db.execute({sql:`INSERT INTO student_credentials(student_id,course_id,award_name,qualification_name,approved,course_completed,fees_completed,partner_university,approved_by,approved_at)
-    VALUES(?,?,?,?,?,?,?,?,?,CURRENT_TIMESTAMP)
-    ON CONFLICT(student_id,course_id) DO UPDATE SET award_name=excluded.award_name,qualification_name=excluded.qualification_name,approved=excluded.approved,course_completed=excluded.course_completed,fees_completed=excluded.fees_completed,partner_university=excluded.partner_university,approved_by=excluded.approved_by,approved_at=CURRENT_TIMESTAMP
+  const certificateId=approved?crypto.randomBytes(16).toString('hex').toUpperCase():null;
+  const saved=await db.execute({sql:`INSERT INTO student_credentials(student_id,course_id,award_name,qualification_name,approved,course_completed,fees_completed,partner_university,certificate_id,approved_by,approved_at)
+    VALUES(?,?,?,?,?,?,?,?,?,?,CURRENT_TIMESTAMP)
+    ON CONFLICT(student_id,course_id) DO UPDATE SET award_name=excluded.award_name,qualification_name=excluded.qualification_name,approved=excluded.approved,course_completed=excluded.course_completed,fees_completed=excluded.fees_completed,partner_university=excluded.partner_university,certificate_id=COALESCE(student_credentials.certificate_id,excluded.certificate_id),approved_by=excluded.approved_by,approved_at=CURRENT_TIMESTAMP
     WHERE student_credentials.approved=0 RETURNING approved`,
-    args:[studentId,courseId,isDegree?name:st.name,qualification,approved,courseApproval?1:0,feeApproval?1:0,isDegree?partner:'',req.admin.id]});
+    args:[studentId,courseId,isDegree?name:st.name,qualification,approved,courseApproval?1:0,feeApproval?1:0,isDegree?partner:'',certificateId,req.admin.id]});
   if(!saved.rows.length) return res.status(409).json({error:'This document has already been issued; duplicate issuance is blocked.'});
-  res.json({ok:true,issued:approved===1});
+  res.json({ok:true,issued:approved===1,certificateId:approved?certificateId:null});
 });
 
-function credentialPalette(code) {
-  let hash=0; for(const ch of String(code)) hash=(hash*31+ch.charCodeAt(0))>>>0;
-  const hue=hash%360;
-  const hsl=(h,s,l)=>{
-    s/=100;l/=100;const k=n=>(n+h/30)%12,a=s*Math.min(l,1-l),f=n=>l-a*Math.max(-1,Math.min(k(n)-3,Math.min(9-k(n),1)));
-    return '#'+[f(0),f(8),f(4)].map(v=>Math.round(v*255).toString(16).padStart(2,'0')).join('');
-  };
-  return {navy:hsl(hue,48,25),accent:hsl((hue+23)%360,48,43),paper:hsl(hue,32,97),variant:hash%4};
+function credentialTemplateFamily(category) {
+  if(['technology','business','short-course'].includes(category)) return 'modern';
+  if(['arts','humanities','secondary'].includes(category)) return 'classic';
+  return 'formal';
 }
-app.get('/api/student/credentials/:courseId/pdf', authStudent, async (req, res) => {
-  const q = await db.execute({ sql: `SELECT c.id,c.code,c.title,s.name,s.reg_no,
-      COALESCE(cc.credential_type,'certificate') credential_type,c.title qualification_name,
+function inferCredentialCategory(title='') {
+  const value=String(title).toLowerCase();
+  if(/engineering|mechanic|electrical|civil|industrial/.test(value)) return 'engineering';
+  if(/medical|medicine|nurs|health|clinical|pharma/.test(value)) return 'medical';
+  if(/humanities|history|literature|journal|media|arts|creative|communication/.test(value)) return 'humanities';
+  if(/secondary|high school|kcse|equivalent/.test(value)) return 'secondary';
+  if(/membership|member|professional body/.test(value)) return 'membership';
+  if(/information technolog|\bit\b|computer|program|software|network|cyber|data science|web design/.test(value)) return 'technology';
+  if(/business|management|finance|account|marketing|leadership|entrepreneur|sales|supply chain/.test(value)) return 'business';
+  if(/short course|short program|workshop/.test(value)) return 'short-course';
+  if(/art|design|music|culinary|hospitality/.test(value)) return 'arts';
+  return 'general';
+}
+function credentialDesign(code, category) {
+  let hash=0; for(const ch of String(code)) hash=(hash*31+ch.charCodeAt(0))>>>0;
+  const family=credentialTemplateFamily(category), variant=hash%8;
+  const hsl=(h,s,l)=>{s/=100;l/=100;const k=n=>(n+h/30)%12,a=s*Math.min(l,1-l),f=n=>l-a*Math.max(-1,Math.min(k(n)-3,Math.min(9-k(n),1)));return '#'+[f(0),f(8),f(4)].map(v=>Math.round(v*255).toString(16).padStart(2,'0')).join('');};
+  if(family==='modern') return {family,variant,brand:hsl(346+(hash%13),52+(hash%9),31+(hash%7)),accent:hsl(39+(hash%11),58,48+(hash%8)),paper:'#fffdfc',ink:'#28212a'};
+  if(family==='classic') return {family,variant,brand:hsl(143+(hash%24),39+(hash%12),24+(hash%7)),accent:hsl(39+(hash%10),55,44+(hash%9)),paper:hsl(42,36,95+(hash%3)),ink:'#2d2922'};
+  return {family,variant,brand:hsl(3+(hash%18),47+(hash%10),29+(hash%8)),accent:hsl(39+(hash%11),54,43+(hash%9)),paper:hsl(42,33,96+(hash%3)),ink:'#292622'};
+}
+function certificatePublicUrl(id) {
+  const base=String(process.env.PUBLIC_BASE_URL||process.env.APP_BASE_URL||'https://heraldtrainer.co.ke').replace(/\/$/,'');
+  return `${base}/verify/${encodeURIComponent(id)}`;
+}
+async function getIssuedCredential(studentId,courseId) {
+  const q=await db.execute({sql:`SELECT s.id student_id,s.name student_name,s.reg_no,c.id course_id,c.code,c.title,c.trainer instructor_name,
+      COALESCE(cc.credential_type,'certificate') credential_type,COALESCE(cc.course_category,'general') course_category,
+      COALESCE(sc.award_name,'') award_name,COALESCE(sc.qualification_name,'') qualification_name,
+      COALESCE(sc.partner_university,'') partner_university,sc.certificate_id,sc.approved_at completion_date,
       COALESCE(sc.approved,0) approved,COALESCE(sc.course_completed,0) course_completed,COALESCE(sc.fees_completed,0) fees_completed,
-      COALESCE(sc.award_name,'') award_name,COALESCE(sc.partner_university,'') partner_university,
-      MAX(r.marks) marks,MAX(CASE WHEN UPPER(COALESCE(r.grade,'')) IN ('A','A-','B+','B','B-','C+','C','D','PASS','PASSED') OR COALESCE(r.marks,0)>=45 THEN 1 ELSE 0 END) academic_complete,
+      MAX(CASE WHEN UPPER(COALESCE(r.grade,'')) IN ('A','A-','B+','B','B-','C+','C','D','PASS','PASSED') OR COALESCE(r.marks,0)>=45 THEN 1 ELSE 0 END) academic_complete,
       COALESCE((SELECT SUM(f.amount_due-COALESCE(f.amount_paid,0)) FROM fees f WHERE f.student_id=s.id),0) balance
     FROM enrollments e JOIN students s ON s.id=e.student_id JOIN courses c ON c.id=e.course_id
-    LEFT JOIN results r ON r.student_id=e.student_id AND r.course_id=e.course_id
-    LEFT JOIN course_credentials cc ON cc.course_id=c.id LEFT JOIN student_credentials sc ON sc.student_id=e.student_id AND sc.course_id=c.id
-    WHERE e.student_id=? AND c.id=? GROUP BY c.id`, args: [req.user.id, req.params.courseId] });
+    JOIN student_credentials sc ON sc.student_id=e.student_id AND sc.course_id=e.course_id
+    LEFT JOIN course_credentials cc ON cc.course_id=c.id LEFT JOIN results r ON r.student_id=e.student_id AND r.course_id=c.id
+    WHERE e.student_id=? AND c.id=? GROUP BY s.id,c.id`,args:[studentId,courseId]});
   const row=q.rows[0];
-  if(!row || Number(row.balance)>0 || Number(row.fees_completed)!==1 || Number(row.course_completed)!==1 || Number(row.approved)!==1 || Number(row.academic_complete)!==1) return res.status(403).json({error:'This academic document is not issued or its requirements are not met.'});
-  const doc=new PDFDocument({margin:60,size:'A4',layout:'landscape',bufferPages:true});
-  res.setHeader('Content-Type','application/pdf');
-  res.setHeader('Content-Disposition',`inline; filename="Herald-${row.credential_type}-${row.code}-${row.reg_no}.pdf"`);
-  doc.pipe(res);
-  const style=credentialPalette(row.code),w=doc.page.width,h=doc.page.height;
-  const serif=path.join(__dirname,'public/fonts/HeraldSerif.ttf'), italic=path.join(__dirname,'public/fonts/HeraldSerifItalic.ttf'), sans=path.join(__dirname,'public/fonts/HeraldSans.ttf'), bold=path.join(__dirname,'public/fonts/HeraldSansBold.ttf');
-  doc.registerFont('HeraldSerif',serif); doc.registerFont('HeraldItalic',italic); doc.registerFont('HeraldSans',sans); doc.registerFont('HeraldBold',bold);
-  const title=String(row.title).toUpperCase();
-  const awardType=row.credential_type.toUpperCase();
-  const titleAlign=['center','left','right','center'][style.variant];
-  const titleX=style.variant===3?72:55, titleWidth=w-titleX*2;
-  const qualificationX=style.variant===1?94:80, qualificationWidth=w-qualificationX*2;
-  doc.rect(0,0,w,h).fill(style.paper);
-  // Course-code keyed palette and ornament variant produce a dedicated design
-  // identity for each programme while retaining the Herald institutional frame.
-  doc.save().fillColor(style.accent,0.08).font('HeraldBold').fontSize(66).rotate(-27,{origin:[w/2,h/2]}).text(row.code.toUpperCase(),50,h/2-35,{width:w-100,align:'center'}).restore();
-  for(let i=0;i<9;i++){const y=70+i*43;doc.moveTo(68,y).bezierCurveTo(w*.28,y+(i%2?13:-13),w*.72,y+(i%2?-13:13),w-68,y).lineWidth(.65).strokeColor(style.accent,0.20).stroke();}
-  doc.lineWidth(7).strokeColor(style.navy).rect(24,24,w-48,h-48).stroke();
-  doc.lineWidth(1.5).strokeColor(style.accent).rect(34,34,w-68,h-68).stroke();
-  const corners=[[51,51],[w-51,51],[51,h-51],[w-51,h-51]];
-  corners.forEach(([x,y],i)=>{doc.save().translate(x,y).rotate(i%2?90:0).moveTo(-12,-12).lineTo(0,-27).lineTo(12,-12).lineTo(27,0).lineTo(12,12).lineTo(0,27).lineTo(-12,12).lineTo(-27,0).closePath().lineWidth(1.5).strokeColor(style.accent).stroke().restore();});
-  // Distinct border treatments based on the mapped programme template variant.
-  if(style.variant===1) for(let x=54;x<w-54;x+=14) doc.circle(x,49,1.4).fill(style.accent);
-  if(style.variant===2) { doc.lineWidth(1).strokeColor(style.accent).roundedRect(44,44,w-88,h-88,22).stroke(); }
-  if(style.variant===3) { doc.moveTo(54,62).lineTo(190,62).moveTo(w-190,62).lineTo(w-54,62).moveTo(54,h-62).lineTo(190,h-62).moveTo(w-190,h-62).lineTo(w-54,h-62).lineWidth(1).strokeColor(style.accent).stroke(); }
-  doc.fillColor(style.navy).font('HeraldBold').fontSize(12).text('HERALD TRAINER & CONSULTANT',0,74,{width:w,align:'center',characterSpacing:2});
-  doc.moveTo(w/2-52,99).lineTo(w/2+52,99).lineWidth(2).strokeColor(style.accent).stroke();
-  doc.fillColor(style.accent).font('HeraldSerif').fontSize(30).text(awardType,titleX,116,{width:titleWidth,align:titleAlign,lineGap:2});
-  doc.fillColor('#344454').font('HeraldSans').fontSize(14).text('This is proudly presented to',60,174,{width:w-120,align:'center'});
-  doc.fillColor(style.navy).font('HeraldItalic').fontSize(38).text(row.credential_type==='degree'?row.award_name:row.name,70,201,{width:w-140,align:'center',lineBreak:false,ellipsis:true});
-  doc.moveTo(w/2-125,251).lineTo(w/2+125,251).lineWidth(1).strokeColor(style.accent).stroke();
-  doc.fillColor('#344454').font('HeraldSans').fontSize(14).text(row.credential_type==='degree'?'for the award of':'for successfully completing',60,269,{width:w-120,align:'center'});
-  doc.fillColor(style.navy).font('HeraldSerif').fontSize(22+style.variant*1.5).text(title,qualificationX,293,{width:qualificationWidth,align:titleAlign,height:60,ellipsis:true});
-  if(row.credential_type==='degree' && row.partner_university) doc.fillColor('#344454').font('HeraldSans').fontSize(11).text(`In partnership with ${row.partner_university}`,60,359,{width:w-120,align:'center'});
-  doc.save().fillColor(style.accent,0.035).font('HeraldBold').fontSize(12).text(`PROGRAMME  ${row.code}     •     REGISTRATION  ${row.reg_no}`,60,h-91,{width:w-120,align:'center'}).restore();
-  doc.moveTo(w/2-95,h-68).lineTo(w/2+95,h-68).lineWidth(1).strokeColor(style.navy).stroke();
-  doc.fillColor('#344454').font('HeraldSans').fontSize(9).text('AUTHORIZED SIGNATURE',w/2-95,h-58,{width:190,align:'center'});
-  doc.end();
+  if(!row || Number(row.approved)!==1 || Number(row.course_completed)!==1 || Number(row.fees_completed)!==1 || Number(row.academic_complete)!==1 || Number(row.balance)>0 || !row.certificate_id) return null;
+  const degree=row.credential_type==='degree';
+  const studentName=degree?row.award_name:row.student_name;
+  const courseName=degree?(row.qualification_name||row.title):row.title;
+  const verificationUrl=certificatePublicUrl(row.certificate_id);
+  const qrDataUrl=await QRCode.toDataURL(verificationUrl,{errorCorrectionLevel:'H',margin:1,width:240,color:{dark:'#20242b',light:'#ffffff'}});
+  const courseCategory=row.course_category==='general'?inferCredentialCategory(row.title):row.course_category;
+  const design=credentialDesign(row.code,courseCategory);
+  return {...row,studentName,courseName,completionDate:row.completion_date,instructorName:row.instructor_name,certificateId:row.certificate_id,courseCategory,templateFamily:design.family,theme:design,verificationUrl,qrDataUrl};
+}
+async function renderCredential(row,format='pdf') {
+  const chromePath=process.env.PUPPETEER_EXECUTABLE_PATH||process.env.CHROME_PATH||['/usr/bin/google-chrome','/usr/bin/chromium','/usr/bin/chromium-browser'].find(candidate=>fs.existsSync(candidate));
+  if(!chromePath) throw new Error('Chrome is unavailable. Set PUPPETEER_EXECUTABLE_PATH to the Chrome executable.');
+  const browser=await puppeteer.launch({executablePath:chromePath,headless:true,args:['--no-sandbox','--disable-setuid-sandbox','--disable-dev-shm-usage']});
+  try {
+    const page=await browser.newPage();
+    await page.setViewport({width:1123,height:794,deviceScaleFactor:format==='png'?3:1});
+    await page.goto(`http://127.0.0.1:${PORT}/certificate-generator.html?render=1`,{waitUntil:'networkidle0',timeout:20000});
+    await page.evaluate(data=>window.renderCertificate(data),row);
+    await page.evaluate(()=>document.fonts.ready);
+    await page.waitForFunction(()=>{const img=document.querySelector('#schoolWatermark');return img&&img.complete&&img.naturalWidth>0;},{timeout:10000});
+    if(format==='png') return Buffer.from(await (await page.$('#certificate')).screenshot({type:'png',captureBeyondViewport:true}));
+    return Buffer.from(await page.pdf({printBackground:true,preferCSSPageSize:true,margin:{top:'0',right:'0',bottom:'0',left:'0'}}));
+  } finally { await browser.close(); }
+}
+app.get('/api/admin/credentials/issued',authAdmin,async(req,res)=>{
+  const term=String(req.query.q||'').trim(); if(term.length<2) return res.json([]);
+  const like=`%${term}%`;
+  const q=await db.execute({sql:`SELECT s.id student_id,s.name student_name,s.reg_no,s.course programme,c.id course_id,c.code,c.title,
+      c.trainer instructor_name,COALESCE(cc.course_category,'general') course_category,COALESCE(cc.credential_type,'certificate') credential_type,
+      COALESCE(sc.award_name,'') award_name,COALESCE(sc.qualification_name,'') qualification_name,
+      COALESCE(sc.partner_university,'') partner_university,sc.certificate_id,sc.approved_at completion_date
+    FROM students s JOIN enrollments e ON e.student_id=s.id JOIN courses c ON c.id=e.course_id
+    JOIN student_credentials sc ON sc.student_id=s.id AND sc.course_id=c.id
+    LEFT JOIN course_credentials cc ON cc.course_id=c.id
+    LEFT JOIN results r ON r.student_id=s.id AND r.course_id=c.id
+    WHERE (s.name LIKE ? OR s.reg_no LIKE ?) AND sc.approved=1 AND sc.course_completed=1 AND sc.fees_completed=1 AND sc.certificate_id IS NOT NULL
+      AND NOT EXISTS (SELECT 1 FROM fees f WHERE f.student_id=s.id AND f.amount_due>COALESCE(f.amount_paid,0))
+    GROUP BY s.id,c.id HAVING MAX(CASE WHEN UPPER(COALESCE(r.grade,'')) IN ('A','A-','B+','B','B-','C+','C','D','PASS','PASSED') OR COALESCE(r.marks,0)>=45 THEN 1 ELSE 0 END)=1
+    ORDER BY s.name,c.title LIMIT 100`,args:[like,like]});
+  res.json(q.rows.map(row=>({...row,course_category:row.course_category==='general'?inferCredentialCategory(row.title):row.course_category})));
 });
-
+app.get('/api/admin/credentials/:courseId/students/:studentId/png',authAdmin,async(req,res)=>{
+  try {
+    const row=await getIssuedCredential(Number(req.params.studentId),Number(req.params.courseId));
+    if(!row) return res.status(404).json({error:'No issued document was found for this student and programme.'});
+    const png=await renderCredential(row,'png');
+    res.setHeader('Content-Type','image/png');res.setHeader('Content-Disposition',`attachment; filename="Herald-${row.credential_type}-${row.code}-${row.certificateId}.png"`);res.send(png);
+  } catch(err) { console.error('Credential PNG render failed:',err.message);res.status(500).json({error:'Could not render this academic document.'}); }
+});
+app.get('/api/admin/credentials/:courseId/students/:studentId/pdf',authAdmin,async(req,res)=>{
+  try {
+    const row=await getIssuedCredential(Number(req.params.studentId),Number(req.params.courseId));
+    if(!row) return res.status(404).json({error:'No issued document was found for this student and programme.'});
+    const pdf=await renderCredential(row,'pdf');
+    res.setHeader('Content-Type','application/pdf');res.setHeader('Content-Disposition',`attachment; filename="Herald-${row.credential_type}-${row.code}-${row.certificateId}.pdf"`);res.send(pdf);
+  } catch(err) { console.error('Credential PDF render failed:',err.message);res.status(500).json({error:'Could not generate this academic document PDF.'}); }
+});
+app.get('/api/student/credentials/:courseId/pdf',authStudent,async(req,res)=>{
+  try {
+    const row=await getIssuedCredential(Number(req.user.id),Number(req.params.courseId));
+    if(!row) return res.status(403).json({error:'This academic document is not issued or its requirements are not met.'});
+    const pdf=await renderCredential(row,'pdf');
+    res.setHeader('Content-Type','application/pdf');res.setHeader('Content-Disposition',`${req.query.download==='1'?'attachment':'inline'}; filename="Herald-${row.credential_type}-${row.code}-${row.certificateId}.pdf"`);res.send(pdf);
+  } catch(err) { console.error('Credential PDF render failed:',err.message);res.status(500).json({error:'Could not generate this academic document PDF.'}); }
+});
+app.get('/api/verify/:certificateId',async(req,res)=>{
+  const id=String(req.params.certificateId||'').toUpperCase();
+  if(!/^[A-F0-9]{32}$/.test(id)) return res.status(404).json({valid:false});
+  const q=await db.execute({sql:`SELECT CASE WHEN COALESCE(cc.credential_type,'certificate')='degree' THEN sc.award_name ELSE s.name END student_name,c.title,COALESCE(cc.credential_type,'certificate') credential_type,sc.approved_at,
+      COALESCE(sc.partner_university,'') partner_university
+    FROM student_credentials sc JOIN students s ON s.id=sc.student_id JOIN courses c ON c.id=sc.course_id
+    LEFT JOIN course_credentials cc ON cc.course_id=c.id WHERE sc.certificate_id=? AND sc.approved=1 AND sc.course_completed=1 AND sc.fees_completed=1 LIMIT 1`,args:[id]});
+  const row=q.rows[0];if(!row) return res.status(404).json({valid:false});
+  res.json({valid:true,institution:'Herald Trainer & Consultant',studentName:row.student_name,courseName:row.title,credentialType:row.credential_type,completionDate:row.approved_at,partnerUniversity:row.partner_university||undefined});
+});
+app.get('/verify/:certificateId',(req,res)=>res.type('html').send(`<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Verify academic document</title><style>body{font:16px Arial,sans-serif;background:#f4f6f8;color:#183047;margin:0;padding:40px}.card{max-width:640px;margin:8vh auto;padding:30px;background:white;border:1px solid #dce3eb;border-radius:14px}h1{font-family:Georgia,serif;color:#123b5d}#state{color:#526174}</style><main class="card"><h1>Herald Trainer &amp; Consultant</h1><p id="state">Verifying document…</p><div id="result"></div></main><script>fetch('/api/verify/'+encodeURIComponent(location.pathname.split('/').pop())).then(r=>r.json()).then(d=>{const s=document.getElementById('state'),o=document.getElementById('result');if(!d.valid){s.textContent='This document could not be verified.';return}s.textContent='Valid academic document';for(const [label,value] of [['Student',d.studentName],['Programme',d.courseName],['Document',d.credentialType],['Completion date',d.completionDate],['Partner university',d.partnerUniversity]])if(value){const p=document.createElement('p'),b=document.createElement('strong');b.textContent=label+': ';p.append(b,document.createTextNode(value));o.append(p)}}).catch(()=>document.getElementById('state').textContent='Verification is temporarily unavailable.');</script></html>`));
 
 // ---------- Download PDF Transcript ----------
 

@@ -1,0 +1,208 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Herald Academic Document Generator</title>
+  <style>
+    @font-face{font-family:HeraldSerif;src:url('/fonts/HeraldSerif.ttf') format('truetype');font-display:swap}
+    @font-face{font-family:HeraldGreatVibes;src:url('/fonts/HeraldGreatVibes.woff2') format('woff2');font-display:swap}
+    @font-face{font-family:HeraldBlackletter;src:url('/fonts/HeraldBlackletter.woff2') format('woff2');font-display:swap}
+    @font-face{font-family:HeraldSans;src:url('/fonts/HeraldSans.ttf') format('truetype');font-display:swap}
+    *{box-sizing:border-box}
+    body{margin:0;padding:24px;background:#f3f5f8;color:#182332;font:15px HeraldSans,Arial,sans-serif}
+    .studio{max-width:1100px;margin:0 auto}
+    .studio h1{font:30px HeraldSerif,Georgia,serif;color:#10294a;margin:0 0 6px}
+    .studio-intro{color:#526174;margin:0 0 18px}
+    .controls{padding:20px;background:#fff;border:1px solid #dce3eb;border-radius:14px;box-shadow:0 12px 34px #11243b0c}
+    .fields{display:grid;grid-template-columns:minmax(220px,1fr) minmax(220px,1fr);gap:14px}
+    label{display:block;font-weight:700;margin-bottom:6px}
+    input,select{width:100%;padding:11px 12px;border:1px solid #cbd4df;border-radius:8px;font:inherit;color:inherit;background:#fff}
+    input[readonly]{background:#f4f7fa;color:#46566b}
+    .matches{display:grid;gap:6px;margin:8px 0 12px;max-width:560px}
+    .match{border:1px solid #dce3eb;background:#f9fbfd;border-radius:8px;text-align:left;padding:10px 12px;cursor:pointer;color:#193d5b}
+    .match:hover{background:#eef4f8}
+    .actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:15px}
+    button,.download{border:0;border-radius:8px;padding:11px 16px;background:#a01f3a;color:#fff;font-weight:700;cursor:pointer;text-decoration:none}
+    button:disabled{opacity:.55;cursor:not-allowed}
+    .download{display:none;background:#254b68}
+    .status{min-height:20px;margin:12px 0 0;color:#536579}
+    .status.error{color:#9b1c35}
+    .preview-note{margin:14px 0 0;color:#66778a;font-size:13px}
+    #certificate{display:none}
+    #certificate.visible{display:block}
+
+    /* Shared A4 landscape canvas. Puppeteer captures this node for both PNG and PDF. */
+    .certificate{position:relative;width:1123px;height:794px;overflow:hidden;background:var(--paper);color:var(--ink);isolation:isolate;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+    .certificate.visible{display:block}
+    .certificate:before,.certificate:after{content:"";position:absolute;pointer-events:none;z-index:-1}
+    .certificate .logo-watermark{position:absolute;z-index:-1;width:310px;height:310px;object-fit:contain;opacity:.045;left:calc(50% - 155px);top:calc(50% - 155px);filter:grayscale(1)}
+    .certificate .school-name{position:absolute;top:63px;left:100px;right:100px;text-align:center;color:var(--brand);font:30px HeraldGreatVibes,cursive;letter-spacing:.3px}
+    .certificate .award-type{position:absolute;top:114px;left:110px;right:110px;text-align:center;color:var(--brand);font:700 34px HeraldSerif,Georgia,serif;letter-spacing:5px}
+    .certificate .decree{position:absolute;top:178px;left:100px;right:100px;text-align:center;font:18px HeraldSerif,Georgia,serif}
+    .certificate .student-name{position:absolute;top:222px;left:110px;right:110px;text-align:center;white-space:nowrap;overflow:hidden;text-overflow:clip;color:var(--brand);font:64px HeraldGreatVibes,cursive;line-height:1.16}
+    .certificate .course-name{position:absolute;top:353px;left:130px;right:130px;text-align:center;white-space:nowrap;overflow:hidden;color:var(--ink);font:32px HeraldSerif,Georgia,serif;line-height:1.25}
+    .certificate .completion{position:absolute;top:415px;left:110px;right:110px;text-align:center;font:17px HeraldSerif,Georgia,serif}
+    .certificate .details{position:absolute;top:458px;left:120px;right:120px;text-align:center;font:13px HeraldSans,Arial,sans-serif;letter-spacing:.25px}
+    .certificate .cert-code{position:absolute;left:60px;bottom:32px;font:10px HeraldSans,Arial,sans-serif;color:#526174}
+    .certificate .qr-wrap{position:absolute;right:46px;bottom:28px;width:104px;text-align:center;font:9px HeraldSans,Arial,sans-serif;color:#394958}
+    .certificate .qr{width:82px;height:82px;display:block;margin:0 auto 4px}
+    .certificate .signatures{position:absolute;bottom:72px;left:150px;right:150px;display:flex;justify-content:space-between;gap:80px}
+    .certificate .signature{width:260px;border-top:1px solid var(--brand);padding-top:7px;text-align:center;font:11px HeraldSans,Arial,sans-serif;color:var(--ink)}
+    .certificate .signature em{display:block;margin-bottom:2px;font:20px HeraldGreatVibes,cursive;color:var(--brand)}
+    .certificate .seal{position:absolute;left:calc(50% - 49px);bottom:31px;width:98px;height:98px;display:flex;align-items:center;justify-content:center;text-align:center;font:700 10px HeraldSans,Arial,sans-serif;line-height:1.2;color:#fff;background:radial-gradient(circle at 34% 27%,#f5df9b 0,#b8862d 32%,#8c5a16 68%,#d6b463 100%);box-shadow:0 2px 8px #51400c40}
+    .certificate .star{position:absolute;color:var(--accent);font-size:19px;z-index:2}
+    .certificate .photo-placeholder{display:none}
+
+    /* Template A — Modern Minimalist: crimson, gold, generous white space. */
+    .template-modern{--paper:#fffdfc}
+    .template-modern:before{left:0;top:0;width:24px;height:100%;background:linear-gradient(180deg,var(--brand),var(--accent),var(--brand))}
+    .template-modern:after{right:0;top:0;width:24px;height:100%;background:linear-gradient(180deg,var(--accent),var(--brand),var(--accent))}
+    .template-modern .frame{position:absolute;inset:32px;border:2px solid var(--accent);pointer-events:none}
+    .template-modern .frame:before,.template-modern .frame:after{content:"";position:absolute;width:165px;height:165px;border:1px solid color-mix(in srgb,var(--brand) 40%,transparent);transform:rotate(45deg)}
+    .template-modern .frame:before{left:-88px;top:-88px}.template-modern .frame:after{right:-88px;bottom:-88px}
+    .template-modern .award-type{font-weight:700}
+    .template-modern .seal{clip-path:polygon(50% 0,61% 13%,78% 5%,82% 23%,99% 30%,89% 47%,100% 62%,82% 70%,79% 89%,60% 85%,50% 100%,39% 85%,20% 91%,17% 72%,0 63%,10% 47%,1% 30%,19% 23%,22% 5%,39% 13%)}
+    .template-modern .star-a{left:19%;top:46%}.template-modern .star-b{right:19%;top:46%}
+
+    /* Template B — Classic Ornate: cream parchment, green/gold guilloche frame. */
+    .template-classic{--paper:#f7f0df}
+    .template-classic .frame{position:absolute;inset:23px;border:18px solid transparent;background:repeating-linear-gradient(45deg,var(--brand) 0 5px,var(--accent) 5px 9px,var(--paper) 9px 13px) border-box;outline:2px solid var(--brand);outline-offset:-27px;pointer-events:none}
+    .template-classic:before{inset:47px;border:2px solid var(--accent);z-index:-1}
+    .template-classic .school-name{font:34px HeraldBlackletter,serif;letter-spacing:1px}
+    .template-classic .award-type{font:700 31px HeraldBlackletter,serif;letter-spacing:2px}
+    .template-classic .student-name{font-family:HeraldSerif,Georgia,serif;font-weight:700}
+    .template-classic .seal{border:5px double #f3d98a;border-radius:50%;box-shadow:0 0 0 5px #936b25,0 0 0 9px #dfc270,0 2px 8px #51400c40}
+    .template-classic .signature em{font-family:HeraldGreatVibes,cursive}
+    .template-classic .star-a{left:72px;top:58px}.template-classic .star-b{right:72px;top:58px}
+    .template-classic .star-c{left:72px;bottom:58px}.template-classic .star-d{right:72px;bottom:58px}
+
+    /* Template C — Institutional Formal: decree layout, gold frame and photo placeholder. */
+    .template-formal{--paper:#fbf8ef}
+    .template-formal .frame{position:absolute;inset:24px;border:5px double var(--accent);outline:1px solid var(--brand);outline-offset:-15px;pointer-events:none}
+    .template-formal:before{inset:39px;border:1px solid var(--accent);z-index:-1}
+    .template-formal .school-name{top:53px;font-size:34px}
+    .template-formal .award-type{top:113px;font-size:31px;letter-spacing:3px}
+    .template-formal .decree{top:176px;font-size:20px}
+    .template-formal .student-name{top:230px;font-size:60px}
+    .template-formal .course-name{top:362px;font-size:30px}
+    .template-formal .photo-placeholder{display:flex;position:absolute;right:73px;top:63px;width:110px;height:130px;border:2px solid var(--accent);background:linear-gradient(145deg,#f3ead4,#fffdf7);align-items:center;justify-content:center;text-align:center;color:#7c6c4c;font:11px HeraldSans,Arial,sans-serif}
+    .template-formal .decree-copy{position:absolute;top:500px;left:150px;right:150px;text-align:center;font:14px HeraldSerif,Georgia,serif}
+    .template-formal .seal{clip-path:polygon(50% 0,58% 15%,73% 5%,77% 22%,95% 19%,91% 38%,100% 50%,91% 62%,95% 81%,77% 78%,73% 95%,58% 85%,50% 100%,42% 85%,27% 95%,23% 78%,5% 81%,9% 62%,0 50%,9% 38%,5% 19%,23% 22%,27% 5%,42% 15%)}
+    .template-formal .star-a{left:66px;top:64px}.template-formal .star-b{left:66px;bottom:64px}.template-formal .star-c{right:66px;top:64px}.template-formal .star-d{right:66px;bottom:64px}
+
+    .variant-1 .frame{border-radius:3px}.variant-2 .frame{border-style:dashed}.variant-3 .frame{border-width:4px 12px}.variant-4 .frame{inset:29px;border-radius:28px}.variant-5 .frame{border-style:double}.variant-6 .frame{inset:38px}.variant-7 .frame{border-width:9px}
+    .variant-1 .student-name{letter-spacing:.2px}.variant-2 .award-type{letter-spacing:7px}.variant-3 .course-name{font-style:italic}.variant-4 .school-name{font-size:36px}.variant-5 .details{letter-spacing:1px}.variant-6 .seal{transform:rotate(12deg)}.variant-7 .student-name{font-size:59px}
+    .hide-for-render{display:block}
+    @page{size:A4 landscape;margin:0}
+    @media print{
+      html,body{margin:0!important;padding:0!important;width:1123px;height:794px;background:#fff}
+      body>*{display:none!important}
+      #certificate.visible{display:block!important;position:absolute;left:0;top:0;width:1123px;height:794px;print-color-adjust:exact;-webkit-print-color-adjust:exact}
+    }
+    @media(max-width:650px){body{padding:12px}.fields{grid-template-columns:1fr}.studio h1{font-size:25px}.controls{padding:14px}}
+  </style>
+</head>
+<body>
+  <main class="studio hide-for-render">
+    <h1>Academic Document Generator</h1>
+    <p class="studio-intro">Choose a student and an already issued programme document to preview and export its course-specific design.</p>
+    <form class="controls" id="certificateForm" autocomplete="off">
+      <div class="fields">
+        <div><label for="studentSearch">Student name or admission number</label><input id="studentSearch" type="search" minlength="2" placeholder="Search students with issued documents" required></div>
+        <div><label for="studentName">Registered / approved document name</label><input id="studentName" type="text" readonly placeholder="Select a student record"></div>
+        <div><label for="courseSelect">Course or programme</label><select id="courseSelect" required disabled><option value="">Select a student first</option></select></div>
+        <div><label for="documentType">Document type</label><input id="documentType" type="text" readonly placeholder="Selected programme's document"></div>
+      </div>
+      <div class="matches" id="studentMatches" role="listbox" aria-label="Issued document search results"></div>
+      <div class="actions"><button type="submit" id="generateButton" disabled>Generate high-resolution PNG</button><button type="button" id="downloadPdfButton" disabled>Download PDF</button><a class="download" id="downloadPng" download>Download PNG</a></div>
+      <p class="status" id="studioStatus" aria-live="polite">Only issued documents are available here.</p>
+      <p class="preview-note">The saved student name, programme, issue date, instructor, and verification ID are loaded from the school records. Approval remains in the admin dashboard.</p>
+    </form>
+  </main>
+
+  <section id="certificate" class="certificate" aria-label="Academic certificate">
+    <div class="frame"></div>
+    <img class="logo-watermark" id="schoolWatermark" src="/images/herald-logo.png" alt="">
+    <span class="star star-a">✦</span><span class="star star-b">✦</span><span class="star star-c">✦</span><span class="star star-d">✦</span>
+    <div class="photo-placeholder">STUDENT<br>PHOTOGRAPH</div>
+    <div class="school-name" id="institutionName">Herald Trainer &amp; Consultant</div>
+    <div class="award-type" id="awardType">CERTIFICATE</div>
+    <div class="decree" id="decreeText">This is proudly presented to</div>
+    <div class="student-name" id="studentNameText"></div>
+    <div class="course-name" id="courseNameText"></div>
+    <div class="completion" id="completionText"></div>
+    <div class="details" id="instructorText"></div>
+    <div class="decree-copy" id="decreeCopy"></div>
+    <div class="signatures">
+      <div class="signature"><em id="signatureOne">Academic Office</em>Authorized Institutional Signature</div>
+      <div class="signature"><em id="signatureTwo">Herald Trainer</em>Programme Instructor</div>
+    </div>
+    <div class="seal" id="documentSeal">HERALD<br>ACADEMIC<br>AWARD</div>
+    <div class="cert-code" id="certificateCode"></div>
+    <div class="qr-wrap"><img class="qr" id="verificationQr" alt="Certificate verification QR code"><span>VERIFY DOCUMENT</span></div>
+  </section>
+
+  <script>
+    (()=>{
+      const form=document.getElementById('certificateForm'),search=document.getElementById('studentSearch'),matches=document.getElementById('studentMatches'),courseSelect=document.getElementById('courseSelect'),nameInput=document.getElementById('studentName'),typeInput=document.getElementById('documentType'),status=document.getElementById('studioStatus'),generate=document.getElementById('generateButton'),downloadPdf=document.getElementById('downloadPdfButton'),downloadPng=document.getElementById('downloadPng');
+      let selectedRows=[],selectedStudent=null,searchTimer;
+      const escapeHtml=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+      const setStatus=(message,isError=false)=>{status.textContent=message;status.classList.toggle('error',isError)};
+      function pickStudent(rows){
+        selectedStudent=rows[0];selectedRows=rows;
+        const label=selectedStudent.credential_type==='degree'?(selectedStudent.award_name||selectedStudent.student_name):selectedStudent.student_name;
+        nameInput.value=label;
+        courseSelect.innerHTML=rows.map((r,i)=>`<option value="${i}">${escapeHtml(r.title)} · ${escapeHtml(r.credential_type)}</option>`).join('');courseSelect.disabled=false;
+        typeInput.value=selectedStudent.credential_type.toUpperCase();generate.disabled=false;downloadPdf.disabled=false;setStatus('Issued document selected. Generate a PNG or download the print-ready PDF.');
+      }
+      async function searchIssued(){
+        const term=search.value.trim();if(term.length<2){matches.replaceChildren();return}
+        try{
+          const response=await fetch(`/api/admin/credentials/issued?q=${encodeURIComponent(term)}`,{credentials:'same-origin'});const rows=await response.json();if(!response.ok)throw new Error(rows.error||'Student search failed.');
+          matches.replaceChildren();
+          const grouped=new Map();for(const row of rows){const key=String(row.student_id);if(!grouped.has(key))grouped.set(key,[]);grouped.get(key).push(row)}
+          for(const studentRows of grouped.values()){
+            const student=studentRows[0],button=document.createElement('button');button.type='button';button.className='match';
+            button.textContent=`${student.student_name} · ${student.reg_no} · ${studentRows.length} issued document${studentRows.length===1?'':'s'}`;
+            button.addEventListener('click',()=>pickStudent(studentRows));matches.appendChild(button);
+          }
+          if(!grouped.size)setStatus('No issued documents matched that name or admission number.');
+        }catch(error){setStatus(error.message,true)}
+      }
+      search.addEventListener('input',()=>{clearTimeout(searchTimer);searchTimer=setTimeout(searchIssued,250)});
+      courseSelect.addEventListener('change',()=>{const row=selectedRows[Number(courseSelect.value)];if(!row)return;selectedStudent=row;nameInput.value=row.credential_type==='degree'?(row.award_name||row.student_name):row.student_name;typeInput.value=row.credential_type.toUpperCase()});
+      async function requestRender(format){
+        const row=selectedRows[Number(courseSelect.value)];if(!row)throw new Error('Choose an issued document first.');
+        const url=`/api/admin/credentials/${encodeURIComponent(row.course_id)}/students/${encodeURIComponent(row.student_id)}/${format}`;
+        const response=await fetch(url,{credentials:'same-origin'});if(!response.ok){let data={};try{data=await response.json()}catch{}throw new Error(data.error||'Document rendering failed.')};return response.blob();
+      }
+      form.addEventListener('submit',async event=>{event.preventDefault();generate.disabled=true;downloadPng.style.display='none';setStatus('Rendering the course-specific document…');try{const blob=await requestRender('png');const href=URL.createObjectURL(blob);downloadPng.href=href;downloadPng.style.display='inline-block';downloadPng.click();setStatus('High-resolution PNG generated. Use Download PNG to save another copy.')}catch(error){setStatus(error.message,true)}finally{generate.disabled=false}});
+      downloadPdf.addEventListener('click',async()=>{downloadPdf.disabled=true;setStatus('Rendering the print-ready PDF…');try{const blob=await requestRender('pdf');const href=URL.createObjectURL(blob);const a=document.createElement('a');a.href=href;a.download=`Herald-${selectedStudent.credential_type}-${selectedStudent.code}-${selectedStudent.certificate_id}.pdf`;a.click();setTimeout(()=>URL.revokeObjectURL(href),10000);setStatus('PDF generated and downloaded.')}catch(error){setStatus(error.message,true)}finally{downloadPdf.disabled=false}});
+      window.renderCertificate=payload=>{
+        const root=document.getElementById('certificate');
+        root.className=`certificate template-${payload.templateFamily} variant-${Number(payload.theme?.variant||0)}`;
+        for(const key of ['brand','accent','paper','ink'])root.style.setProperty(`--${key}`,payload.theme[key]);
+        document.getElementById('institutionName').textContent='Herald Trainer & Consultant';
+        document.getElementById('awardType').textContent=String(payload.credential_type||'certificate').toUpperCase();
+        document.getElementById('decreeText').textContent=payload.templateFamily==='formal'?'This is to certify that':payload.templateFamily==='classic'?'Be it known by this present document that':'This is proudly presented to';
+        document.getElementById('studentNameText').textContent=payload.studentName||'';
+        document.getElementById('courseNameText').textContent=payload.courseName||'';
+        const date=payload.completionDate?new Date(`${String(payload.completionDate).replace(' ','T')}Z`):null;
+        const dateLabel=date&&!Number.isNaN(date.valueOf())?date.toLocaleDateString('en-GB',{day:'numeric',month:'long',year:'numeric'}):String(payload.completionDate||'');
+        document.getElementById('completionText').textContent=payload.templateFamily==='formal'?'has fulfilled the academic requirements recorded by the institution':'for successfully completing the programme';
+        document.getElementById('instructorText').textContent=`Awarded ${dateLabel} · Instructor: ${payload.instructorName||'Herald Trainer & Consultant'}`;
+        document.getElementById('decreeCopy').textContent=payload.templateFamily==='formal'?`By authority of Herald Trainer & Consultant, this document records the successful completion of ${payload.courseName||'the stated programme'} and the award shown herein.`:'';
+        document.getElementById('signatureOne').textContent='Academic Registrar';document.getElementById('signatureTwo').textContent=payload.instructorName||'Programme Instructor';
+        document.getElementById('documentSeal').innerHTML=`HERALD<br>${String(payload.credential_type||'AWARD').toUpperCase()}<br>OFFICIAL`;
+        document.getElementById('certificateCode').textContent=`Certificate ID ${payload.certificateId} · ${payload.courseCategory}`;
+        document.getElementById('verificationQr').src=payload.qrDataUrl;
+        root.classList.add('visible');
+        for(const [id,max,min] of [['studentNameText',64,24],['courseNameText',32,16]]){const el=document.getElementById(id);el.style.fontSize=max+'px';while(el.scrollWidth>el.clientWidth&&parseFloat(el.style.fontSize)>min)el.style.fontSize=(parseFloat(el.style.fontSize)-1)+'px'}
+        return document.fonts.ready;
+      };
+      if(new URLSearchParams(location.search).get('render')==='1')document.querySelector('.studio').style.display='none';
+    })();
+  </script>
+</body>
+</html>
