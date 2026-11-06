@@ -32,7 +32,7 @@
     #certificate{display:none}
     #certificate.visible{display:block}
 
-    /* Shared A4 landscape canvas. Puppeteer captures this node for both PNG and PDF. */
+    /* Shared A4 landscape canvas, exported as PNG and PDF. */
     .certificate{position:relative;width:1123px;height:794px;overflow:hidden;background:var(--paper);color:var(--ink);isolation:isolate;-webkit-print-color-adjust:exact;print-color-adjust:exact}
     .certificate.visible{display:block}
     .certificate:before,.certificate:after{content:"";position:absolute;pointer-events:none;z-index:-1}
@@ -40,17 +40,18 @@
     .certificate .school-name{position:absolute;top:63px;left:100px;right:100px;text-align:center;color:var(--brand);font:30px HeraldGreatVibes,cursive;letter-spacing:.3px}
     .certificate .award-type{position:absolute;top:114px;left:110px;right:110px;text-align:center;color:var(--brand);font:700 34px HeraldSerif,Georgia,serif;letter-spacing:5px}
     .certificate .decree{position:absolute;top:178px;left:100px;right:100px;text-align:center;font:18px HeraldSerif,Georgia,serif}
-    .certificate .student-name{position:absolute;top:222px;left:110px;right:110px;text-align:center;white-space:nowrap;overflow:hidden;text-overflow:clip;color:var(--brand);font:64px HeraldGreatVibes,cursive;line-height:1.16}
-    .certificate .course-name{position:absolute;top:353px;left:130px;right:130px;text-align:center;white-space:nowrap;overflow:hidden;color:var(--ink);font:32px HeraldSerif,Georgia,serif;line-height:1.25}
-    .certificate .completion{position:absolute;top:415px;left:110px;right:110px;text-align:center;font:17px HeraldSerif,Georgia,serif}
-    .certificate .details{position:absolute;top:458px;left:120px;right:120px;text-align:center;font:13px HeraldSans,Arial,sans-serif;letter-spacing:.25px}
-    .certificate .cert-code{position:absolute;left:60px;bottom:32px;font:10px HeraldSans,Arial,sans-serif;color:#526174}
-    .certificate .qr-wrap{position:absolute;right:46px;bottom:28px;width:104px;text-align:center;font:9px HeraldSans,Arial,sans-serif;color:#394958}
-    .certificate .qr{width:82px;height:82px;display:block;margin:0 auto 4px}
-    .certificate .signatures{position:absolute;bottom:72px;left:150px;right:150px;display:flex;justify-content:space-between;gap:80px}
-    .certificate .signature{width:260px;border-top:1px solid var(--brand);padding-top:7px;text-align:center;font:11px HeraldSans,Arial,sans-serif;color:var(--ink)}
-    .certificate .signature em{display:block;margin-bottom:2px;font:20px HeraldGreatVibes,cursive;color:var(--brand)}
-    .certificate .seal{position:absolute;left:calc(50% - 49px);bottom:31px;width:98px;height:98px;display:flex;align-items:center;justify-content:center;text-align:center;font:700 10px HeraldSans,Arial,sans-serif;line-height:1.2;color:#fff;background:radial-gradient(circle at 34% 27%,#f5df9b 0,#b8862d 32%,#8c5a16 68%,#d6b463 100%);box-shadow:0 2px 8px #51400c40}
+    .certificate .student-name{position:absolute;top:222px;left:110px;right:110px;height:78px;text-align:center;white-space:nowrap;overflow:hidden;text-overflow:clip;color:var(--brand);font:64px HeraldGreatVibes,cursive;line-height:1.05;overflow-wrap:anywhere}
+    .certificate .course-name{position:absolute;top:353px;left:130px;right:130px;height:55px;text-align:center;white-space:nowrap;overflow:hidden;color:var(--ink);font:32px HeraldSerif,Georgia,serif;line-height:1.15;overflow-wrap:anywhere}
+    .certificate .completion{position:absolute;top:316px;left:110px;right:110px;text-align:center;font:17px HeraldSerif,Georgia,serif}
+    .certificate .details{position:absolute;top:425px;left:120px;right:120px;text-align:center;font:13px HeraldSans,Arial,sans-serif;letter-spacing:.25px}
+    .certificate .cert-code{position:absolute;left:52px;bottom:14px;font:9px HeraldSans,Arial,sans-serif;color:#394958}
+    .certificate .qr-wrap{position:absolute;right:42px;bottom:13px;width:76px;text-align:center;font:7px HeraldSans,Arial,sans-serif;color:#394958}
+    .certificate .qr-wrap.unavailable{display:none}
+    .certificate .qr{width:58px;height:58px;display:block;margin:0 auto 2px}
+    .certificate .signatures{position:absolute;bottom:68px;left:125px;right:125px;display:flex;justify-content:space-between;gap:90px}
+    .certificate .signature{width:265px;border-top:1px solid var(--brand);padding-top:5px;text-align:center;font:9px HeraldSans,Arial,sans-serif;color:var(--ink)}
+    .certificate .signature em{display:block;margin-bottom:1px;font:19px HeraldGreatVibes,cursive;color:var(--brand)}
+    .certificate .seal{position:absolute;left:calc(50% - 39px);bottom:21px;width:78px;height:78px;display:flex;align-items:center;justify-content:center;text-align:center;font:700 8px HeraldSans,Arial,sans-serif;line-height:1.2;color:#fff;background:radial-gradient(circle at 34% 27%,#f5df9b 0,#b8862d 32%,#8c5a16 68%,#d6b463 100%);box-shadow:0 2px 8px #51400c40}
     .certificate .star{position:absolute;color:var(--accent);font-size:19px;z-index:2}
     .certificate .photo-placeholder{display:none}
 
@@ -85,9 +86,11 @@
     .template-formal .award-type{top:113px;font-size:31px;letter-spacing:3px}
     .template-formal .decree{top:176px;font-size:20px}
     .template-formal .student-name{top:230px;font-size:60px}
+    .template-formal .completion{top:326px}
     .template-formal .course-name{top:362px;font-size:30px}
+    .template-formal .details{top:430px}
     .template-formal .photo-placeholder{display:flex;position:absolute;right:73px;top:63px;width:110px;height:130px;border:2px solid var(--accent);background:linear-gradient(145deg,#f3ead4,#fffdf7);align-items:center;justify-content:center;text-align:center;color:#7c6c4c;font:11px HeraldSans,Arial,sans-serif}
-    .template-formal .decree-copy{position:absolute;top:500px;left:150px;right:150px;text-align:center;font:14px HeraldSerif,Georgia,serif}
+    .template-formal .decree-copy{position:absolute;top:493px;left:150px;right:150px;text-align:center;font:14px HeraldSerif,Georgia,serif}
     .template-formal .seal{clip-path:polygon(50% 0,58% 15%,73% 5%,77% 22%,95% 19%,91% 38%,100% 50%,91% 62%,95% 81%,77% 78%,73% 95%,58% 85%,50% 100%,42% 85%,27% 95%,23% 78%,5% 81%,9% 62%,0 50%,9% 38%,5% 19%,23% 22%,27% 5%,42% 15%)}
     .template-formal .star-a{left:66px;top:64px}.template-formal .star-b{left:66px;bottom:64px}.template-formal .star-c{right:66px;top:64px}.template-formal .star-d{right:66px;bottom:64px}
 
@@ -115,9 +118,9 @@
         <div><label for="documentType">Document type</label><input id="documentType" type="text" readonly placeholder="Selected programme's document"></div>
       </div>
       <div class="matches" id="studentMatches" role="listbox" aria-label="Issued document search results"></div>
-      <div class="actions"><button type="submit" id="generateButton" disabled>Generate high-resolution PNG</button><button type="button" id="downloadPdfButton" disabled>Download PDF</button><a class="download" id="downloadPng" download>Download PNG</a></div>
+      <div class="actions"><button type="submit" id="generateButton" disabled>Download high-resolution PNG</button><button type="button" id="downloadPdfButton" disabled>Download PDF</button><a class="download" id="downloadPng" download>Download PNG</a></div>
       <p class="status" id="studioStatus" aria-live="polite">Only issued documents are available here.</p>
-      <p class="preview-note">The saved student name, programme, issue date, instructor, and verification ID are loaded from the school records. Approval remains in the admin dashboard.</p>
+      <p class="preview-note">Student names, programme details, issue dates, instructors, and verification IDs come from approved school records.</p>
     </form>
   </main>
 
@@ -128,21 +131,22 @@
     <div class="photo-placeholder">STUDENT<br>PHOTOGRAPH</div>
     <div class="school-name" id="institutionName">Herald Trainer &amp; Consultant</div>
     <div class="award-type" id="awardType">CERTIFICATE</div>
-    <div class="decree" id="decreeText">This is proudly presented to</div>
+    <div class="decree" id="decreeText">This is to certify that</div>
     <div class="student-name" id="studentNameText"></div>
     <div class="course-name" id="courseNameText"></div>
     <div class="completion" id="completionText"></div>
     <div class="details" id="instructorText"></div>
-    <div class="decree-copy" id="decreeCopy"></div>
+    <div class="decree-copy" id="legalText"></div>
     <div class="signatures">
-      <div class="signature"><em id="signatureOne">Academic Office</em>Authorized Institutional Signature</div>
-      <div class="signature"><em id="signatureTwo">Herald Trainer</em>Programme Instructor</div>
+      <div class="signature"><em id="signatureOne">Programme Instructor</em><span>Programme Instructor</span></div>
+      <div class="signature"><em id="signatureTwo">Academic Registrar</em><span>Academic Registrar</span></div>
     </div>
     <div class="seal" id="documentSeal">HERALD<br>ACADEMIC<br>AWARD</div>
     <div class="cert-code" id="certificateCode"></div>
     <div class="qr-wrap"><img class="qr" id="verificationQr" alt="Certificate verification QR code"><span>VERIFY DOCUMENT</span></div>
   </section>
 
+  <script src="/vendor/html-to-image.js"></script>
   <script>
     (()=>{
       const form=document.getElementById('certificateForm'),search=document.getElementById('studentSearch'),matches=document.getElementById('studentMatches'),courseSelect=document.getElementById('courseSelect'),nameInput=document.getElementById('studentName'),typeInput=document.getElementById('documentType'),status=document.getElementById('studioStatus'),generate=document.getElementById('generateButton'),downloadPdf=document.getElementById('downloadPdfButton'),downloadPng=document.getElementById('downloadPng');
@@ -177,30 +181,39 @@
         const url=`/api/admin/credentials/${encodeURIComponent(row.course_id)}/students/${encodeURIComponent(row.student_id)}/${format}`;
         const response=await fetch(url,{credentials:'same-origin'});if(!response.ok){let data={};try{data=await response.json()}catch{}throw new Error(data.error||'Document rendering failed.')};return response.blob();
       }
-      form.addEventListener('submit',async event=>{event.preventDefault();generate.disabled=true;downloadPng.style.display='none';setStatus('Rendering the course-specific document…');try{const blob=await requestRender('png');const href=URL.createObjectURL(blob);downloadPng.href=href;downloadPng.style.display='inline-block';downloadPng.click();setStatus('High-resolution PNG generated. Use Download PNG to save another copy.')}catch(error){setStatus(error.message,true)}finally{generate.disabled=false}});
+      form.addEventListener('submit',async event=>{event.preventDefault();generate.disabled=true;downloadPng.style.display='none';setStatus('Preparing the course-specific certificate…');try{const row=selectedRows[Number(courseSelect.value)];if(!row)throw new Error('Choose an issued document first.');const certificate=await window.generateCertificate(row);const dataUrl=await htmlToImage.toPng(certificate,{pixelRatio:3,cacheBust:true,backgroundColor:row.theme?.paper||'#fffdfc'});downloadPng.href=dataUrl;downloadPng.download=`Herald-${row.credential_type}-${row.code}-${row.certificate_id}.png`;downloadPng.style.display='inline-block';downloadPng.click();setStatus('High-resolution PNG generated. Use Download PNG to save another copy.')}catch(error){setStatus(error.message||'PNG export failed.',true)}finally{generate.disabled=false}});
       downloadPdf.addEventListener('click',async()=>{downloadPdf.disabled=true;setStatus('Rendering the print-ready PDF…');try{const blob=await requestRender('pdf');const href=URL.createObjectURL(blob);const a=document.createElement('a');a.href=href;a.download=`Herald-${selectedStudent.credential_type}-${selectedStudent.code}-${selectedStudent.certificate_id}.pdf`;a.click();setTimeout(()=>URL.revokeObjectURL(href),10000);setStatus('PDF generated and downloaded.')}catch(error){setStatus(error.message,true)}finally{downloadPdf.disabled=false}});
-      window.renderCertificate=payload=>{
+      window.generateCertificate=async(payload={})=>{
         const root=document.getElementById('certificate');
-        root.className=`certificate template-${payload.templateFamily} variant-${Number(payload.theme?.variant||0)}`;
-        for(const key of ['brand','accent','paper','ink'])root.style.setProperty(`--${key}`,payload.theme[key]);
+        const category=String(payload.courseCategory||'general').toLowerCase();
+        const family=payload.templateFamily||((/technology|information|business|short|^it$/.test(category))?'modern':(/arts|humanities|secondary|high.school/.test(category)?'classic':'formal'));
+        const presets={modern:{brand:'#93243b',accent:'#bd9447',paper:'#fffdfc',ink:'#29222a',variant:0},classic:{brand:'#244c3b',accent:'#b18b42',paper:'#f6f0e2',ink:'#2f2c25',variant:0},formal:{brand:'#7b2431',accent:'#b4944f',paper:'#fbf8ef',ink:'#292622',variant:0}};
+        const theme={...presets[family],...(payload.theme||{})};
+        const certificateId=payload.certificateId||Array.from(crypto.getRandomValues(new Uint8Array(16)),b=>b.toString(16).padStart(2,'0')).join('').toUpperCase();
+        const type=String(payload.credential_type||'certificate').toLowerCase();
+        root.className=`certificate template-${family} variant-${Number(theme.variant||0)}`;
+        for(const key of ['brand','accent','paper','ink'])root.style.setProperty(`--${key}`,theme[key]);
         document.getElementById('institutionName').textContent='Herald Trainer & Consultant';
-        document.getElementById('awardType').textContent=String(payload.credential_type||'certificate').toUpperCase();
-        document.getElementById('decreeText').textContent=payload.templateFamily==='formal'?'This is to certify that':payload.templateFamily==='classic'?'Be it known by this present document that':'This is proudly presented to';
+        document.getElementById('awardType').textContent=type==='certificate'?'CERTIFICATE OF ACHIEVEMENT':type.toUpperCase();
+        document.getElementById('decreeText').textContent='This is to certify that';
         document.getElementById('studentNameText').textContent=payload.studentName||'';
         document.getElementById('courseNameText').textContent=payload.courseName||'';
         const date=payload.completionDate?new Date(`${String(payload.completionDate).replace(' ','T')}Z`):null;
         const dateLabel=date&&!Number.isNaN(date.valueOf())?date.toLocaleDateString('en-GB',{day:'numeric',month:'long',year:'numeric'}):String(payload.completionDate||'');
-        document.getElementById('completionText').textContent=payload.templateFamily==='formal'?'has fulfilled the academic requirements recorded by the institution':'for successfully completing the programme';
-        document.getElementById('instructorText').textContent=`Awarded ${dateLabel} · Instructor: ${payload.instructorName||'Herald Trainer & Consultant'}`;
-        document.getElementById('decreeCopy').textContent=payload.templateFamily==='formal'?`By authority of Herald Trainer & Consultant, this document records the successful completion of ${payload.courseName||'the stated programme'} and the award shown herein.`:'';
-        document.getElementById('signatureOne').textContent='Academic Registrar';document.getElementById('signatureTwo').textContent=payload.instructorName||'Programme Instructor';
-        document.getElementById('documentSeal').innerHTML=`HERALD<br>${String(payload.credential_type||'AWARD').toUpperCase()}<br>OFFICIAL`;
-        document.getElementById('certificateCode').textContent=`Certificate ID ${payload.certificateId} · ${payload.courseCategory}`;
-        document.getElementById('verificationQr').src=payload.qrDataUrl;
+        document.getElementById('completionText').textContent='has satisfied the academic requirements for';
+        document.getElementById('instructorText').textContent=`${dateLabel} · Instructor: ${payload.instructorName||'Herald Trainer & Consultant'}`;
+        document.getElementById('legalText').textContent=family==='formal'?'In testimony whereof, this credential is issued by Herald Trainer & Consultant.':'';
+        document.getElementById('signatureOne').textContent=payload.instructorName||'Programme Instructor';document.getElementById('signatureTwo').textContent='Academic Registrar';
+        document.getElementById('documentSeal').innerHTML=`HERALD<br>${type.toUpperCase()}<br>OFFICIAL`;
+        document.getElementById('certificateCode').textContent=`Verify ID: ${certificateId}`;
+        const qr=document.getElementById('verificationQr');
+        if(payload.qrDataUrl){qr.src=payload.qrDataUrl;qr.parentElement.classList.remove('unavailable')}else{qr.removeAttribute('src');qr.parentElement.classList.add('unavailable')}
         root.classList.add('visible');
-        for(const [id,max,min] of [['studentNameText',64,24],['courseNameText',32,16]]){const el=document.getElementById(id);el.style.fontSize=max+'px';while(el.scrollWidth>el.clientWidth&&parseFloat(el.style.fontSize)>min)el.style.fontSize=(parseFloat(el.style.fontSize)-1)+'px'}
-        return document.fonts.ready;
+        await document.fonts.ready;
+        for(const [id,max,min] of [['studentNameText',64,18],['courseNameText',32,16]]){const el=document.getElementById(id);el.style.whiteSpace='nowrap';el.style.display='block';el.style.fontSize=max+'px';while(el.scrollWidth>el.clientWidth&&parseFloat(el.style.fontSize)>min)el.style.fontSize=(parseFloat(el.style.fontSize)-1)+'px';if(el.scrollWidth>el.clientWidth){el.style.whiteSpace='normal';el.style.display='flex';el.style.alignItems='center';el.style.justifyContent='center';el.style.fontSize=min+'px'}}
+        return root;
       };
+      window.renderCertificate=window.generateCertificate;
       if(new URLSearchParams(location.search).get('render')==='1')document.querySelector('.studio').style.display='none';
     })();
   </script>

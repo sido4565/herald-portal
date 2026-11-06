@@ -1630,24 +1630,31 @@ async function renderCredentialPdf(row) {
   if(variant%3===1){doc.save().lineWidth(1).strokeColor(theme.accent).roundedRect(48,48,w-96,h-96,15).stroke().restore();}
   if(variant%3===2){for(let x=65;x<w-65;x+=24){doc.save().fillColor(theme.accent);polygon([[x,46],[x+4,52],[x,58],[x-4,52]]);doc.fill().restore();}}
   doc.fillColor(theme.brand).font('HeraldItalic').fontSize(family==='classic'?23:21).text('Herald Trainer & Consultant',60,57,{width:w-120,align:'center',lineBreak:false});
-  doc.fillColor(theme.brand).font('HeraldSerif').fontSize(27).text(String(row.credential_type||'certificate').toUpperCase(),60,96,{width:w-120,align:'center',characterSpacing:2,lineBreak:false});
-  doc.fillColor(theme.ink).font('HeraldSerif').fontSize(13).text(family==='formal'?'This is to certify that':'This is proudly presented to',60,144,{width:w-120,align:'center'});
+  const awardType=String(row.credential_type||'certificate').toLowerCase();
+  const awardTitle=awardType==='certificate'?'CERTIFICATE OF ACHIEVEMENT':awardType.toUpperCase();
+  doc.fillColor(theme.brand).font('HeraldSerif').fontSize(awardTitle.length>22?22:27).text(awardTitle,60,96,{width:w-120,align:'center',characterSpacing:2,lineBreak:false});
+  doc.fillColor(theme.ink).font('HeraldSerif').fontSize(13).text('This is to certify that',60,144,{width:w-120,align:'center'});
   const student=String(row.studentName||'');
   let studentSize=39;while(studentSize>23){doc.font('HeraldItalic').fontSize(studentSize);if(doc.widthOfString(student)<=w-150)break;studentSize-=1;}
-  doc.fillColor(theme.brand).font('HeraldItalic').fontSize(studentSize).text(student,68,170,{width:w-136,align:'center',lineBreak:false,ellipsis:true});
+  doc.fillColor(theme.brand).font('HeraldItalic').fontSize(studentSize).text(student,68,170,{width:w-136,height:52,align:'center',lineBreak:true,ellipsis:true});
   doc.moveTo(w/2-95,218).lineTo(w/2+95,218).lineWidth(1).strokeColor(theme.accent).stroke();
-  doc.fillColor(theme.ink).font('HeraldSans').fontSize(12).text(family==='formal'?'has satisfied the academic requirements for':'for successful completion of',60,232,{width:w-120,align:'center'});
+  doc.fillColor(theme.ink).font('HeraldSans').fontSize(12).text('has satisfied the academic requirements for',60,232,{width:w-120,align:'center'});
   const course=String(row.courseName||'');
   let courseSize=25;while(courseSize>15){doc.font('HeraldSerif').fontSize(courseSize);if(doc.widthOfString(course)<=w-150)break;courseSize-=1;}
-  doc.fillColor(theme.ink).font('HeraldSerif').fontSize(courseSize).text(course,68,254,{width:w-136,align:'center',lineBreak:false,ellipsis:true});
+  doc.fillColor(theme.ink).font('HeraldSerif').fontSize(courseSize).text(course,68,254,{width:w-136,height:52,align:'center',lineBreak:true,ellipsis:true});
   const rawDate=String(row.completionDate||'');
   const parsedDate=new Date(rawDate.includes('T')?rawDate:`${rawDate.replace(' ','T')}Z`);
   const dateLabel=rawDate&& !Number.isNaN(parsedDate.valueOf())?parsedDate.toLocaleDateString('en-GB',{day:'numeric',month:'long',year:'numeric'}):rawDate;
   const detail=`Awarded ${dateLabel}${row.instructorName?` · Instructor: ${row.instructorName}`:''}`;
   doc.fillColor(theme.ink).font('HeraldSans').fontSize(9.5).text(detail,55,294,{width:w-110,align:'center',lineBreak:false,ellipsis:true});
   if(row.credential_type==='degree'&&row.partner_university) doc.font('HeraldSans').fontSize(9).text(`In partnership with ${row.partner_university}`,55,311,{width:w-110,align:'center',lineBreak:false,ellipsis:true});
+  if(family==='formal'){
+    doc.save().fillColor('#fffaf0').strokeColor(theme.accent).lineWidth(1.2).rect(w-116,55,62,78).fillAndStroke().restore();
+    doc.fillColor(theme.ink).font('HeraldSans').fontSize(6.5).text('STUDENT PHOTO',w-112,89,{width:54,align:'center',lineBreak:false});
+    doc.fillColor(theme.brand).font('HeraldSerif').fontSize(9).text('In testimony whereof, this credential is issued by the Institute.',100,335,{width:w-200,align:'center',lineBreak:false,ellipsis:true});
+  }
   // Course-specific medal/seal, with a distinct silhouette in each design family.
-  const cx=w/2,cy=386,r=28;
+  const cx=w/2,cy=426,r=28;
   if(family==='classic'){
     doc.circle(cx,cy,r).fill(theme.accent);doc.circle(cx,cy,r-5).lineWidth(1.5).strokeColor('#f7f0df').stroke();
   } else {
@@ -1656,14 +1663,14 @@ async function renderCredentialPdf(row) {
   }
   doc.fillColor('#ffffff').font('HeraldBold').fontSize(7).text('HERALD',cx-r,cy-8,{width:r*2,align:'center'}).text(String(row.credential_type||'award').toUpperCase(),cx-r,cy+1,{width:r*2,align:'center',lineBreak:false,ellipsis:true});
   const sigY=464;
-  for(const [x,label,signature,width] of [[86,'AUTHORIZED INSTITUTIONAL SIGNATURE','Academic Registrar',190],[w-276,'PROGRAMME INSTRUCTOR',row.instructorName||'Programme Instructor',190]]){
+  for(const [x,label,signature,width] of [[86,'PROGRAMME INSTRUCTOR',row.instructorName||'Programme Instructor',190],[w-276,'ACADEMIC REGISTRAR','Academic Registrar',190]]){
     doc.moveTo(x,sigY).lineTo(x+width,sigY).lineWidth(.8).strokeColor(theme.brand).stroke();
     doc.fillColor(theme.brand).font('HeraldItalic').fontSize(14).text(signature,x,sigY-22,{width,align:'center',lineBreak:false,ellipsis:true});
     doc.fillColor(theme.ink).font('HeraldSans').fontSize(7).text(label,x,sigY+4,{width,align:'center',lineBreak:false});
   }
   const qrData=Buffer.from(String(row.qrDataUrl||'').replace(/^data:image\/png;base64,/,''),'base64');
   if(qrData.length) doc.image(qrData,w-91,h-94,{width:48,height:48});
-  doc.fillColor(theme.ink).font('HeraldSans').fontSize(6.5).text(`ID ${row.certificateId}`,46,h-52,{width:220,lineBreak:false,ellipsis:true});
+  doc.fillColor(theme.ink).font('HeraldSans').fontSize(6.5).text(`Verify ID: ${row.certificateId}`,46,h-52,{width:220,lineBreak:false,ellipsis:true});
   doc.fillColor(theme.ink).font('HeraldSans').fontSize(6).text('SCAN TO VERIFY',w-111,h-42,{width:88,align:'center',lineBreak:false});
   doc.end();
   return bufferPromise;
@@ -1701,7 +1708,15 @@ app.get('/api/admin/credentials/issued',authAdmin,async(req,res)=>{
       AND NOT EXISTS (SELECT 1 FROM fees f WHERE f.student_id=s.id AND f.amount_due>COALESCE(f.amount_paid,0))
     GROUP BY s.id,c.id HAVING MAX(CASE WHEN UPPER(COALESCE(r.grade,'')) IN ('A','A-','B+','B','B-','C+','C','D','PASS','PASSED') OR COALESCE(r.marks,0)>=45 THEN 1 ELSE 0 END)=1
     ORDER BY s.name,c.title LIMIT 100`,args:[like,like]});
-  res.json(q.rows.map(row=>({...row,course_category:row.course_category==='general'?inferCredentialCategory(row.title):row.course_category})));
+  const issuedRows=await Promise.all(q.rows.map(async row=>{
+    const courseCategory=row.course_category==='general'?inferCredentialCategory(row.title):row.course_category;
+    const design=credentialDesign(row.code,courseCategory);
+    const degree=row.credential_type==='degree';
+    const qrDataUrl=await QRCode.toDataURL(certificatePublicUrl(row.certificate_id),{errorCorrectionLevel:'H',margin:1,width:240,color:{dark:'#20242b',light:'#ffffff'}});
+    return {...row,studentName:degree?(row.award_name||row.student_name):row.student_name,courseName:degree?(row.qualification_name||row.title):row.title,
+      completionDate:row.completion_date,instructorName:row.instructor_name,certificateId:row.certificate_id,courseCategory,templateFamily:design.family,theme:design,qrDataUrl};
+  }));
+  res.json(issuedRows);
 });
 app.get('/api/admin/credentials/:courseId/students/:studentId/png',authAdmin,async(req,res)=>{
   try {
