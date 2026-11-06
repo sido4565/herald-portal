@@ -102,7 +102,7 @@ async function ensureStudentCourseFees(studentId) {
   }
 }
 const PDFDocument = require('pdfkit');
-const puppeteer = require('puppeteer-core');
+const puppeteer = require('puppeteer');
 const QRCode = require('qrcode');
 const { sendSMS } = require('./sms');
 
@@ -1591,8 +1591,10 @@ async function getIssuedCredential(studentId,courseId) {
   return {...row,studentName,courseName,completionDate:row.completion_date,instructorName:row.instructor_name,certificateId:row.certificate_id,courseCategory,templateFamily:design.family,theme:design,verificationUrl,qrDataUrl};
 }
 async function renderCredential(row,format='pdf') {
-  const chromePath=process.env.PUPPETEER_EXECUTABLE_PATH||process.env.CHROME_PATH||['/usr/bin/google-chrome','/usr/bin/chromium','/usr/bin/chromium-browser'].find(candidate=>fs.existsSync(candidate));
-  if(!chromePath) throw new Error('Chrome is unavailable. Set PUPPETEER_EXECUTABLE_PATH to the Chrome executable.');
+  const configuredChrome=process.env.PUPPETEER_EXECUTABLE_PATH||process.env.CHROME_PATH;
+  const systemChrome=['/usr/bin/google-chrome','/usr/bin/chromium','/usr/bin/chromium-browser'].find(candidate=>fs.existsSync(candidate));
+  const chromePath=configuredChrome||systemChrome||await puppeteer.executablePath();
+  if(!fs.existsSync(chromePath)) throw new Error(`Chrome is unavailable at ${chromePath}. Install dependencies with Puppeteer's browser download enabled, or set PUPPETEER_EXECUTABLE_PATH.`);
   const browser=await puppeteer.launch({executablePath:chromePath,headless:true,args:['--no-sandbox','--disable-setuid-sandbox','--disable-dev-shm-usage']});
   try {
     const page=await browser.newPage();
@@ -1628,7 +1630,7 @@ app.get('/api/admin/credentials/:courseId/students/:studentId/png',authAdmin,asy
     if(!row) return res.status(404).json({error:'No issued document was found for this student and programme.'});
     const png=await renderCredential(row,'png');
     res.setHeader('Content-Type','image/png');res.setHeader('Content-Disposition',`attachment; filename="Herald-${row.credential_type}-${row.code}-${row.certificateId}.png"`);res.send(png);
-  } catch(err) { console.error('Credential PNG render failed:',err.message);res.status(500).json({error:'Could not render this academic document.'}); }
+  } catch(err) { console.error('Credential PNG render failed:',err.stack||err.message);res.status(500).json({error:'Could not render this academic document.'}); }
 });
 app.get('/api/admin/credentials/:courseId/students/:studentId/pdf',authAdmin,async(req,res)=>{
   try {
@@ -1636,7 +1638,7 @@ app.get('/api/admin/credentials/:courseId/students/:studentId/pdf',authAdmin,asy
     if(!row) return res.status(404).json({error:'No issued document was found for this student and programme.'});
     const pdf=await renderCredential(row,'pdf');
     res.setHeader('Content-Type','application/pdf');res.setHeader('Content-Disposition',`attachment; filename="Herald-${row.credential_type}-${row.code}-${row.certificateId}.pdf"`);res.send(pdf);
-  } catch(err) { console.error('Credential PDF render failed:',err.message);res.status(500).json({error:'Could not generate this academic document PDF.'}); }
+  } catch(err) { console.error('Credential PDF render failed:',err.stack||err.message);res.status(500).json({error:'Could not generate this academic document PDF.'}); }
 });
 app.get('/api/student/credentials/:courseId/pdf',authStudent,async(req,res)=>{
   try {
@@ -1644,7 +1646,7 @@ app.get('/api/student/credentials/:courseId/pdf',authStudent,async(req,res)=>{
     if(!row) return res.status(403).json({error:'This academic document is not issued or its requirements are not met.'});
     const pdf=await renderCredential(row,'pdf');
     res.setHeader('Content-Type','application/pdf');res.setHeader('Content-Disposition',`${req.query.download==='1'?'attachment':'inline'}; filename="Herald-${row.credential_type}-${row.code}-${row.certificateId}.pdf"`);res.send(pdf);
-  } catch(err) { console.error('Credential PDF render failed:',err.message);res.status(500).json({error:'Could not generate this academic document PDF.'}); }
+  } catch(err) { console.error('Credential PDF render failed:',err.stack||err.message);res.status(500).json({error:'Could not generate this academic document PDF.'}); }
 });
 app.get('/api/verify/:certificateId',async(req,res)=>{
   const id=String(req.params.certificateId||'').toUpperCase();
