@@ -332,6 +332,11 @@ async function loadDashboard() {
     });
     return;
   }
+  const studentPhoto = document.getElementById('studentPassportPhoto');
+  if (me.passport_photo_key) {
+    studentPhoto.src = '/api/student/passport-photo';
+    studentPhoto.addEventListener('error', () => { studentPhoto.hidden = true; });
+  } else studentPhoto.hidden = true;
   loadStudentCredentials();
 
   document.getElementById('welcomeName').textContent = me.name;
@@ -631,7 +636,7 @@ async function loadDashboard() {
               ? m.purchase_status === 'pending_review'
                 ? `<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;"><strong>KES ${Number(m.price).toLocaleString()}</strong><span>Bank payment awaiting verification</span><button class="btn-xs" type="button" onclick="checkMaterialPayment(${m.id})">Check status</button></div>`
                 : m.purchase_status === 'pending'
-                  ? `<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;"><strong>KES ${Number(m.price).toLocaleString()}</strong><span>Previous M-Pesa payment is still pending</span><button class="btn-xs" type="button" onclick="checkMaterialPayment(${m.id})">Check status</button></div>`
+                  ? `<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;"><strong>KES ${Number(m.price).toLocaleString()}</strong><span>Previous payment is still pending</span><button class="btn-xs" type="button" onclick="checkMaterialPayment(${m.id})">Check status</button></div>`
                 : `<div style="display:grid;gap:8px;padding:10px;background:var(--surface);border-radius:8px;"><strong>Herald KCB payment · KES ${Number(m.price).toLocaleString()}</strong><small>KCB Bank Kenya · Paybill 522522 · Account 1279021640<br>HERALD TRAINER AND CONSULTANT</small><input id="materialPayer-${m.id}" type="text" placeholder="Name used for payment" aria-label="Name used for payment" style="padding:7px;border:1px solid var(--border);border-radius:6px;"><input id="materialPhone-${m.id}" type="tel" placeholder="Your contact phone" aria-label="Your contact phone" style="padding:7px;border:1px solid var(--border);border-radius:6px;"><input id="materialReference-${m.id}" type="text" maxlength="40" placeholder="Bank transaction reference" aria-label="Bank transaction reference" style="padding:7px;border:1px solid var(--border);border-radius:6px;"><button class="btn-xs" type="button" onclick="submitMaterialBankPayment(${m.id})">Submit for verification</button></div>`
               : m.file_available
                 ? `<a href="/api/my-materials/${m.id}/download" class="btn-xs" style="text-decoration:none;display:inline-block;">📥 ${paid ? 'Download purchased material' : 'Download / Open'}</a>`
@@ -693,7 +698,7 @@ function renderPaymentBox() {
       </div>
       <div class="payment-note">
         Use your <strong>registration number</strong> as the payment reference where required.
-        Retain your M-Pesa confirmation SMS as proof of payment.
+        Retain your bank payment confirmation and transaction reference as proof of payment.
       </div>
     </div>`;
 }

@@ -23,55 +23,6 @@ const courseFeeCatalog = require('./course-fees');
 const partnerPrograms = require('./partner-programs');
 const ADMISSION_FEE = 3000;
 
-function paymentErrorMessage(err, phase = 'M-Pesa request') {
-  const provider = err?.response && typeof err.response === 'object' ? err.response : {};
-  const message = [
-    err?.message, err?.errorMessage, err?.description, err?.cause?.message,
-    provider.errorMessage, provider.ResponseDescription, provider.resultDesc,
-    provider.message, provider.error,
-  ]
-    .find(value => typeof value === 'string' && value.trim());
-  if (message) return `${phase}: ${message}`;
-  const code = [provider.errorCode, provider.ResponseCode, err?.errorCode, err?.code, err?.name]
-    .find(value => typeof value === 'string' && value.trim());
-  const status = err?.statusCode || err?.status;
-  const requestId = err?.requestId || provider.requestId || provider.RequestID;
-  const responseSummary = safePaymentResponse(err?.response);
-  const details = [code, status ? `HTTP ${status}` : '', requestId ? `request ${requestId}` : '', responseSummary && responseSummary !== '{}' ? `response ${responseSummary}` : '']
-    .filter(Boolean).join(', ');
-  if (phase === 'saving the purchase record') {
-    return `The M-Pesa prompt may have been sent, but purchase tracking failed${details ? ` (${details})` : ''}. Check your phone and contact the school before retrying.`;
-  }
-  return `M-Pesa could not start the payment prompt${details ? ` (${details})` : ''}. Please contact the school if the problem continues.`;
-}
-
-function logPaymentFailure(context, err, phase) {
-  const provider = err?.response && typeof err.response === 'object' ? err.response : {};
-  console.error(context, {
-    phase,
-    errorType: err?.constructor?.name || typeof err,
-    code: err?.code || err?.errorCode || undefined,
-    status: err?.statusCode || err?.status || err?.response?.status || undefined,
-    providerCode: provider.errorCode || provider.ResponseCode || undefined,
-    providerMessage: provider.errorMessage || provider.ResponseDescription || provider.resultDesc || provider.message || provider.error || undefined,
-    providerResponse: safePaymentResponse(err?.response),
-    requestId: err?.requestId || provider.requestId || provider.RequestID || undefined,
-    message: paymentErrorMessage(err),
-  });
-}
-
-function safePaymentResponse(response) {
-  if (typeof response === 'string') return response.replace(/\b(?:\+?254|0)?\d{9,12}\b/g, '[number]').slice(0, 240);
-  if (!response || typeof response !== 'object') return undefined;
-  const safe = {};
-  for (const [key, value] of Object.entries(response).slice(0, 12)) {
-    if (/password|passkey|token|authorization|phone|party|secret|credential/i.test(key)) continue;
-    if (['string', 'number', 'boolean'].includes(typeof value)) safe[key] = value;
-    else if (value && typeof value === 'object') safe[key] = '[nested response]';
-  }
-  return JSON.stringify(safe).replace(/\b(?:\+?254|0)?\d{9,12}\b/g, '[number]').slice(0, 240);
-}
-
 function getCourseFee(course) {
   const adminFee = Number(course.fee);
   if (Number.isFinite(adminFee) && adminFee > 0) return { amount: adminFee, label: 'Course fee' };
@@ -4754,7 +4705,7 @@ app.post('/api/help/ask', async (req, res) => {
     if (!groqKey) {
       return res.json({
         source: 'fallback',
-        answer: "I'm not sure about that one yet. I can help with: registration, fees & M-Pesa, courses, exams, transcripts & certificates, lecturer applications, and login issues. Try rephrasing your question, or email support@heraldtrainer.co.ke for a human reply.",
+        answer: "I'm not sure about that one yet. I can help with: registration, fees and bank payments, courses, exams, transcripts and certificates, lecturer applications, and login issues. Try rephrasing your question, or email support@heraldtrainer.co.ke for a human reply.",
         links: getHelpLinks(message),
         who,
       });
@@ -4798,7 +4749,7 @@ app.post('/api/help/ask', async (req, res) => {
       console.error('Groq fallback failed:', groqErr.message);
       return res.json({
         source: 'fallback',
-        answer: "I'm not sure about that one yet. I can help with: registration, fees & M-Pesa, courses, exams, transcripts & certificates, lecturer applications, and login issues. Try rephrasing your question, or email support@heraldtrainer.co.ke for a human reply.",
+        answer: "I'm not sure about that one yet. I can help with: registration, fees and bank payments, courses, exams, transcripts and certificates, lecturer applications, and login issues. Try rephrasing your question, or email support@heraldtrainer.co.ke for a human reply.",
         links: getHelpLinks(message),
         who,
       });
@@ -4917,59 +4868,9 @@ app.post('/api/student/exams/:attemptId/submit', authStudent, async (req, res) =
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-const { Mpesa, isStkCallbackSuccess, getCallbackValue } = require('pesafy');
-
-// Initialize the client (place this near the top with other imports)
-// Safer initialization
-let mpesa = null;
-try {
-  if (process.env.MPESA_CONSUMER_KEY && process.env.MPESA_CONSUMER_SECRET) {
-    mpesa = new Mpesa({
-      consumerKey: process.env.MPESA_CONSUMER_KEY,
-      consumerSecret: process.env.MPESA_CONSUMER_SECRET,
-      environment: process.env.MPESA_ENV || 'sandbox',
-      lipaNaMpesaShortCode: process.env.MPESA_SHORTCODE,
-      lipaNaMpesaPassKey: process.env.MPESA_PASSKEY,
-    });
-    console.log('📱 M-Pesa configured');
-  } else {
-    console.warn('⚠️ M-Pesa keys missing. M-Pesa routes disabled.');
-  }
-} catch (err) {
-  console.error('⚠️ M-Pesa initialization failed:', err.message);
-}
-
-const MPESA_CALLBACK_URL = 'https://heraldtrainer.co.ke/api/mpesa/callback';
-async function startMpesaStkPush({ amount, phoneNumber, accountReference, transactionDesc }) {
-  if (!mpesa) throw new Error('M-Pesa is not configured on this server.');
-  // Fee and material prompts share the same configured shortcode and credentials.
-  return mpesa.stkPush({
-    amount: Number(amount), phoneNumber, callbackUrl: MPESA_CALLBACK_URL,
-    accountReference, transactionDesc,
-  });
-}
-
-// 1. Trigger the STK Push (Student clicks "Pay with M-Pesa")
-app.post('/api/mpesa/stk-push', authStudent, async (req, res) => {
-  if (!mpesa) return res.status(503).json({ error: 'M-Pesa is not configured on this server.' });
-  
-  try {
-    // ... rest of the route
-    const { phoneNumber, amount } = req.body;
-    
-    // pesafy handles the 2547... format automatically
-    const push = await startMpesaStkPush({ amount, phoneNumber, accountReference: 'HERALD FEE', transactionDesc: 'Fee Payment' });
-
-    // Save push.CheckoutRequestID to your DB if you want to track it
-    res.json({ 
-        ok: true, 
-        message: 'Check your phone for the M-Pesa prompt',
-        checkoutRequestId: push.CheckoutRequestID 
-    });
-  } catch (err) {
-    logPaymentFailure('Fee M-Pesa STK request failed:', err);
-    res.status(502).json({ error: paymentErrorMessage(err) });
-  }
+const { isStkCallbackSuccess, getCallbackValue } = require('pesafy');
+app.post('/api/mpesa/stk-push', authStudent, (req, res) => {
+  res.status(410).json({ error: 'M-Pesa payments are paused. Please use the bank payment instructions in your dashboard.' });
 });
 
 // 2. The Callback (Safaricom sends the result here)

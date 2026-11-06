@@ -2517,7 +2517,7 @@ function renderPublicMaterials() {
     } else if (paid && guestPurchase?.status === 'pending_review') {
       action = `<span class="material-badge paid">Bank payment awaiting verification</span> <button class="btn-outline" type="button" onclick="checkPublicMaterialPayment(${Number(item.id)})">Check status</button>`;
     } else if (paid && guestPurchase?.status === 'pending') {
-      action = `<span class="material-badge paid">Previous M-Pesa payment pending</span> <button class="btn-outline" type="button" onclick="checkPublicMaterialPayment(${Number(item.id)})">Check status</button>`;
+      action = `<span class="material-badge paid">Previous payment pending</span> <button class="btn-outline" type="button" onclick="checkPublicMaterialPayment(${Number(item.id)})">Check status</button>`;
     } else if (paid && owned) {
       action = `<a class="btn-gold" href="/api/my-materials/${Number(item.id)}/download">Download purchased material</a>`;
     } else if (paid && signedInStudent && access?.purchase_status === 'pending') {
@@ -2575,7 +2575,7 @@ window.checkPublicMaterialPayment = async id => {
       : await fetch(`/api/my-materials/${id}/purchase-status`, { credentials: 'same-origin' });
     const status = await response.json();
     if (status.owned) { await loadPublicMaterials(); return; }
-    alert(status.status === 'pending_review' ? 'Your bank payment details are awaiting verification.' : status.status === 'pending' ? 'A previous M-Pesa prompt is still pending.' : `Payment status: ${status.status}.`);
+    alert(status.status === 'pending_review' ? 'Your bank payment details are awaiting verification.' : status.status === 'pending' ? 'A previous payment is still pending.' : `Payment status: ${status.status}.`);
   } catch (err) { alert(err.message); }
 };
 

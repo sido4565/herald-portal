@@ -37,7 +37,7 @@
   <div class="container">
     <h1>My Exams</h1>
     <section class="student-exam-card" aria-label="Student exam card">
-      <img id="examCardPhoto" src="/api/student/passport-photo" alt="Student passport photo" />
+      <img id="examCardPhoto" alt="Student passport photo" />
       <div><strong id="examCardName">Loading student details…</strong><p>Registration No: <span id="examCardReg"></span></p><p id="examCardCourse"></p></div>
     </section>
     <div id="examsList"><p class="empty">Loading...</p></div>
@@ -48,6 +48,8 @@
       document.getElementById('examCardName').textContent = student.name;
       document.getElementById('examCardReg').textContent = student.reg_no;
       document.getElementById('examCardCourse').textContent = student.course;
+      if (student.passport_photo_key) document.getElementById('examCardPhoto').src = '/api/student/passport-photo';
+      else document.getElementById('examCardName').textContent = 'Upload your passport photo from the dashboard to activate your exam card.';
     }).catch(error => { document.getElementById('examCardName').textContent = error.message; });
     document.getElementById('examCardPhoto').addEventListener('error', function () { this.style.display = 'none'; });
 
