@@ -1590,7 +1590,86 @@ async function getIssuedCredential(studentId,courseId) {
   const design=credentialDesign(row.code,courseCategory);
   return {...row,studentName,courseName,completionDate:row.completion_date,instructorName:row.instructor_name,certificateId:row.certificate_id,courseCategory,templateFamily:design.family,theme:design,verificationUrl,qrDataUrl};
 }
+async function renderCredentialPdf(row) {
+  const doc=new PDFDocument({size:'A4',layout:'landscape',margin:0,compress:true});
+  const chunks=[];
+  const bufferPromise=new Promise((resolve,reject)=>{doc.on('data',chunk=>chunks.push(chunk));doc.on('end',()=>resolve(Buffer.concat(chunks)));doc.on('error',reject);});
+  const w=doc.page.width,h=doc.page.height,theme=row.theme||credentialDesign(row.code,row.courseCategory);
+  const family=row.templateFamily||credentialTemplateFamily(row.courseCategory);
+  const polygon=points=>{doc.moveTo(points[0][0],points[0][1]);for(const [x,y] of points.slice(1))doc.lineTo(x,y);doc.closePath();};
+  const serif=path.join(__dirname,'public/fonts/HeraldSerif.ttf');
+  const italic=path.join(__dirname,'public/fonts/HeraldSerifItalic.ttf');
+  const sans=path.join(__dirname,'public/fonts/HeraldSans.ttf');
+  const bold=path.join(__dirname,'public/fonts/HeraldSansBold.ttf');
+  doc.registerFont('HeraldSerif',serif);doc.registerFont('HeraldItalic',italic);doc.registerFont('HeraldSans',sans);doc.registerFont('HeraldBold',bold);
+  doc.rect(0,0,w,h).fill(theme.paper);
+  // Light security curves and an institutional wordmark sit behind the text.
+  doc.save().strokeColor(theme.accent).strokeOpacity(.14).lineWidth(.8);
+  for(let i=0;i<8;i++){
+    const y=120+i*42;
+    doc.moveTo(46,y).bezierCurveTo(w*.25,y+(i%2?14:-14),w*.75,y+(i%2?-14:14),w-46,y).stroke();
+  }
+  doc.restore();
+  doc.save().fillColor(theme.brand).fillOpacity(.045).font('HeraldBold').fontSize(54).rotate(-24,{origin:[w/2,h/2]}).text('HERALD',0,h/2-24,{width:w,align:'center',lineBreak:false}).restore();
+  if(family==='modern'){
+    doc.rect(0,0,19,h).fill(theme.brand);doc.rect(19,0,5,h).fill(theme.accent);
+    doc.lineWidth(1.4).strokeColor(theme.accent).rect(34,27,w-58,h-54).stroke();
+    doc.lineWidth(.7).strokeColor(theme.brand).rect(42,35,w-74,h-70).stroke();
+  } else if(family==='classic') {
+    doc.lineWidth(10).strokeColor(theme.brand).rect(20,20,w-40,h-40).stroke();
+    doc.lineWidth(2).strokeColor(theme.accent).rect(34,34,w-68,h-68).stroke();
+    doc.lineWidth(.8).strokeColor(theme.brand).rect(41,41,w-82,h-82).stroke();
+    for(let x=47;x<w-47;x+=15){doc.circle(x,27,1.5).fill(theme.accent);doc.circle(x,h-27,1.5).fill(theme.accent);}
+  } else {
+    doc.lineWidth(4).strokeColor(theme.accent).rect(22,22,w-44,h-44).stroke();
+    doc.lineWidth(1.2).strokeColor(theme.brand).rect(32,32,w-64,h-64).stroke();
+    doc.lineWidth(.7).strokeColor(theme.accent).rect(39,39,w-78,h-78).stroke();
+    [[49,49],[w-49,49],[49,h-49],[w-49,h-49]].forEach(([x,y])=>doc.circle(x,y,5).lineWidth(1).strokeColor(theme.accent).stroke());
+  }
+  const variant=Number(theme.variant||0);
+  if(variant%3===1){doc.save().lineWidth(1).strokeColor(theme.accent).roundedRect(48,48,w-96,h-96,15).stroke().restore();}
+  if(variant%3===2){for(let x=65;x<w-65;x+=24){doc.save().fillColor(theme.accent);polygon([[x,46],[x+4,52],[x,58],[x-4,52]]);doc.fill().restore();}}
+  doc.fillColor(theme.brand).font('HeraldItalic').fontSize(family==='classic'?23:21).text('Herald Trainer & Consultant',60,57,{width:w-120,align:'center',lineBreak:false});
+  doc.fillColor(theme.brand).font('HeraldSerif').fontSize(27).text(String(row.credential_type||'certificate').toUpperCase(),60,96,{width:w-120,align:'center',characterSpacing:2,lineBreak:false});
+  doc.fillColor(theme.ink).font('HeraldSerif').fontSize(13).text(family==='formal'?'This is to certify that':'This is proudly presented to',60,144,{width:w-120,align:'center'});
+  const student=String(row.studentName||'');
+  let studentSize=39;while(studentSize>23){doc.font('HeraldItalic').fontSize(studentSize);if(doc.widthOfString(student)<=w-150)break;studentSize-=1;}
+  doc.fillColor(theme.brand).font('HeraldItalic').fontSize(studentSize).text(student,68,170,{width:w-136,align:'center',lineBreak:false,ellipsis:true});
+  doc.moveTo(w/2-95,218).lineTo(w/2+95,218).lineWidth(1).strokeColor(theme.accent).stroke();
+  doc.fillColor(theme.ink).font('HeraldSans').fontSize(12).text(family==='formal'?'has satisfied the academic requirements for':'for successful completion of',60,232,{width:w-120,align:'center'});
+  const course=String(row.courseName||'');
+  let courseSize=25;while(courseSize>15){doc.font('HeraldSerif').fontSize(courseSize);if(doc.widthOfString(course)<=w-150)break;courseSize-=1;}
+  doc.fillColor(theme.ink).font('HeraldSerif').fontSize(courseSize).text(course,68,254,{width:w-136,align:'center',lineBreak:false,ellipsis:true});
+  const rawDate=String(row.completionDate||'');
+  const parsedDate=new Date(rawDate.includes('T')?rawDate:`${rawDate.replace(' ','T')}Z`);
+  const dateLabel=rawDate&& !Number.isNaN(parsedDate.valueOf())?parsedDate.toLocaleDateString('en-GB',{day:'numeric',month:'long',year:'numeric'}):rawDate;
+  const detail=`Awarded ${dateLabel}${row.instructorName?` · Instructor: ${row.instructorName}`:''}`;
+  doc.fillColor(theme.ink).font('HeraldSans').fontSize(9.5).text(detail,55,294,{width:w-110,align:'center',lineBreak:false,ellipsis:true});
+  if(row.credential_type==='degree'&&row.partner_university) doc.font('HeraldSans').fontSize(9).text(`In partnership with ${row.partner_university}`,55,311,{width:w-110,align:'center',lineBreak:false,ellipsis:true});
+  // Course-specific medal/seal, with a distinct silhouette in each design family.
+  const cx=w/2,cy=386,r=28;
+  if(family==='classic'){
+    doc.circle(cx,cy,r).fill(theme.accent);doc.circle(cx,cy,r-5).lineWidth(1.5).strokeColor('#f7f0df').stroke();
+  } else {
+    const points=[];for(let i=0;i<24;i++){const angle=-Math.PI/2+i*Math.PI/12,rad=i%2===0?r:r*.76;points.push([cx+Math.cos(angle)*rad,cy+Math.sin(angle)*rad]);}
+    doc.save().fillColor(theme.accent);polygon(points);doc.fill().restore();
+  }
+  doc.fillColor('#ffffff').font('HeraldBold').fontSize(7).text('HERALD',cx-r,cy-8,{width:r*2,align:'center'}).text(String(row.credential_type||'award').toUpperCase(),cx-r,cy+1,{width:r*2,align:'center',lineBreak:false,ellipsis:true});
+  const sigY=464;
+  for(const [x,label,signature,width] of [[86,'AUTHORIZED INSTITUTIONAL SIGNATURE','Academic Registrar',190],[w-276,'PROGRAMME INSTRUCTOR',row.instructorName||'Programme Instructor',190]]){
+    doc.moveTo(x,sigY).lineTo(x+width,sigY).lineWidth(.8).strokeColor(theme.brand).stroke();
+    doc.fillColor(theme.brand).font('HeraldItalic').fontSize(14).text(signature,x,sigY-22,{width,align:'center',lineBreak:false,ellipsis:true});
+    doc.fillColor(theme.ink).font('HeraldSans').fontSize(7).text(label,x,sigY+4,{width,align:'center',lineBreak:false});
+  }
+  const qrData=Buffer.from(String(row.qrDataUrl||'').replace(/^data:image\/png;base64,/,''),'base64');
+  if(qrData.length) doc.image(qrData,w-91,h-94,{width:48,height:48});
+  doc.fillColor(theme.ink).font('HeraldSans').fontSize(6.5).text(`ID ${row.certificateId}`,46,h-52,{width:220,lineBreak:false,ellipsis:true});
+  doc.fillColor(theme.ink).font('HeraldSans').fontSize(6).text('SCAN TO VERIFY',w-111,h-42,{width:88,align:'center',lineBreak:false});
+  doc.end();
+  return bufferPromise;
+}
 async function renderCredential(row,format='pdf') {
+  if(format==='pdf') return renderCredentialPdf(row);
   const configuredChrome=process.env.PUPPETEER_EXECUTABLE_PATH||process.env.CHROME_PATH;
   const systemChrome=['/usr/bin/google-chrome','/usr/bin/chromium','/usr/bin/chromium-browser'].find(candidate=>fs.existsSync(candidate));
   const chromePath=configuredChrome||systemChrome||await puppeteer.executablePath();
