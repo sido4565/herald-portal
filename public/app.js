@@ -280,7 +280,12 @@ async function loadStudentCredentials() {
     clearTimeout(timeout);
     if (!response.ok) throw new Error(`Request failed (${response.status})`);
     const credentials = await response.json();
-    target.innerHTML = credentials.length ? `<ul class="list">${credentials.map(c => `<li><strong>${esc(c.code)} — ${esc(c.title)}</strong><br>${esc(c.credential_type[0].toUpperCase()+c.credential_type.slice(1))} · ${c.available ? `<a href="/api/student/credentials/${c.course_id}/pdf">Download ${esc(c.credential_type)}</a>` : `Available after fee completion${Number(c.balance)>0 ? ` · outstanding balance KES ${Number(c.balance).toLocaleString()}` : ''}`}</li>`).join('')}</ul>` : '<p>No enrolled courses yet.</p>';
+    target.innerHTML = credentials.length ? `<ul class="list">${credentials.map(c => {
+      const type=esc(c.credential_type[0].toUpperCase()+c.credential_type.slice(1));
+      const url=`/api/student/credentials/${encodeURIComponent(c.course_id)}/pdf`;
+      const status=c.available?'Issued and available':(Number(c.approved)===1?'Approval saved; document requirements are being verified':'Pending academic and financial approval');
+      return `<li><strong>${esc(c.code)} — ${esc(c.title)}</strong><br>${type} · ${status}${c.available?`<br><a href="${url}" target="_blank" rel="noopener">View</a> · <a href="${url}" download>Download</a> · <a href="${url}" target="_blank" rel="noopener" aria-label="Open ${type} PDF to print">Print</a>`:Number(c.balance)>0?` · Outstanding balance KES ${Number(c.balance).toLocaleString()}`:''}</li>`;
+    }).join('')}</ul>` : '<p>No enrolled courses yet.</p>';
     target.querySelector('[data-retry-credentials]')?.addEventListener('click', loadStudentCredentials);
   } catch (e) {
     console.error('Could not load student credentials:', e);

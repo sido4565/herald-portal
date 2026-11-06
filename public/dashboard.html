@@ -211,9 +211,6 @@
             <select id="resultsSemester" aria-label="Select semester" style="padding:8px 10px; border:1px solid var(--border-soft); border-radius:6px; background:var(--surface); color:var(--text);">
               <option value="">All semesters</option>
             </select>
-          <a id="downloadTranscriptBtn" href="/api/student/transcript/pdf" class="btn-primary" style="text-decoration:none; padding: 8px 16px; font-size: 12px; border-radius: 6px;">
-            📥 Download PDF Transcript
-          </a>
           </div>
         </div>
         <div class="table-wrap">
@@ -227,8 +224,15 @@
       </section>
 
       <section class="card wide" id="course-credentials">
-        <h3>Certificates, Diplomas &amp; Degrees</h3>
-        <p>Downloads appear here when the credential requirements are met.</p>
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap">
+          <h3 style="margin:0">Academic Documents</h3>
+          <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+            <a href="/api/student/transcript/pdf?view=1" target="_blank" rel="noopener">View transcript</a>
+            <a id="downloadTranscriptBtn" href="/api/student/transcript/pdf" class="btn-primary" style="text-decoration:none;padding:8px 16px;font-size:12px;border-radius:6px">Download transcript</a>
+            <a href="/api/student/transcript/pdf?view=1" target="_blank" rel="noopener">Print transcript</a>
+          </div>
+        </div>
+        <p>Issued certificates, diplomas, degrees, and your academic transcript.</p>
         <div id="studentCredentials" style="margin:12px 0"><p>Loading credentials…</p></div>
       </section>
 
@@ -337,7 +341,7 @@
       }
     });
   </script>
-  <script src="app.js?v=credentials-4"></script>
+  <script src="app.js?v=academic-documents-5"></script>
   <script src="home-button.js"></script>
 
   <script>

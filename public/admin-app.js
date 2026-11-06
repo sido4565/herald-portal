@@ -1341,16 +1341,75 @@ async function openBulkAssignModal() {
 
   // ---------------- Results ----------------
   async function loadCredentials() {
-    const rows = await api('/api/admin/credentials');
-    const body = $('#credentialsTable tbody');
-    body.innerHTML = rows.map(c => `<tr data-course="${c.course_id}"><td>${esc(c.code)} — ${esc(c.title)}</td><td><select class="cred-type"><option value="certificate" ${c.credential_type==='certificate'?'selected':''}>Certificate</option><option value="diploma" ${c.credential_type==='diploma'?'selected':''}>Diploma</option><option value="degree" ${c.credential_type==='degree'?'selected':''}>Degree</option></select></td><td><input class="cred-name" value="${esc(c.qualification_name)}" placeholder="e.g. Bachelor of …" /></td><td><input type="checkbox" class="cred-partner" ${c.partner_course?'checked':''}></td><td><input type="checkbox" class="cred-approval" ${c.approval_required?'checked':''}></td><td><button class="btn-primary cred-save">Save</button> <button class="btn-ghost cred-students">Students</button></td></tr>`).join('');
-    body.querySelectorAll('.cred-save').forEach(btn => btn.onclick = async () => { const tr=btn.closest('tr'); await api(`/api/admin/credentials/${tr.dataset.course}`,{method:'PUT',body:{credential_type:tr.querySelector('.cred-type').value,qualification_name:tr.querySelector('.cred-name').value,partner_course:tr.querySelector('.cred-partner').checked,approval_required:tr.querySelector('.cred-approval').checked}}); toast('Credential settings saved'); });
-    body.querySelectorAll('.cred-students').forEach(btn => btn.onclick = async () => {
-      const tr=btn.closest('tr'), list=await api(`/api/admin/credentials/${tr.dataset.course}/students`), isDegree=tr.querySelector('.cred-type').value==='degree';
-      $('#credentialStudents').innerHTML=`<div class="cred-section-label">Selected course</div><h3>${esc(tr.cells[0].textContent)}</h3><p>Certificates and diplomas print the registered name. For degrees, enter the name exactly as it should appear. Fee approval is enabled only at a zero balance.</p><input class="cred-search" id="credentialStudentSearch" type="search" placeholder="Search students by name or registration number…"><div class="table-wrap" style="margin-top:14px"><table><thead><tr><th>Student</th><th>Balance</th>${isDegree?'<th>Degree recipient name</th>':''}<th>Fee approved</th><th>Action</th></tr></thead><tbody>${list.map(s=>`<tr data-student="${s.student_id}"><td>${esc(s.name)}<br><small>${esc(s.reg_no)}</small></td><td><span class="cred-type-pill ${Number(s.balance)>0?'balance-due':'balance-clear'}">KES ${Number(s.balance||0).toLocaleString()}</span></td>${isDegree?`<td><input type="text" class="award-name" value="${esc(s.award_name)}" aria-label="Degree recipient name" placeholder="Name for degree certificate"></td>`:''}<td><input class="fees-completed" type="checkbox" ${s.fees_completed?'checked':''} ${Number(s.balance)>0?'disabled':''} aria-label="Approve fee completion"></td><td><button class="btn-primary award-save">Save</button></td></tr>`).join('')}</tbody></table></div>`;
-      const search=$('#credentialStudentSearch'); search.addEventListener('input',()=>{const term=search.value.trim().toLowerCase();$('#credentialStudents tbody').querySelectorAll('tr').forEach(row=>row.hidden=!row.textContent.toLowerCase().includes(term));});
-      $('#credentialStudents').querySelectorAll('.award-save').forEach(save=>save.onclick=async()=>{const sr=save.closest('tr');try{await api(`/api/admin/credentials/${tr.dataset.course}/students/${sr.dataset.student}`,{method:'PUT',body:{award_name:sr.querySelector('.award-name')?.value||'',course_completed:false,fees_completed:sr.querySelector('.fees-completed').checked}});toast('Fee approval saved')}catch(e){toast(e.message,'error')}});
-    });
+    const search=$('#academicDocumentSearch'), results=$('#credentialSearchResults'), detail=$('#credentialStudents');
+    let timer;
+    const escAttr=value=>esc(value).replace(/"/g,'&quot;');
+    const mappings=await api('/api/admin/credentials');
+    const mappingBody=$('#credentialsTable tbody');
+    mappingBody.innerHTML=mappings.map(c=>`<tr data-course="${Number(c.course_id)}"><td>${esc(c.code)} — ${esc(c.title)}</td><td><select class="map-type"><option value="certificate" ${c.credential_type==='certificate'?'selected':''}>Certificate</option><option value="diploma" ${c.credential_type==='diploma'?'selected':''}>Diploma</option><option value="degree" ${c.credential_type==='degree'?'selected':''}>Degree</option></select></td><td><input class="map-partner" value="${escAttr(c.partner_university||'')}" placeholder="Optional partner university"></td><td><button class="btn-primary map-save">Save</button></td></tr>`).join('');
+    mappingBody.querySelectorAll('.map-save').forEach(button=>button.addEventListener('click',async()=>{
+      const row=button.closest('tr');
+      try{await api(`/api/admin/credentials/${row.dataset.course}`,{method:'PUT',body:{credential_type:row.querySelector('.map-type').value,partner_university:row.querySelector('.map-partner').value,partner_course:!!row.querySelector('.map-partner').value,approval_required:true}});toast('Programme mapping saved');}
+      catch(e){toast(e.message,'error');}
+    }));
+    const renderStudent=rows=>{
+      if(!rows.length){detail.innerHTML='<p>No enrolled programmes were found for this student.</p>';return;}
+      const first=rows[0], balance=Number(first.balance||0);
+      detail.innerHTML=`<h3>${esc(first.name)}</h3><p class="award-meta">Admission number: ${esc(first.reg_no)} &nbsp;·&nbsp; Programme: ${esc(first.programme||'—')} &nbsp;·&nbsp; Fee balance: KES ${balance.toLocaleString()}</p>
+        <label for="credentialProgramme"><strong>Programme document</strong></label><br>
+        <select id="credentialProgramme" class="cred-search" style="margin-top:6px">${rows.map((r,i)=>`<option value="${i}">${esc(r.title)} · ${esc(r.credential_type)}</option>`).join('')}</select>
+        <div id="credentialApprovalCard"></div>`;
+      const cardHost=$('#credentialApprovalCard',detail);
+      const renderCard=r=>{
+        const degree=r.credential_type==='degree', issued=Number(r.approved)===1, academic=Number(r.academic_complete)===1;
+        const qual=degree?(r.qualification_name||`${r.title} Degree`):`${r.title} ${r.credential_type}`;
+        cardHost.innerHTML=`<article class="award-card" data-course="${Number(r.course_id)}">
+          <strong>${esc(r.title)} · ${esc(r.credential_type[0].toUpperCase()+r.credential_type.slice(1))}</strong>
+          <div class="award-meta">${esc(r.code)} · Academic progress: ${academic?`Passing result recorded (${r.marks??'—'} marks)`:'No passing result recorded'} · Fees: ${balance<=0?'No outstanding balance':`KES ${balance.toLocaleString()} outstanding`}</div>
+          <div class="award-meta">Qualification: ${esc(qual)}${degree&&r.partner_course?' · Partner programme':''}</div>
+          ${degree?`<p><label>Official student name <input class="award-name" type="text" maxlength="160" value="${escAttr(r.award_name||r.name)}" autocomplete="off" ${issued?'disabled':''}></label></p>
+            <p><label>Partner university <input class="partner-university" type="text" maxlength="180" value="${escAttr(r.issued_partner||r.partner_university||'')}" placeholder="Confirm partner university" ${issued?'disabled':''}></label></p>`:''}
+          <div class="award-confirm">
+            <label><input class="fees-completed" type="checkbox" ${Number(r.fees_completed)?'checked':''} ${balance>0||issued?'disabled':''}> Confirm fee completion</label>
+            <label><input class="course-completed" type="checkbox" ${Number(r.course_completed)?'checked':''} ${!academic||issued?'disabled':''}> Confirm course completion</label>
+            ${degree?'<label><input class="name-confirmed" type="checkbox" '+(issued?'disabled':'')+'> I confirm the official name</label><label><input class="partner-confirmed" type="checkbox" '+(issued?'disabled':'')+'> I confirm the partner university</label>':''}
+          </div>
+          ${issued?'<p><strong>Issued</strong> · Published to the student dashboard.</p>':`<button class="btn-primary award-issue" ${!academic||balance>0?'disabled':''}>${degree?'Approve and issue degree':'Save approvals and issue document'}</button>`}
+        </article>`;
+        const button=$('.award-issue',cardHost);
+        if(!button)return;
+        button.addEventListener('click',async()=>{
+          const card=button.closest('.award-card');
+          try{
+            button.disabled=true;
+            const result=await api(`/api/admin/credentials/${card.dataset.course}/students/${first.student_id}`,{method:'PUT',body:{
+              fees_completed:card.querySelector('.fees-completed').checked,
+              course_completed:card.querySelector('.course-completed').checked,
+              award_name:card.querySelector('.award-name')?.value||'',
+              partner_university:card.querySelector('.partner-university')?.value||'',
+              name_confirmed:card.querySelector('.name-confirmed')?.checked||false,
+              partner_confirmed:card.querySelector('.partner-confirmed')?.checked||false
+            }});
+            toast(result.issued?'Document issued and published':'Approvals saved');
+            renderStudent(await api(`/api/admin/credentials/students?q=${encodeURIComponent(search.value.trim())}`).then(all=>all.filter(x=>Number(x.student_id)===Number(first.student_id))));
+          }catch(e){button.disabled=false;toast(e.message,'error');}
+        });
+      };
+      renderCard(rows[0]);
+      $('#credentialProgramme',detail).addEventListener('change',event=>renderCard(rows[Number(event.target.value)]));
+    };
+    const doSearch=async()=>{
+      const q=search.value.trim();
+      if(q.length<2){results.innerHTML='';detail.innerHTML='<p>Search by name or admission number to begin.</p>';return;}
+      try{
+        const rows=await api(`/api/admin/credentials/students?q=${encodeURIComponent(q)}`);
+        const students=[...new Map(rows.map(r=>[String(r.student_id),r])).values()];
+        results.innerHTML=students.length?students.map((s,i)=>`<button type="button" class="cred-result" data-student="${s.student_id}"><strong>${esc(s.name)}</strong><br><small>${esc(s.reg_no)} · ${esc(s.programme||'')}</small></button>`).join(''):'<p>No matching students.</p>';
+        results.querySelectorAll('.cred-result').forEach(btn=>btn.addEventListener('click',()=>renderStudent(rows.filter(r=>String(r.student_id)===btn.dataset.student))));
+        if(students.length===1) renderStudent(rows.filter(r=>String(r.student_id)===String(students[0].student_id)));
+      }catch(e){detail.innerHTML=`<p>${esc(e.message)}</p>`;}
+    };
+    search.addEventListener('input',()=>{clearTimeout(timer);timer=setTimeout(doSearch,220);});
   }
 
   async function loadResults() {

@@ -95,7 +95,8 @@ async function initSchema() {
       credential_type TEXT NOT NULL DEFAULT 'certificate',
       qualification_name TEXT NOT NULL DEFAULT '',
       partner_course INTEGER NOT NULL DEFAULT 0,
-      approval_required INTEGER NOT NULL DEFAULT 0
+      approval_required INTEGER NOT NULL DEFAULT 0,
+      partner_university TEXT NOT NULL DEFAULT ''
     )`,
     `CREATE TABLE IF NOT EXISTS credential_approvals (
       student_id INTEGER NOT NULL,
@@ -113,6 +114,7 @@ async function initSchema() {
       approved INTEGER NOT NULL DEFAULT 0,
       course_completed INTEGER NOT NULL DEFAULT 0,
       fees_completed INTEGER NOT NULL DEFAULT 0,
+      partner_university TEXT NOT NULL DEFAULT '',
       approved_by INTEGER,
       approved_at DATETIME,
       PRIMARY KEY(student_id, course_id)
@@ -349,8 +351,12 @@ async function initSchema() {
     await client.execute(sql);
   }
   const studentCredentialColumns = await client.execute('PRAGMA table_info(student_credentials)');
-  for (const [name, definition] of [['course_completed','INTEGER NOT NULL DEFAULT 0'],['fees_completed','INTEGER NOT NULL DEFAULT 0']]) {
+  for (const [name, definition] of [['course_completed','INTEGER NOT NULL DEFAULT 0'],['fees_completed','INTEGER NOT NULL DEFAULT 0'],['partner_university',"TEXT NOT NULL DEFAULT ''"]]) {
     if (!studentCredentialColumns.rows.some(column => column.name === name)) await client.execute(`ALTER TABLE student_credentials ADD COLUMN ${name} ${definition}`);
+  }
+  const courseCredentialColumns = await client.execute('PRAGMA table_info(course_credentials)');
+  if (!courseCredentialColumns.rows.some(column => column.name === 'partner_university')) {
+    await client.execute("ALTER TABLE course_credentials ADD COLUMN partner_university TEXT NOT NULL DEFAULT ''");
   }
   const courseColumns = await client.execute('PRAGMA table_info(courses)');
   if (!courseColumns.rows.some(column => column.name === 'fee')) {

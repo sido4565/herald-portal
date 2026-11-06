@@ -1442,93 +1442,155 @@ app.get('/api/my-transcript', authStudent, async (req, res) => {
   });
 });
 
-// Course credential availability is tied to course results. Admins configure
-// the credential name/type and approve partner course awards.
+// Academic credentials are stored per student and enrolled programme. The same
+// authenticated student routes serve every credential shown in the dashboard.
 app.get('/api/student/credentials', authStudent, async (req, res) => {
   const rows = await db.execute({ sql: `SELECT c.id AS course_id, c.code, c.title,
       COALESCE(cc.credential_type, 'certificate') AS credential_type,
       COALESCE(cc.qualification_name, '') AS qualification_name,
-      COALESCE(cc.partner_course, 0) AS partner_course,
-      COALESCE(cc.approval_required, 0) AS approval_required,
-      MAX(r.marks) AS marks,
-      COALESCE(sc.approved, 0) AS approved, COALESCE(sc.course_completed,0) AS course_completed, COALESCE(sc.fees_completed,0) AS fees_completed,
-      CASE WHEN COALESCE(cc.credential_type,'certificate')='degree' THEN COALESCE(sc.award_name,'') ELSE s.name END AS award_name,
       COALESCE(sc.qualification_name,'') AS student_qualification,
+      COALESCE(sc.approved, 0) AS approved, COALESCE(sc.course_completed,0) AS course_completed,
+      COALESCE(sc.fees_completed,0) AS fees_completed, COALESCE(sc.award_name,'') AS award_name,
+      COALESCE(sc.partner_university,'') AS partner_university,
+      MAX(r.marks) AS marks,
+      MAX(CASE WHEN UPPER(COALESCE(r.grade,'')) IN ('A','A-','B+','B','B-','C+','C','D','PASS','PASSED') OR COALESCE(r.marks,0)>=45 THEN 1 ELSE 0 END) AS academic_complete,
       COALESCE((SELECT SUM(f.amount_due-COALESCE(f.amount_paid,0)) FROM fees f WHERE f.student_id=e.student_id),0) AS balance
-    FROM enrollments e JOIN courses c ON c.id=e.course_id JOIN students s ON s.id=e.student_id
+    FROM enrollments e JOIN courses c ON c.id=e.course_id
     LEFT JOIN results r ON r.student_id=e.student_id AND r.course_id=e.course_id
     LEFT JOIN course_credentials cc ON cc.course_id=c.id
-    LEFT JOIN student_credentials sc ON sc.student_id=e.student_id AND sc.course_id=c.id
+    LEFT JOIN student_credentials sc ON sc.student_id=e.student_id AND sc.course_id=e.course_id
     WHERE e.student_id=? GROUP BY c.id ORDER BY c.title`, args: [req.user.id] });
-  res.json(rows.rows.map(row => ({ ...row, available: Number(row.balance)<=0 && Number(row.fees_completed)===1 })));
+  res.json(rows.rows.map(row => ({ ...row, available: Number(row.balance)<=0 && Number(row.fees_completed)===1 && Number(row.course_completed)===1 && Number(row.approved)===1 && Number(row.academic_complete)===1 })));
 });
 
 app.get('/api/admin/credentials', authAdmin, async (req, res) => {
-  const q = await db.execute({ sql: `SELECT c.id course_id,c.code,c.title,COALESCE(cc.credential_type,'certificate') credential_type,COALESCE(cc.qualification_name,'') qualification_name,COALESCE(cc.partner_course,0) partner_course,COALESCE(cc.approval_required,0) approval_required FROM courses c LEFT JOIN course_credentials cc ON cc.course_id=c.id ORDER BY c.title` });
+  const q = await db.execute({ sql: `SELECT c.id course_id,c.code,c.title,COALESCE(cc.credential_type,'certificate') credential_type,COALESCE(cc.qualification_name,'') qualification_name,COALESCE(cc.partner_course,0) partner_course,COALESCE(cc.approval_required,0) approval_required,COALESCE(cc.partner_university,'') partner_university FROM courses c LEFT JOIN course_credentials cc ON cc.course_id=c.id ORDER BY c.title` });
   res.json(q.rows);
 });
 app.put('/api/admin/credentials/:courseId', authAdmin, async (req, res) => {
-  const { credential_type='certificate', qualification_name='', partner_course=0, approval_required=0 } = req.body || {};
+  const { credential_type='certificate', qualification_name='', partner_course=0, approval_required=0, partner_university='' } = req.body || {};
   if (!['certificate','diploma','degree'].includes(credential_type)) return res.status(400).json({error:'Choose certificate, diploma, or degree.'});
-  await db.execute({ sql:`INSERT INTO course_credentials(course_id,credential_type,qualification_name,partner_course,approval_required) VALUES(?,?,?,?,?) ON CONFLICT(course_id) DO UPDATE SET credential_type=excluded.credential_type,qualification_name=excluded.qualification_name,partner_course=excluded.partner_course,approval_required=excluded.approval_required`, args:[req.params.courseId,credential_type,String(qualification_name).trim(),partner_course?1:0,approval_required?1:0] });
+  const course = await db.execute({sql:`SELECT c.id,c.title,COALESCE(cc.credential_type,'certificate') credential_type
+    FROM courses c LEFT JOIN course_credentials cc ON cc.course_id=c.id WHERE c.id=?`,args:[req.params.courseId]});
+  if (!course.rows.length) return res.status(404).json({error:'Programme not found.'});
+  const issued=await db.execute({sql:'SELECT COUNT(*) AS issued_count FROM student_credentials WHERE course_id=? AND approved=1',args:[req.params.courseId]});
+  if(Number(issued.rows[0]?.issued_count)>0 && course.rows[0].credential_type!==credential_type) return res.status(409).json({error:'The document type cannot change after issuance.'});
+  await db.execute({ sql:`INSERT INTO course_credentials(course_id,credential_type,qualification_name,partner_course,approval_required,partner_university) VALUES(?,?,?,?,?,?) ON CONFLICT(course_id) DO UPDATE SET credential_type=excluded.credential_type,qualification_name=excluded.qualification_name,partner_course=excluded.partner_course,approval_required=excluded.approval_required,partner_university=excluded.partner_university`, args:[req.params.courseId,credential_type,credential_type==='degree'?course.rows[0].title:String(course.rows[0].title),partner_course?1:0,approval_required?1:0,String(partner_university||'').trim()] });
   res.json({ok:true});
 });
-app.get('/api/admin/credentials/:courseId/students', authAdmin, async (req,res) => {
-  const q=await db.execute({sql:`SELECT s.id student_id,s.name,s.reg_no,MAX(r.marks) marks,COALESCE(sc.approved,0) approved,COALESCE(sc.course_completed,0) course_completed,COALESCE(sc.fees_completed,0) fees_completed,COALESCE(sc.award_name,'') award_name,COALESCE(sc.qualification_name,'') student_qualification,COALESCE((SELECT SUM(f.amount_due-COALESCE(f.amount_paid,0)) FROM fees f WHERE f.student_id=s.id),0) balance FROM enrollments e JOIN students s ON s.id=e.student_id LEFT JOIN results r ON r.student_id=s.id AND r.course_id=e.course_id LEFT JOIN student_credentials sc ON sc.student_id=s.id AND sc.course_id=e.course_id WHERE e.course_id=? GROUP BY s.id ORDER BY s.name`,args:[req.params.courseId]}); res.json(q.rows);
+app.get('/api/admin/credentials/students', authAdmin, async (req,res) => {
+  const term=String(req.query.q||'').trim();
+  if(term.length<2) return res.json([]);
+  const like=`%${term}%`;
+  const q=await db.execute({sql:`SELECT s.id student_id,s.name,s.reg_no,s.course programme,
+      c.id course_id,c.code,c.title,COALESCE(cc.credential_type,'certificate') credential_type,
+      c.title qualification_name,COALESCE(cc.partner_course,0) partner_course,
+      COALESCE(cc.partner_university,'') partner_university,
+      MAX(r.marks) marks,MAX(CASE WHEN UPPER(COALESCE(r.grade,'')) IN ('A','A-','B+','B','B-','C+','C','D','PASS','PASSED') OR COALESCE(r.marks,0)>=45 THEN 1 ELSE 0 END) academic_complete,
+      COALESCE(sc.approved,0) approved,COALESCE(sc.course_completed,0) course_completed,
+      COALESCE(sc.fees_completed,0) fees_completed,COALESCE(sc.award_name,'') award_name,
+      COALESCE(sc.partner_university,'') issued_partner,
+      COALESCE((SELECT SUM(f.amount_due-COALESCE(f.amount_paid,0)) FROM fees f WHERE f.student_id=s.id),0) balance
+    FROM students s JOIN enrollments e ON e.student_id=s.id JOIN courses c ON c.id=e.course_id
+    LEFT JOIN course_credentials cc ON cc.course_id=c.id
+    LEFT JOIN results r ON r.student_id=s.id AND r.course_id=c.id
+    LEFT JOIN student_credentials sc ON sc.student_id=s.id AND sc.course_id=c.id
+    WHERE s.name LIKE ? OR s.reg_no LIKE ? GROUP BY s.id,c.id ORDER BY s.name,c.title LIMIT 100`,args:[like,like]});
+  res.json(q.rows);
 });
 app.put('/api/admin/credentials/:courseId/students/:studentId', authAdmin, async(req,res)=>{
-  const award=String(req.body.award_name||'').trim();
-  const cfg=await db.execute({sql:'SELECT credential_type FROM course_credentials WHERE course_id=?',args:[req.params.courseId]});
-  if(!cfg.rows.length) return res.status(404).json({error:'Course credential settings were not found.'});
-  if(cfg.rows[0].credential_type==='degree'&&!award) return res.status(400).json({error:'Enter the degree recipient name.'});
-  const student=await db.execute({sql:'SELECT id FROM enrollments WHERE student_id=? AND course_id=? LIMIT 1',args:[req.params.studentId,req.params.courseId]});
-  if(!student.rows.length) return res.status(404).json({error:'Student is not enrolled in this course.'});
-  const courseCompleted=req.body.course_completed?1:0, feesCompleted=req.body.fees_completed?1:0;
-  await db.execute({sql:`INSERT INTO student_credentials(student_id,course_id,award_name,qualification_name,approved,course_completed,fees_completed,approved_by,approved_at) VALUES(?,?,?,'',?, ?,?,?,CASE WHEN ?=1 OR ?=1 THEN CURRENT_TIMESTAMP ELSE NULL END) ON CONFLICT(student_id,course_id) DO UPDATE SET award_name=excluded.award_name,approved=excluded.approved,course_completed=excluded.course_completed,fees_completed=excluded.fees_completed,approved_by=excluded.approved_by,approved_at=excluded.approved_at`,args:[req.params.studentId,req.params.courseId,award,courseCompleted&&feesCompleted?1:0,courseCompleted,feesCompleted,req.admin.id,courseCompleted,feesCompleted]}); res.json({ok:true});
+  const courseId=Number(req.params.courseId),studentId=Number(req.params.studentId);
+  if(!Number.isSafeInteger(courseId)||!Number.isSafeInteger(studentId)) return res.status(400).json({error:'Invalid student or programme.'});
+  const cfg=await db.execute({sql:`SELECT cc.credential_type,cc.qualification_name,cc.partner_course,cc.partner_university,c.title,c.code
+    FROM courses c LEFT JOIN course_credentials cc ON cc.course_id=c.id WHERE c.id=?`,args:[courseId]});
+  if(!cfg.rows.length) return res.status(404).json({error:'Programme not found.'});
+  const enrollment=await db.execute({sql:'SELECT 1 FROM enrollments WHERE student_id=? AND course_id=? LIMIT 1',args:[studentId,courseId]});
+  if(!enrollment.rows.length) return res.status(404).json({error:'Student is not enrolled in this programme.'});
+  const c=cfg.rows[0], isDegree=c.credential_type==='degree';
+  const info=await db.execute({sql:`SELECT s.name,MAX(r.marks) marks,
+    MAX(CASE WHEN UPPER(COALESCE(r.grade,'')) IN ('A','A-','B+','B','B-','C+','C','D','PASS','PASSED') OR COALESCE(r.marks,0)>=45 THEN 1 ELSE 0 END) academic_complete,
+    COALESCE((SELECT SUM(f.amount_due-COALESCE(f.amount_paid,0)) FROM fees f WHERE f.student_id=s.id),0) balance
+    FROM students s LEFT JOIN results r ON r.student_id=s.id AND r.course_id=? WHERE s.id=? GROUP BY s.id`,args:[courseId,studentId]});
+  if(!info.rows.length) return res.status(404).json({error:'Student not found.'});
+  const st=info.rows[0], feeApproval=req.body?.fees_completed===true, courseApproval=req.body?.course_completed===true;
+  if(feeApproval && Number(st.balance)>0) return res.status(409).json({error:'Fees cannot be confirmed while an outstanding balance remains.'});
+  if(courseApproval && Number(st.academic_complete)!==1) return res.status(409).json({error:'Academic completion cannot be confirmed without a passing result in this programme.'});
+  const name=String(req.body?.award_name||'').trim().slice(0,160);
+  const partner=String(req.body?.partner_university||'').trim().slice(0,180);
+  if(isDegree && (!name || req.body?.name_confirmed!==true || !partner || req.body?.partner_confirmed!==true)) return res.status(400).json({error:'Confirm the official name and partner university before approving a degree.'});
+  const approved=feeApproval&&courseApproval?1:0;
+  if(isDegree && (!feeApproval || !courseApproval || Number(st.balance)>0 || Number(st.academic_complete)!==1)) return res.status(409).json({error:'Degrees require confirmed academic completion and zero balance before issuance.'});
+  const existing=await db.execute({sql:'SELECT approved FROM student_credentials WHERE student_id=? AND course_id=?',args:[studentId,courseId]});
+  if(Number(existing.rows[0]?.approved)===1) return res.status(409).json({error:'This document has already been issued; duplicate issuance is blocked.'});
+  const qualification=isDegree ? String(c.title||'').trim() : '';
+  const saved=await db.execute({sql:`INSERT INTO student_credentials(student_id,course_id,award_name,qualification_name,approved,course_completed,fees_completed,partner_university,approved_by,approved_at)
+    VALUES(?,?,?,?,?,?,?,?,?,CURRENT_TIMESTAMP)
+    ON CONFLICT(student_id,course_id) DO UPDATE SET award_name=excluded.award_name,qualification_name=excluded.qualification_name,approved=excluded.approved,course_completed=excluded.course_completed,fees_completed=excluded.fees_completed,partner_university=excluded.partner_university,approved_by=excluded.approved_by,approved_at=CURRENT_TIMESTAMP
+    WHERE student_credentials.approved=0 RETURNING approved`,
+    args:[studentId,courseId,isDegree?name:st.name,qualification,approved,courseApproval?1:0,feeApproval?1:0,isDegree?partner:'',req.admin.id]});
+  if(!saved.rows.length) return res.status(409).json({error:'This document has already been issued; duplicate issuance is blocked.'});
+  res.json({ok:true,issued:approved===1});
 });
 
+function credentialPalette(code) {
+  let hash=0; for(const ch of String(code)) hash=(hash*31+ch.charCodeAt(0))>>>0;
+  const hue=hash%360;
+  const hsl=(h,s,l)=>{
+    s/=100;l/=100;const k=n=>(n+h/30)%12,a=s*Math.min(l,1-l),f=n=>l-a*Math.max(-1,Math.min(k(n)-3,Math.min(9-k(n),1)));
+    return '#'+[f(0),f(8),f(4)].map(v=>Math.round(v*255).toString(16).padStart(2,'0')).join('');
+  };
+  return {navy:hsl(hue,48,25),accent:hsl((hue+23)%360,48,43),paper:hsl(hue,32,97),variant:hash%4};
+}
 app.get('/api/student/credentials/:courseId/pdf', authStudent, async (req, res) => {
   const q = await db.execute({ sql: `SELECT c.id,c.code,c.title,s.name,s.reg_no,
-      COALESCE(cc.credential_type,'certificate') credential_type, COALESCE(cc.qualification_name,'') qualification_name,
-      COALESCE(cc.approval_required,0) approval_required, COALESCE(sc.approved,0) approved,COALESCE(sc.course_completed,0) course_completed,COALESCE(sc.fees_completed,0) fees_completed, MAX(r.marks) marks, CASE WHEN COALESCE(cc.credential_type,'certificate')='degree' THEN COALESCE(NULLIF(sc.award_name,''),s.name) ELSE s.name END award_name, COALESCE(sc.award_name,'') student_qualification,
+      COALESCE(cc.credential_type,'certificate') credential_type,c.title qualification_name,
+      COALESCE(sc.approved,0) approved,COALESCE(sc.course_completed,0) course_completed,COALESCE(sc.fees_completed,0) fees_completed,
+      COALESCE(sc.award_name,'') award_name,COALESCE(sc.partner_university,'') partner_university,
+      MAX(r.marks) marks,MAX(CASE WHEN UPPER(COALESCE(r.grade,'')) IN ('A','A-','B+','B','B-','C+','C','D','PASS','PASSED') OR COALESCE(r.marks,0)>=45 THEN 1 ELSE 0 END) academic_complete,
       COALESCE((SELECT SUM(f.amount_due-COALESCE(f.amount_paid,0)) FROM fees f WHERE f.student_id=s.id),0) balance
     FROM enrollments e JOIN students s ON s.id=e.student_id JOIN courses c ON c.id=e.course_id
     LEFT JOIN results r ON r.student_id=e.student_id AND r.course_id=e.course_id
-    LEFT JOIN course_credentials cc ON cc.course_id=c.id LEFT JOIN credential_approvals ca ON ca.student_id=e.student_id AND ca.course_id=c.id LEFT JOIN student_credentials sc ON sc.student_id=e.student_id AND sc.course_id=c.id
+    LEFT JOIN course_credentials cc ON cc.course_id=c.id LEFT JOIN student_credentials sc ON sc.student_id=e.student_id AND sc.course_id=c.id
     WHERE e.student_id=? AND c.id=? GROUP BY c.id`, args: [req.user.id, req.params.courseId] });
-  const row = q.rows[0];
-  if (!row || Number(row.balance)>0 || Number(row.fees_completed)!==1) return res.status(403).json({ error: 'Admin fee approval and a zero fee balance are required to download this credential.' });
-  const doc = new PDFDocument({ margin: 60, size: 'A4', layout: 'landscape' });
+  const row=q.rows[0];
+  if(!row || Number(row.balance)>0 || Number(row.fees_completed)!==1 || Number(row.course_completed)!==1 || Number(row.approved)!==1 || Number(row.academic_complete)!==1) return res.status(403).json({error:'This academic document is not issued or its requirements are not met.'});
+  const doc=new PDFDocument({margin:60,size:'A4',layout:'landscape',bufferPages:true});
   res.setHeader('Content-Type','application/pdf');
-  res.setHeader('Content-Disposition', `attachment; filename="Herald-${row.credential_type}-${row.code}-${row.reg_no}.pdf"`);
+  res.setHeader('Content-Disposition',`inline; filename="Herald-${row.credential_type}-${row.code}-${row.reg_no}.pdf"`);
   doc.pipe(res);
-  const navy='#10294a', gold='#b8860b', ink='#253858', paper='#fffdf8';
-  const w=doc.page.width, h=doc.page.height;
-  row.name=row.award_name;
-  if(row.credential_type==='degree') row.qualification_name=row.student_qualification || row.qualification_name || `${row.title} Degree`;
-  doc.rect(0,0,w,h).fill(paper);
-  // Double frame and corner accents give each award a formal certificate look.
-  doc.lineWidth(5).strokeColor(navy).rect(22,22,w-44,h-44).stroke();
-  doc.lineWidth(1.5).strokeColor(gold).rect(31,31,w-62,h-62).stroke();
-  [[45,45],[w-45,45],[45,h-45],[w-45,h-45]].forEach(([x,y])=>doc.circle(x,y,5).fill(gold));
-  // Low contrast watermark uses the specific course code for each credential.
-  const typeStyle={certificate:{color:gold,watermark:'CERTIFIED',display:'Times-Bold',name:'Times-Italic'},diploma:{color:'#146c6a',watermark:'DIPLOMA',display:'Times-Roman',name:'Times-Bold'},degree:{color:'#65358b',watermark:'DEGREE',display:'Times-Bold',name:'Times-Bold'}}[row.credential_type];
-  doc.save().rotate(-28,{origin:[w/2,h/2]}).fillColor(typeStyle.color,0.07).font('Helvetica-Bold').fontSize(74)
-    .text(`${typeStyle.watermark}  •  ${String(row.code).toUpperCase()}`,30,h/2-40,{width:w-60,align:'center'}).restore();
-  doc.lineWidth(row.credential_type==='degree'?8:5).strokeColor(typeStyle.color).rect(37,37,w-74,h-74).stroke();
-  doc.save().rotate(-35,{origin:[w/2,h/2]}).fillColor(typeStyle.color,0.035).font('Helvetica-Bold').fontSize(18).text(`${row.code} · ${row.reg_no}`,50,h/2+55,{width:w-100,align:'center'}).restore();
-  doc.fillColor(gold).font('Helvetica-Bold').fontSize(11).text('HERALD TRAINER & CONSULTANT',0,64,{width:w,align:'center',characterSpacing:2});
-  doc.moveTo(w/2-48,88).lineTo(w/2+48,88).lineWidth(2).strokeColor(gold).stroke();
-  doc.fillColor(typeStyle.color).font(typeStyle.display).fontSize(row.credential_type==='degree'?34:30).text(row.credential_type.toUpperCase(),60,111,{width:w-120,align:'center',characterSpacing:3});
-  doc.fillColor(ink).font('Helvetica').fontSize(15).text('This is proudly presented to',60,165,{width:w-120,align:'center'});
-  doc.fillColor(navy).font(typeStyle.name).fontSize(31).text(row.name,70,195,{width:w-140,align:'center'});
-  doc.moveTo(w/2-115,239).lineTo(w/2+115,239).lineWidth(1).strokeColor(gold).stroke();
-  doc.fillColor(ink).font('Helvetica').fontSize(15).text('for successfully completing',60,256,{width:w-120,align:'center'});
-  doc.fillColor(navy).font('Times-Italic').fontSize(21).text(row.title,75,282,{width:w-150,align:'center'});
-  doc.fillColor(gold).font('Helvetica-Bold').fontSize(14).text(row.qualification_name || `${row.title} ${row.credential_type}`,70,321,{width:w-140,align:'center'});
-  doc.fillColor(ink).font('Helvetica').fontSize(10).text(`COURSE ${row.code}     •     REGISTRATION ${row.reg_no}`,60,h-105,{width:w-120,align:'center'});
-  doc.moveTo(w/2-95,h-78).lineTo(w/2+95,h-78).lineWidth(1).strokeColor(navy).stroke();
-  doc.fillColor(ink).fontSize(9).text('AUTHORIZED SIGNATURE',w/2-95,h-67,{width:190,align:'center'});
+  const style=credentialPalette(row.code),w=doc.page.width,h=doc.page.height;
+  const serif=path.join(__dirname,'public/fonts/HeraldSerif.ttf'), italic=path.join(__dirname,'public/fonts/HeraldSerifItalic.ttf'), sans=path.join(__dirname,'public/fonts/HeraldSans.ttf'), bold=path.join(__dirname,'public/fonts/HeraldSansBold.ttf');
+  doc.registerFont('HeraldSerif',serif); doc.registerFont('HeraldItalic',italic); doc.registerFont('HeraldSans',sans); doc.registerFont('HeraldBold',bold);
+  const title=String(row.title).toUpperCase();
+  const awardType=row.credential_type.toUpperCase();
+  const titleAlign=['center','left','right','center'][style.variant];
+  const titleX=style.variant===3?72:55, titleWidth=w-titleX*2;
+  const qualificationX=style.variant===1?94:80, qualificationWidth=w-qualificationX*2;
+  doc.rect(0,0,w,h).fill(style.paper);
+  // Course-code keyed palette and ornament variant produce a dedicated design
+  // identity for each programme while retaining the Herald institutional frame.
+  doc.save().fillColor(style.accent,0.08).font('HeraldBold').fontSize(66).rotate(-27,{origin:[w/2,h/2]}).text(row.code.toUpperCase(),50,h/2-35,{width:w-100,align:'center'}).restore();
+  for(let i=0;i<9;i++){const y=70+i*43;doc.moveTo(68,y).bezierCurveTo(w*.28,y+(i%2?13:-13),w*.72,y+(i%2?-13:13),w-68,y).lineWidth(.65).strokeColor(style.accent,0.20).stroke();}
+  doc.lineWidth(7).strokeColor(style.navy).rect(24,24,w-48,h-48).stroke();
+  doc.lineWidth(1.5).strokeColor(style.accent).rect(34,34,w-68,h-68).stroke();
+  const corners=[[51,51],[w-51,51],[51,h-51],[w-51,h-51]];
+  corners.forEach(([x,y],i)=>{doc.save().translate(x,y).rotate(i%2?90:0).moveTo(-12,-12).lineTo(0,-27).lineTo(12,-12).lineTo(27,0).lineTo(12,12).lineTo(0,27).lineTo(-12,12).lineTo(-27,0).closePath().lineWidth(1.5).strokeColor(style.accent).stroke().restore();});
+  // Distinct border treatments based on the mapped programme template variant.
+  if(style.variant===1) for(let x=54;x<w-54;x+=14) doc.circle(x,49,1.4).fill(style.accent);
+  if(style.variant===2) { doc.lineWidth(1).strokeColor(style.accent).roundedRect(44,44,w-88,h-88,22).stroke(); }
+  if(style.variant===3) { doc.moveTo(54,62).lineTo(190,62).moveTo(w-190,62).lineTo(w-54,62).moveTo(54,h-62).lineTo(190,h-62).moveTo(w-190,h-62).lineTo(w-54,h-62).lineWidth(1).strokeColor(style.accent).stroke(); }
+  doc.fillColor(style.navy).font('HeraldBold').fontSize(12).text('HERALD TRAINER & CONSULTANT',0,74,{width:w,align:'center',characterSpacing:2});
+  doc.moveTo(w/2-52,99).lineTo(w/2+52,99).lineWidth(2).strokeColor(style.accent).stroke();
+  doc.fillColor(style.accent).font('HeraldSerif').fontSize(30).text(awardType,titleX,116,{width:titleWidth,align:titleAlign,lineGap:2});
+  doc.fillColor('#344454').font('HeraldSans').fontSize(14).text('This is proudly presented to',60,174,{width:w-120,align:'center'});
+  doc.fillColor(style.navy).font('HeraldItalic').fontSize(38).text(row.credential_type==='degree'?row.award_name:row.name,70,201,{width:w-140,align:'center',lineBreak:false,ellipsis:true});
+  doc.moveTo(w/2-125,251).lineTo(w/2+125,251).lineWidth(1).strokeColor(style.accent).stroke();
+  doc.fillColor('#344454').font('HeraldSans').fontSize(14).text(row.credential_type==='degree'?'for the award of':'for successfully completing',60,269,{width:w-120,align:'center'});
+  doc.fillColor(style.navy).font('HeraldSerif').fontSize(22+style.variant*1.5).text(title,qualificationX,293,{width:qualificationWidth,align:titleAlign,height:60,ellipsis:true});
+  if(row.credential_type==='degree' && row.partner_university) doc.fillColor('#344454').font('HeraldSans').fontSize(11).text(`In partnership with ${row.partner_university}`,60,359,{width:w-120,align:'center'});
+  doc.save().fillColor(style.accent,0.035).font('HeraldBold').fontSize(12).text(`PROGRAMME  ${row.code}     •     REGISTRATION  ${row.reg_no}`,60,h-91,{width:w-120,align:'center'}).restore();
+  doc.moveTo(w/2-95,h-68).lineTo(w/2+95,h-68).lineWidth(1).strokeColor(style.navy).stroke();
+  doc.fillColor('#344454').font('HeraldSans').fontSize(9).text('AUTHORIZED SIGNATURE',w/2-95,h-58,{width:190,align:'center'});
   doc.end();
 });
 
@@ -1565,7 +1627,7 @@ app.get('/api/student/transcript/pdf', authStudent, async (req, res) => {
     const transcriptName = safeTerm
       ? `Herald-Transcript-${student.reg_no}-${safeTerm}.pdf`
       : `Herald-Transcript-${student.reg_no}.pdf`;
-    res.setHeader('Content-Disposition', `attachment; filename="${transcriptName}"`);
+    res.setHeader('Content-Disposition', `${req.query.view === '1' ? 'inline' : 'attachment'}; filename="${transcriptName}"`);
 
     // Pipe the PDF directly to the response
     doc.pipe(res);
