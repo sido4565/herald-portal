@@ -52,6 +52,28 @@
       else document.getElementById('examCardName').textContent = 'Upload your passport photo from the dashboard to activate your exam card.';
     }).catch(error => { document.getElementById('examCardName').textContent = error.message; });
     document.getElementById('examCardPhoto').addEventListener('error', function () { this.style.display = 'none'; });
+    document.getElementById('downloadExamCard').addEventListener('click', async event => {
+      event.preventDefault();
+      const status = document.getElementById('examCardFeeStatus');
+      status.textContent = 'Preparing your exam card…';
+      try {
+        const response = await fetch(event.currentTarget.href, { credentials: 'same-origin' });
+        if (!response.ok) {
+          const result = await response.json().catch(() => ({}));
+          throw new Error(result.error || 'Exam card download failed.');
+        }
+        const blobUrl = URL.createObjectURL(await response.blob());
+        const download = document.createElement('a');
+        download.href = blobUrl;
+        download.download = 'Herald-Exam-Card.pdf';
+        download.click();
+        setTimeout(() => URL.revokeObjectURL(blobUrl), 10000);
+        status.textContent = 'Exam card downloaded.';
+      } catch (error) {
+        status.textContent = error.message;
+        if (/photo/i.test(error.message)) status.insertAdjacentHTML('beforeend', ' <a href="dashboard.html" style="color:#fff;text-decoration:underline">Return to dashboard to upload a replacement</a>.');
+      }
+    });
 
     fetch('/api/my-fees', { credentials: 'same-origin' }).then(r => r.json()).then(fees => {
       const cleared = Array.isArray(fees) && fees.length > 0 && fees.reduce((balance, fee) => balance + Number(fee.amount_due) - Number(fee.amount_paid), 0) <= 0;

@@ -120,7 +120,12 @@
   <div style="display:flex;align-items:center;justify-content:space-between;gap:18px;flex-wrap:wrap;">
     <div><h2 style="margin: 0 0 8px; font-size: 26px;">Welcome, <span id="welcomeName"></span></h2>
       <p style="margin: 0; opacity: 0.92;">Reg No <strong id="regNo"></strong> &middot; <span id="studentCourse"></span></p></div>
-    <img id="studentPassportPhoto" alt="Your passport photo" style="width:92px;height:116px;object-fit:cover;border:3px solid rgba(255,255,255,.85);border-radius:8px;background:#fff;" />
+    <div style="display:flex;align-items:center;gap:10px;">
+      <img id="studentPassportPhoto" alt="Your passport photo" hidden style="width:92px;height:116px;object-fit:cover;border:3px solid rgba(255,255,255,.85);border-radius:8px;background:#fff;" />
+      <div><button id="replacePassportPhotoBtn" type="button" class="btn-ghost" style="color:#fff;border-color:rgba(255,255,255,.7);">Upload / replace photo</button>
+        <input id="replacePassportPhotoInput" type="file" accept="image/jpeg,image/png" hidden />
+        <p id="replacePassportPhotoMsg" aria-live="polite" style="max-width:180px;margin:6px 0 0;font-size:11px;"></p></div>
+    </div>
   </div>
 </section>
 

@@ -749,10 +749,22 @@ app.post('/api/student/passport-photo', authStudent, passportPhotoUpload.single(
   }
 });
 
+async function markPassportPhotoMissing(studentId, photoKey) {
+  await db.execute({
+    sql: `UPDATE students SET passport_photo_key=NULL, passport_photo_storage=NULL,
+          passport_photo_mime=NULL, passport_required=1, passport_notice_sent=0
+          WHERE id=? AND passport_photo_key IS ?`,
+    args: [studentId, photoKey || null],
+  });
+}
+
 app.get('/api/student/passport-photo', authStudent, async (req, res) => {
   const result = await db.execute({ sql: 'SELECT passport_photo_key, passport_photo_storage, passport_photo_mime FROM students WHERE id = ?', args: [req.user.id] });
   const photo = result.rows[0];
-  if (!photo?.passport_photo_key) return res.status(404).json({ error: 'No passport photo uploaded.' });
+  if (!photo?.passport_photo_key) {
+    await markPassportPhotoMissing(req.user.id, null);
+    return res.status(404).json({ error: 'No passport photo uploaded. Upload one from your dashboard.' });
+  }
   try {
     if (photo.passport_photo_storage === 'r2-private' && r2 && R2_PRIVATE_BUCKET) {
       const object = await r2.send(new GetObjectCommand({ Bucket: R2_PRIVATE_BUCKET, Key: photo.passport_photo_key }));
@@ -761,11 +773,18 @@ app.get('/api/student/passport-photo', authStudent, async (req, res) => {
       return object.Body.pipe(res);
     }
     const file = path.join(PRIVATE_MATERIALS_DIR, path.basename(photo.passport_photo_key));
-    if (!fs.existsSync(file)) return res.status(404).json({ error: 'Photo file is missing.' });
+    if (!fs.existsSync(file)) {
+      await markPassportPhotoMissing(req.user.id, photo.passport_photo_key);
+      return res.status(410).json({ error: 'Your saved photo is unavailable. Upload a replacement from your dashboard.' });
+    }
     res.setHeader('Content-Type', photo.passport_photo_mime || 'image/jpeg');
     res.setHeader('Cache-Control', 'private, no-store');
     res.sendFile(file);
   } catch (err) {
+    if (['NoSuchKey', 'NotFound'].includes(err?.name) || Number(err?.$metadata?.httpStatusCode) === 404) {
+      await markPassportPhotoMissing(req.user.id, photo.passport_photo_key);
+      return res.status(410).json({ error: 'Your saved photo is unavailable. Upload a replacement from your dashboard.' });
+    }
     console.error('Passport photo read failed:', err.message);
     res.status(500).json({ error: 'Could not load passport photo.' });
   }
@@ -4792,8 +4811,15 @@ app.get('/api/student/exam-card/pdf', authStudent, async (req, res) => {
     if (Number(student.fee_count) === 0 || Number(student.balance) > 0) {
       return res.status(403).json({ error: 'Clear all outstanding fees before downloading your exam card.' });
     }
-    const photo = await getPrivateMaterialBytes({ storage_key: student.passport_photo_key, storage_type: student.passport_photo_storage });
-    if (!photo) return res.status(409).json({ error: 'Upload or replace your passport photo before downloading your exam card.' });
+    let photo;
+    try { photo = await getPrivateMaterialBytes({ storage_key: student.passport_photo_key, storage_type: student.passport_photo_storage }); }
+    catch (err) {
+      if (!['NoSuchKey', 'NotFound'].includes(err?.name) && Number(err?.$metadata?.httpStatusCode) !== 404) throw err;
+    }
+    if (!photo) {
+      await markPassportPhotoMissing(req.user.id, student.passport_photo_key);
+      return res.status(409).json({ error: 'Your saved passport photo is unavailable. Upload a replacement from your dashboard, then download the exam card again.' });
+    }
 
     const doc = new PDFDocument({ size: 'A6', margin: 24, compress: true });
     const chunks = [];

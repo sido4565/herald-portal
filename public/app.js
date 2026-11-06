@@ -293,6 +293,14 @@ async function loadStudentCredentials() {
   }
 }
 
+async function uploadStudentPassportPhoto(file) {
+  const data = new FormData();
+  data.append('photo', file);
+  const response = await fetch('/api/student/passport-photo', { method: 'POST', body: data, credentials: 'same-origin' });
+  const result = await response.json();
+  if (!response.ok) throw new Error(result.error || 'Photo upload failed.');
+}
+
 async function loadDashboard() {
   const meRes = await fetch('/api/me');
   if (!meRes.ok) return (location.href = 'login.html');
@@ -316,14 +324,10 @@ async function loadDashboard() {
       const input = document.getElementById('passportPhotoInput');
       const message = document.getElementById('passportPhotoMsg');
       if (!input.files?.[0]) return;
-      const data = new FormData();
-      data.append('photo', input.files[0]);
       document.getElementById('passportPhotoSubmit').disabled = true;
       message.textContent = 'Uploading photo…';
       try {
-        const response = await fetch('/api/student/passport-photo', { method: 'POST', body: data, credentials: 'same-origin' });
-        const result = await response.json();
-        if (!response.ok) throw new Error(result.error || 'Upload failed.');
+        await uploadStudentPassportPhoto(input.files[0]);
         location.reload();
       } catch (error) {
         message.textContent = error.message;
@@ -333,9 +337,28 @@ async function loadDashboard() {
     return;
   }
   const studentPhoto = document.getElementById('studentPassportPhoto');
+  const replacePhotoBtn = document.getElementById('replacePassportPhotoBtn');
+  const replacePhotoInput = document.getElementById('replacePassportPhotoInput');
+  const replacePhotoMsg = document.getElementById('replacePassportPhotoMsg');
+  replacePhotoBtn.addEventListener('click', () => replacePhotoInput.click());
+  replacePhotoInput.addEventListener('change', async () => {
+    const file = replacePhotoInput.files?.[0];
+    if (!file) return;
+    replacePhotoBtn.disabled = true;
+    replacePhotoMsg.textContent = 'Uploading photo…';
+    try {
+      await uploadStudentPassportPhoto(file);
+      location.reload();
+    } catch (error) {
+      replacePhotoMsg.textContent = error.message;
+      replacePhotoBtn.disabled = false;
+      replacePhotoInput.value = '';
+    }
+  });
   if (me.passport_photo_key) {
     studentPhoto.src = '/api/student/passport-photo';
-    studentPhoto.addEventListener('error', () => { studentPhoto.hidden = true; });
+    studentPhoto.addEventListener('load', () => { studentPhoto.hidden = false; });
+    studentPhoto.addEventListener('error', () => { studentPhoto.hidden = true; replacePhotoMsg.textContent = 'Saved photo could not be loaded. Upload a replacement.'; });
   } else studentPhoto.hidden = true;
   loadStudentCredentials();
 
@@ -431,6 +454,27 @@ async function loadDashboard() {
     const feesCleared = fees.length > 0 && balance <= 0;
     if (examCardStatus) examCardStatus.textContent = feesCleared ? 'Fees cleared' : 'Clear fees to download your exam card';
     if (downloadExamCard) downloadExamCard.style.display = feesCleared ? 'inline-block' : 'none';
+    if (downloadExamCard) downloadExamCard.addEventListener('click', async event => {
+      event.preventDefault();
+      examCardStatus.textContent = 'Preparing your exam card…';
+      try {
+        const response = await fetch(downloadExamCard.href, { credentials: 'same-origin' });
+        if (!response.ok) {
+          const result = await response.json().catch(() => ({}));
+          throw new Error(result.error || 'Exam card download failed.');
+        }
+        const blobUrl = URL.createObjectURL(await response.blob());
+        const download = document.createElement('a');
+        download.href = blobUrl;
+        download.download = 'Herald-Exam-Card.pdf';
+        download.click();
+        setTimeout(() => URL.revokeObjectURL(blobUrl), 10000);
+        examCardStatus.textContent = 'Exam card downloaded.';
+      } catch (error) {
+        examCardStatus.textContent = error.message;
+        if (/photo/i.test(error.message)) document.getElementById('replacePassportPhotoBtn').focus();
+      }
+    });
 
     document.getElementById('feesSummary').innerHTML = `
       <div class="fee-summary-grid">
