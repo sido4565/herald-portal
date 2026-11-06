@@ -266,7 +266,6 @@ if (document.getElementById('announcements')) {
   const themeBtn = document.getElementById('themeToggle');
   if (themeBtn) themeBtn.addEventListener('click', toggleTheme);
 
-  loadStudentCredentials();
   loadDashboard();
 }
 
@@ -299,15 +298,45 @@ async function loadDashboard() {
   if (!meRes.ok) return (location.href = 'login.html');
   const me = await meRes.json();
 
-  document.getElementById('userName').textContent = me.name;
-  document.getElementById('welcomeName').textContent = me.name;
-  document.getElementById('regNo').textContent = me.reg_no;
-  document.getElementById('studentCourse').textContent = me.course;
-
   document.getElementById('logoutBtn').addEventListener('click', async () => {
     await fetch('/api/logout', { method: 'POST' });
     location.href = 'login.html';
   });
+  document.getElementById('userName').textContent = me.name;
+
+  const passportGate = document.getElementById('passportPhotoGate');
+  if (Number(me.passport_required) === 1 && !me.passport_photo_key) {
+    for (const child of document.querySelector('main.container').children) {
+      if (child !== passportGate) child.style.display = 'none';
+    }
+    passportGate.style.display = 'block';
+    const form = document.getElementById('passportPhotoForm');
+    form.addEventListener('submit', async event => {
+      event.preventDefault();
+      const input = document.getElementById('passportPhotoInput');
+      const message = document.getElementById('passportPhotoMsg');
+      if (!input.files?.[0]) return;
+      const data = new FormData();
+      data.append('photo', input.files[0]);
+      document.getElementById('passportPhotoSubmit').disabled = true;
+      message.textContent = 'Uploading photo…';
+      try {
+        const response = await fetch('/api/student/passport-photo', { method: 'POST', body: data, credentials: 'same-origin' });
+        const result = await response.json();
+        if (!response.ok) throw new Error(result.error || 'Upload failed.');
+        location.reload();
+      } catch (error) {
+        message.textContent = error.message;
+        document.getElementById('passportPhotoSubmit').disabled = false;
+      }
+    });
+    return;
+  }
+  loadStudentCredentials();
+
+  document.getElementById('welcomeName').textContent = me.name;
+  document.getElementById('regNo').textContent = me.reg_no;
+  document.getElementById('studentCourse').textContent = me.course;
 
   // ─── Announcements ───
   try {

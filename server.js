@@ -456,6 +456,15 @@ const materialUpload = multer({
   },
 });
 
+const passportPhotoUpload = multer({
+  storage,
+  limits: { fileSize: 5 * 1024 * 1024 },
+  fileFilter: (req, file, cb) => {
+    if (!['image/jpeg', 'image/png'].includes(file.mimetype)) return cb(new Error('Upload a JPEG or PNG passport photo.'));
+    cb(null, true);
+  },
+});
+
 // Legacy static route — still serves old local uploads if any exist
 app.use('/uploads', express.static(UPLOAD_DIR, {
   setHeaders: (res) => {
@@ -472,7 +481,19 @@ function authStudent(req, res, next) {
   try {
     const p = jwt.verify(req.cookies.token, JWT_SECRET);
     if (p.type !== 'student') return res.status(403).json({ error: 'Student only' });
-    req.user = p; next();
+    req.user = p;
+    if (req.path !== '/api/me' && req.path !== '/api/student/passport-photo' && req.path !== '/api/logout') {
+      db.execute({ sql: 'SELECT passport_required, passport_photo_key FROM students WHERE id = ?', args: [p.id] })
+        .then(result => {
+          const student = result.rows[0];
+          if (student && Number(student.passport_required) === 1 && !student.passport_photo_key) {
+            return res.status(423).json({ error: 'Upload your passport photo to activate your dashboard.', code: 'PASSPORT_PHOTO_REQUIRED' });
+          }
+          next();
+        }).catch(() => res.status(500).json({ error: 'Could not verify student profile requirements.' }));
+      return;
+    }
+    next();
   } catch { res.status(401).json({ error: 'Not authenticated' }); }
 }
 function authAdmin(req, res, next) {
@@ -731,10 +752,46 @@ app.post('/api/logout', (req, res) => { res.clearCookie('token'); res.json({ ok:
 
 app.get('/api/me', authStudent, async (req, res) => {
   const r = await db.execute({
-    sql: 'SELECT id, reg_no, name, email, course FROM students WHERE id = ?',
+    sql: 'SELECT id, reg_no, name, email, course, passport_required, passport_photo_key FROM students WHERE id = ?',
     args: [req.user.id],
   });
   res.json(r.rows[0]);
+});
+
+app.post('/api/student/passport-photo', authStudent, passportPhotoUpload.single('photo'), async (req, res) => {
+  if (!req.file) return res.status(400).json({ error: 'Choose a passport photo to upload.' });
+  try {
+    const saved = await savePrivateMaterialFile({ ...req.file, originalname: `student-${req.user.id}-passport.${req.file.mimetype === 'image/png' ? 'png' : 'jpg'}` });
+    const old = await db.execute({ sql: 'SELECT passport_photo_key, passport_photo_storage FROM students WHERE id = ?', args: [req.user.id] });
+    await db.execute({ sql: 'UPDATE students SET passport_photo_key = ?, passport_photo_storage = ?, passport_photo_mime = ?, passport_required = 0 WHERE id = ?', args: [saved.storage_key, saved.storage_type, req.file.mimetype, req.user.id] });
+    if (old.rows[0]?.passport_photo_key) await deletePrivateMaterialFile(old.rows[0].passport_photo_key, old.rows[0].passport_photo_storage);
+    res.json({ ok: true, passport_required: 0 });
+  } catch (err) {
+    console.error('Passport photo upload failed:', err.message);
+    res.status(500).json({ error: 'Photo upload failed. Please try again.' });
+  }
+});
+
+app.get('/api/student/passport-photo', authStudent, async (req, res) => {
+  const result = await db.execute({ sql: 'SELECT passport_photo_key, passport_photo_storage, passport_photo_mime FROM students WHERE id = ?', args: [req.user.id] });
+  const photo = result.rows[0];
+  if (!photo?.passport_photo_key) return res.status(404).json({ error: 'No passport photo uploaded.' });
+  try {
+    if (photo.passport_photo_storage === 'r2-private' && r2 && R2_PRIVATE_BUCKET) {
+      const object = await r2.send(new GetObjectCommand({ Bucket: R2_PRIVATE_BUCKET, Key: photo.passport_photo_key }));
+      res.setHeader('Content-Type', photo.passport_photo_mime || 'image/jpeg');
+      res.setHeader('Cache-Control', 'private, no-store');
+      return object.Body.pipe(res);
+    }
+    const file = path.join(PRIVATE_MATERIALS_DIR, path.basename(photo.passport_photo_key));
+    if (!fs.existsSync(file)) return res.status(404).json({ error: 'Photo file is missing.' });
+    res.setHeader('Content-Type', photo.passport_photo_mime || 'image/jpeg');
+    res.setHeader('Cache-Control', 'private, no-store');
+    res.sendFile(file);
+  } catch (err) {
+    console.error('Passport photo read failed:', err.message);
+    res.status(500).json({ error: 'Could not load passport photo.' });
+  }
 });
 
 async function hasOpenLecturerVacancy() {
@@ -1573,6 +1630,7 @@ async function getIssuedCredential(studentId,courseId) {
       COALESCE(sc.award_name,'') award_name,COALESCE(sc.qualification_name,'') qualification_name,
       COALESCE(sc.partner_university,'') partner_university,sc.certificate_id,sc.approved_at completion_date,
       COALESCE(sc.approved,0) approved,COALESCE(sc.course_completed,0) course_completed,COALESCE(sc.fees_completed,0) fees_completed,
+      s.passport_photo_key,s.passport_photo_storage,s.passport_photo_mime,
       MAX(CASE WHEN UPPER(COALESCE(r.grade,'')) IN ('A','A-','B+','B','B-','C+','C','D','PASS','PASSED') OR COALESCE(r.marks,0)>=45 THEN 1 ELSE 0 END) academic_complete,
       COALESCE((SELECT SUM(f.amount_due-COALESCE(f.amount_paid,0)) FROM fees f WHERE f.student_id=s.id),0) balance
     FROM enrollments e JOIN students s ON s.id=e.student_id JOIN courses c ON c.id=e.course_id
@@ -1588,7 +1646,9 @@ async function getIssuedCredential(studentId,courseId) {
   const qrDataUrl=await QRCode.toDataURL(verificationUrl,{errorCorrectionLevel:'H',margin:1,width:240,color:{dark:'#20242b',light:'#ffffff'}});
   const courseCategory=row.course_category==='general'?inferCredentialCategory(row.title):row.course_category;
   const design=credentialDesign(row.code,courseCategory);
-  return {...row,studentName,courseName,completionDate:row.completion_date,instructorName:row.instructor_name,certificateId:row.certificate_id,courseCategory,templateFamily:design.family,theme:design,verificationUrl,qrDataUrl};
+  const photoBytes = await getPrivateMaterialBytes({ storage_key: row.passport_photo_key, storage_type: row.passport_photo_storage });
+  const photoDataUrl = photoBytes ? `data:${row.passport_photo_mime || 'image/jpeg'};base64,${photoBytes.toString('base64')}` : '';
+  return {...row,studentName,courseName,completionDate:row.completion_date,instructorName:row.instructor_name,certificateId:row.certificate_id,courseCategory,templateFamily:design.family,theme:design,verificationUrl,qrDataUrl,photoDataUrl,photoBytes};
 }
 async function renderCredentialPdf(row) {
   const doc=new PDFDocument({size:'A4',layout:'landscape',margin:0,compress:true});
@@ -1650,7 +1710,11 @@ async function renderCredentialPdf(row) {
   if(row.credential_type==='degree'&&row.partner_university) doc.font('HeraldSans').fontSize(9).text(`In partnership with ${row.partner_university}`,55,311,{width:w-110,align:'center',lineBreak:false,ellipsis:true});
   if(family==='formal'){
     doc.save().fillColor('#fffaf0').strokeColor(theme.accent).lineWidth(1.2).rect(w-116,55,62,78).fillAndStroke().restore();
-    doc.fillColor(theme.ink).font('HeraldSans').fontSize(6.5).text('STUDENT PHOTO',w-112,89,{width:54,align:'center',lineBreak:false});
+    if(row.photoBytes){
+      doc.save();
+      try { doc.rect(w-113,58,56,72).clip();doc.image(row.photoBytes,w-113,58,{fit:[56,72],align:'center',valign:'center'}); }
+      finally { doc.restore(); }
+    } else doc.fillColor(theme.ink).font('HeraldSans').fontSize(6.5).text('STUDENT PHOTO',w-112,89,{width:54,align:'center',lineBreak:false});
     doc.fillColor(theme.brand).font('HeraldSerif').fontSize(9).text('In testimony whereof, this credential is issued by the Institute.',100,335,{width:w-200,align:'center',lineBreak:false,ellipsis:true});
   }
   // Course-specific medal/seal, with a distinct silhouette in each design family.
@@ -2592,7 +2656,7 @@ app.post('/api/admin/students/:id/approve', authAdmin, async (req, res) => {
   try {
     // 1. Update status to active
     await db.execute({ 
-      sql: "UPDATE students SET status = 'active' WHERE id = ?", 
+      sql: "UPDATE students SET status = 'active', passport_required = 1 WHERE id = ?",
       args: [req.params.id] 
     });
 

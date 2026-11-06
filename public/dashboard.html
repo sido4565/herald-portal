@@ -86,6 +86,17 @@
   </header>
 
   <main class="container">
+    <section id="passportPhotoGate" class="card wide" style="display:none;max-width:680px;margin:8vh auto;padding:28px;border-top:5px solid #b77b16;">
+      <p style="margin:0 0 6px;color:#9a6710;font-size:11px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;">Required to activate your dashboard</p>
+      <h1 style="margin:0 0 8px;font-size:24px;">Upload your passport photo</h1>
+      <p style="color:var(--muted);">Your photo will be kept private and used on your academic certificates. Upload a clear, recent JPEG or PNG image (maximum 5 MB).</p>
+      <form id="passportPhotoForm">
+        <label for="passportPhotoInput">Passport photo</label>
+        <input id="passportPhotoInput" name="photo" type="file" accept="image/jpeg,image/png" required />
+        <button id="passportPhotoSubmit" class="btn-primary" type="submit" style="margin-top:14px;">Upload photo and activate dashboard</button>
+        <p id="passportPhotoMsg" class="msg" aria-live="polite"></p>
+      </form>
+    </section>
     <div id="liveClassNotice" role="status" aria-live="polite" style="display:none; align-items:center; justify-content:space-between; gap:16px; flex-wrap:wrap; background:#eff6ff; border:1px solid #bfdbfe; border-left:5px solid #2563eb; border-radius:10px; padding:16px 20px; margin-bottom:20px; color:#10243a;">
       <div>
         <div id="liveClassNoticeLabel" style="font-size:11px; font-weight:800; letter-spacing:.06em; color:#1d4ed8; text-transform:uppercase; margin-bottom:4px;"></div>

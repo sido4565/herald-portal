@@ -27,6 +27,10 @@ async function initSchema() {
       password TEXT NOT NULL,
       course TEXT NOT NULL,
       active INTEGER DEFAULT 1,
+      passport_photo_key TEXT,
+      passport_photo_storage TEXT,
+      passport_photo_mime TEXT,
+      passport_required INTEGER NOT NULL DEFAULT 0,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP
     )`,
     `CREATE TABLE IF NOT EXISTS admins (
@@ -351,6 +355,13 @@ async function initSchema() {
 
   for (const sql of statements) {
     await client.execute(sql);
+  }
+  const studentColumns = await client.execute('PRAGMA table_info(students)');
+  for (const [name, definition] of [
+    ['passport_photo_key', 'TEXT'], ['passport_photo_storage', 'TEXT'], ['passport_photo_mime', 'TEXT'],
+    ['passport_required', 'INTEGER NOT NULL DEFAULT 0'],
+  ]) {
+    if (!studentColumns.rows.some(column => column.name === name)) await client.execute(`ALTER TABLE students ADD COLUMN ${name} ${definition}`);
   }
   const studentCredentialColumns = await client.execute('PRAGMA table_info(student_credentials)');
   for (const [name, definition] of [['course_completed','INTEGER NOT NULL DEFAULT 0'],['fees_completed','INTEGER NOT NULL DEFAULT 0'],['partner_university',"TEXT NOT NULL DEFAULT ''"]]) {
