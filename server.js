@@ -521,6 +521,32 @@ function sendMailSafe(fnName, payload) {
   mailer[fnName](payload).catch(err => console.error(`✉️  ${fnName} failed:`, err.message));
 }
 
+async function notifyActiveStudentsMissingPassportPhotos() {
+  if (!mailer || !mailer.ENABLED || typeof mailer.sendMail !== 'function') return;
+  try {
+    const students = await db.execute({ sql: `SELECT id, name, email FROM students
+      WHERE status = 'active' AND active = 1 AND passport_required = 1
+        AND passport_photo_key IS NULL AND passport_notice_sent = 0` });
+    const baseUrl = String(process.env.APP_URL || process.env.PUBLIC_BASE_URL || 'https://heraldtrainer.co.ke').replace(/\/$/, '');
+    for (const student of students.rows) {
+      const name = String(student.name || 'Student').replace(/[&<>"']/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char]));
+      try {
+        await mailer.sendMail({
+          to: student.email,
+          subject: 'Action required: Upload your passport photo',
+          text: `Hello ${student.name || 'Student'}, please upload a recent passport photo to your Herald Portal dashboard. Your dashboard functions will remain locked until the photo is uploaded. Sign in at ${baseUrl}/login.html.`,
+          html: `<p>Hello ${name},</p><p>Please upload a recent passport photo to your Herald Portal dashboard. Your dashboard functions will remain locked until the photo is uploaded. The photo will be kept private and used on your academic certificates.</p><p><a href="${baseUrl}/login.html">Sign in to upload your photo</a></p>`,
+        });
+        await db.execute({ sql: 'UPDATE students SET passport_notice_sent = 1 WHERE id = ? AND passport_photo_key IS NULL', args: [student.id] });
+      } catch (err) {
+        console.error(`Passport photo reminder failed for student ${student.id}:`, err.message);
+      }
+    }
+  } catch (err) {
+    console.error('Could not send passport photo reminders:', err.message);
+  }
+}
+
 // ---------- Google Sheets webhook ----------
 const GOOGLE_SHEETS_WEBHOOK_URL = process.env.GOOGLE_SHEETS_WEBHOOK_URL;
 
@@ -4777,6 +4803,8 @@ app.post('/api/help/ask', async (req, res) => {
 
 
 app.listen(PORT, () => console.log(`Herald Portal running on http://localhost:${PORT}`));
+setTimeout(notifyActiveStudentsMissingPassportPhotos, 15000);
+setInterval(notifyActiveStudentsMissingPassportPhotos, 6 * 60 * 60 * 1000).unref();
 
 app.get('/api/student/exams', authStudent, async (req, res) => {
   try {
