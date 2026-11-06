@@ -426,6 +426,11 @@ async function loadDashboard() {
     const totalDue  = fees.reduce((s, f) => s + Number(f.amount_due), 0);
     const totalPaid = fees.reduce((s, f) => s + Number(f.amount_paid), 0);
     const balance   = totalDue - totalPaid;
+    const examCardStatus = document.getElementById('examCardDownloadStatus');
+    const downloadExamCard = document.getElementById('downloadExamCardBtn');
+    const feesCleared = fees.length > 0 && balance <= 0;
+    if (examCardStatus) examCardStatus.textContent = feesCleared ? 'Fees cleared' : 'Clear fees to download your exam card';
+    if (downloadExamCard) downloadExamCard.style.display = feesCleared ? 'inline-block' : 'none';
 
     document.getElementById('feesSummary').innerHTML = `
       <div class="fee-summary-grid">

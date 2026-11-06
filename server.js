@@ -4780,6 +4780,63 @@ app.get('/api/student/exams', authStudent, async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
+app.get('/api/student/exam-card/pdf', authStudent, async (req, res) => {
+  try {
+    const result = await db.execute({ sql: `SELECT s.id,s.name,s.reg_no,s.course,s.passport_photo_key,s.passport_photo_storage,
+        s.passport_photo_mime,COUNT(f.id) fee_count,COALESCE(SUM(f.amount_due),0) amount_due,
+        COALESCE(SUM(f.amount_paid),0) amount_paid,
+        COALESCE(SUM(f.amount_due-COALESCE(f.amount_paid,0)),0) balance
+      FROM students s LEFT JOIN fees f ON f.student_id=s.id WHERE s.id=? GROUP BY s.id`, args: [req.user.id] });
+    const student = result.rows[0];
+    if (!student) return res.status(404).json({ error: 'Student record not found.' });
+    if (Number(student.fee_count) === 0 || Number(student.balance) > 0) {
+      return res.status(403).json({ error: 'Clear all outstanding fees before downloading your exam card.' });
+    }
+    const photo = await getPrivateMaterialBytes({ storage_key: student.passport_photo_key, storage_type: student.passport_photo_storage });
+    if (!photo) return res.status(409).json({ error: 'Upload or replace your passport photo before downloading your exam card.' });
+
+    const doc = new PDFDocument({ size: 'A6', margin: 24, compress: true });
+    const chunks = [];
+    const pdfReady = new Promise((resolve, reject) => {
+      doc.on('data', chunk => chunks.push(chunk));
+      doc.on('end', () => resolve(Buffer.concat(chunks)));
+      doc.on('error', reject);
+    });
+    const width = doc.page.width, height = doc.page.height;
+    doc.rect(0, 0, width, height).fill('#f8fafc');
+    doc.lineWidth(2).strokeColor('#b8860b').roundedRect(12, 12, width - 24, height - 24, 9).stroke();
+    doc.rect(14, 14, width - 28, 74).fill('#10243a');
+    doc.fillColor('#ffffff').font('Helvetica-Bold').fontSize(10).text('HERALD TRAINER & CONSULTANT', 26, 30, { width: width - 52, align: 'center' });
+    doc.fillColor('#f1d38b').fontSize(16).text('STUDENT EXAM CARD', 26, 52, { width: width - 52, align: 'center' });
+
+    const photoX = width - 107;
+    doc.save().lineWidth(1).strokeColor('#b8860b').roundedRect(photoX - 2, 104, 74, 92, 4).stroke().restore();
+    doc.image(photo, photoX, 106, { fit: [70, 88], align: 'center', valign: 'center' });
+    doc.fillColor('#64748b').font('Helvetica-Bold').fontSize(7).text('STUDENT NAME', 26, 108);
+    doc.fillColor('#10243a').font('Helvetica-Bold').fontSize(12).text(String(student.name || ''), 26, 120, { width: photoX - 38, height: 48, lineGap: 2, ellipsis: true });
+    doc.fillColor('#64748b').font('Helvetica-Bold').fontSize(7).text('REGISTRATION NUMBER', 26, 174);
+    doc.fillColor('#10243a').font('Helvetica').fontSize(10).text(String(student.reg_no || ''), 26, 186, { width: photoX - 38, lineBreak: false, ellipsis: true });
+
+    doc.moveTo(26, 214).lineTo(width - 26, 214).lineWidth(.7).strokeColor('#cbd5e1').stroke();
+    doc.fillColor('#64748b').font('Helvetica-Bold').fontSize(7).text('PROGRAMME', 26, 228);
+    doc.fillColor('#10243a').font('Helvetica-Bold').fontSize(11).text(String(student.course || ''), 26, 241, { width: width - 52, height: 46, lineGap: 2, ellipsis: true });
+
+    doc.save().fillColor('#e8f4ee').roundedRect(26, 300, width - 52, 34, 6).fill().restore();
+    doc.fillColor('#166534').font('Helvetica-Bold').fontSize(10).text('FEES CLEARED', 34, 312, { width: width - 68, align: 'center' });
+    doc.moveTo(26, 350).lineTo(width - 26, 350).lineWidth(.7).strokeColor('#cbd5e1').stroke();
+    doc.fillColor('#475569').font('Helvetica').fontSize(7).text(`Issued ${new Date().toLocaleDateString('en-KE')}`, 26, 364, { width: width - 52, align: 'center' });
+    doc.end();
+    const pdf = await pdfReady;
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename="Herald-Exam-Card-${String(student.reg_no).replace(/[^A-Za-z0-9-]/g, '')}.pdf"`);
+    res.setHeader('Cache-Control', 'private, no-store');
+    res.send(pdf);
+  } catch (err) {
+    console.error('Exam card PDF generation failed:', err.stack || err.message);
+    res.status(500).json({ error: 'Could not generate your exam card.' });
+  }
+});
+
 app.post('/api/student/exams/:id/start', authStudent, async (req, res) => {
   const examId = req.params.id;
   try {

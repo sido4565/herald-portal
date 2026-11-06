@@ -38,7 +38,7 @@
     <h1>My Exams</h1>
     <section class="student-exam-card" aria-label="Student exam card">
       <img id="examCardPhoto" alt="Student passport photo" />
-      <div><strong id="examCardName">Loading student details…</strong><p>Registration No: <span id="examCardReg"></span></p><p id="examCardCourse"></p></div>
+      <div style="flex:1"><strong id="examCardName">Loading student details…</strong><p>Registration No: <span id="examCardReg"></span></p><p id="examCardCourse"></p><p id="examCardFeeStatus">Checking fee clearance…</p><a id="downloadExamCard" href="/api/student/exam-card/pdf" style="display:none;color:#fff;background:#b8860b;padding:8px 12px;border-radius:6px;font-size:12px;font-weight:700;text-decoration:none;">Download Exam Card</a></div>
     </section>
     <div id="examsList"><p class="empty">Loading...</p></div>
   </div>
@@ -52,6 +52,12 @@
       else document.getElementById('examCardName').textContent = 'Upload your passport photo from the dashboard to activate your exam card.';
     }).catch(error => { document.getElementById('examCardName').textContent = error.message; });
     document.getElementById('examCardPhoto').addEventListener('error', function () { this.style.display = 'none'; });
+
+    fetch('/api/my-fees', { credentials: 'same-origin' }).then(r => r.json()).then(fees => {
+      const cleared = Array.isArray(fees) && fees.length > 0 && fees.reduce((balance, fee) => balance + Number(fee.amount_due) - Number(fee.amount_paid), 0) <= 0;
+      document.getElementById('examCardFeeStatus').textContent = cleared ? 'Fees cleared' : 'Clear your outstanding fees to download the exam card.';
+      if (cleared) document.getElementById('downloadExamCard').style.display = 'inline-block';
+    }).catch(() => { document.getElementById('examCardFeeStatus').textContent = 'Fee clearance could not be checked.'; });
 
     fetch('/api/student/exams', { credentials: 'same-origin' })
       .then(r => r.json())
