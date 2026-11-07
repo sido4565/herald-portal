@@ -444,14 +444,10 @@
         return;
       }
 
-      const now = Date.now();
       wrap.innerHTML = classes.map(c => {
         const start = new Date(c.scheduled_at);
-        const end = new Date(start.getTime() + (c.duration_minutes || 60) * 60000);
-        let status = 'upcoming';
-        let badge = 'pill pill-amber';
-        if (now >= start && now <= end) { status = 'live now'; badge = 'pill pill-green'; }
-        else if (now > end) { status = 'ended'; badge = 'pill'; }
+        const status = c.status || 'SCHEDULED';
+        const badge = status === 'LIVE' ? 'pill pill-green' : status === 'COMPLETED' ? 'pill' : 'pill pill-amber';
 
         return `
           <div class="card" style="padding:16px; border:1px solid var(--border); border-radius:10px;">
@@ -467,12 +463,29 @@
             </div>
             ${c.description ? `<p style="margin:10px 0; color:var(--muted); font-size:13px;">${esc(c.description)}</p>` : ''}
             <div style="display:flex; gap:8px; margin-top:12px; flex-wrap:wrap;">
-              <a href="${esc(c.meeting_url)}" target="_blank" class="btn-xs" style="text-decoration:none;">🔗 Join Link</a>
-              <button class="btn-xs danger" data-act="del-live" data-id="${c.id}" type="button">Delete</button>
+              <a href="${esc(c.meeting_url)}" class="btn-xs" style="text-decoration:none;">${status === 'LIVE' ? 'Open classroom' : 'Class details'}</a>
+              ${status === 'LIVE' ? `<button class="btn-xs" data-act="class-attendance" data-id="${c.id}" type="button">Live attendance</button>` : ''}
+              ${status === 'SCHEDULED' ? `<button class="btn-xs danger" data-act="del-live" data-id="${c.id}" type="button">Delete</button>` : ''}
             </div>
+            <div data-live-attendance="${c.id}" style="margin-top:10px;"></div>
           </div>
         `;
       }).join('');
+
+      wrap.querySelectorAll('[data-act="class-attendance"]').forEach(btn => {
+        btn.addEventListener('click', async () => {
+          const target = wrap.querySelector(`[data-live-attendance="${btn.dataset.id}"]`);
+          const refresh = async () => { try {
+            const rows = await api(`/api/lecturer/live-classes/${btn.dataset.id}/attendance`);
+            target.innerHTML = `<div style="overflow:auto"><table style="width:100%;font-size:12px"><thead><tr><th>Student</th><th>Status</th><th>Joined</th><th>Time in class</th></tr></thead><tbody>${rows.map(r => `<tr><td>${esc(r.name)} (${esc(r.reg_no)})</td><td>${esc(r.status || 'not joined')}</td><td>${r.first_joined_at ? new Date(r.first_joined_at).toLocaleTimeString() : '—'}</td><td>${Math.floor((r.duration_seconds || 0) / 60)} min${!r.last_left_at && r.first_joined_at ? ' (connected)' : ''}</td></tr>`).join('')}</tbody></table></div>`;
+            btn.textContent = 'Live attendance · updates every 5 sec';
+            const state = await api(`/api/live-classes/${btn.dataset.id}/status`);
+            if (state.status !== 'LIVE' && target.dataset.poll) { clearInterval(Number(target.dataset.poll)); delete target.dataset.poll; }
+          } catch (err) { target.textContent = err.message; } };
+          await refresh();
+          if (!target.dataset.poll) target.dataset.poll = String(setInterval(refresh, 5000));
+        });
+      });
 
       wrap.querySelectorAll('[data-act="del-live"]').forEach(btn => {
         btn.addEventListener('click', async () => {
@@ -523,7 +536,7 @@
               <textarea id="lcDesc" rows="2" placeholder="Topic, agenda, notes..."
                         style="padding:10px; border:1px solid var(--border); border-radius:6px;"></textarea>
             </label>
-            <div style="font-size:13px; color:var(--muted);">Join link: <strong>https://meet.google.com/vcg-pnuu-oue</strong></div>
+            <div style="font-size:13px; color:var(--muted);">Students will join from inside the Herald portal after the class starts.</div>
             <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
               <label style="display:grid; gap:6px; font-size:13px; font-weight:600;">
                 Date & Time

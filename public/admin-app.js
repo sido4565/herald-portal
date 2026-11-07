@@ -778,7 +778,6 @@ if (addLectBtn) {
           d.course_id = Number(d.course_id);
           d.duration_minutes = Number(d.duration_minutes);
           d.notify = /^(yes|1|true|y)$/i.test(String(d.notify || '').trim());
-          d.meeting_url = 'https://meet.google.com/vcg-pnuu-oue';
           await api('/api/admin/live-classes', { method: 'POST', body: d });
           await loadLiveClasses();
           toast(d.notify ? 'Class scheduled. Emails queued.' : 'Class scheduled.');
@@ -2058,31 +2057,73 @@ async function openBulkAssignModal() {
   async function loadLiveClasses() {
     const rows = await api('/api/admin/live-classes');
     const tb = $('#liveClassesTable tbody');
-    const now = new Date();
 
     tb.innerHTML = rows.map(c => {
       const start = new Date(c.scheduled_at);
-      const end = new Date(start.getTime() + c.duration_minutes * 60000);
-      let status = 'Upcoming', pillCls = 'pill-amber';
-      if (now >= start && now <= end) { status = 'Live Now'; pillCls = 'pill-green'; }
-      else if (now > end) { status = 'Ended'; pillCls = 'pill-red'; }
+      const status = c.status || 'SCHEDULED';
+      const pillCls = status === 'LIVE' ? 'pill-green' : status === 'COMPLETED' ? 'pill-red' : 'pill-amber';
 
       return `
         <tr>
           <td>${esc(c.code)}</td>
           <td>${esc(c.title)}</td>
+          <td>${esc(c.lecturer_name || 'Herald Trainer')}</td>
           <td>${start.toLocaleString()}</td>
           <td>${c.duration_minutes} min</td>
           <td><span class="pill ${pillCls}">${status}</span></td>
           <td>
-            <a class="btn-xs" href="${esc(c.meeting_url)}" target="_blank" rel="noopener" style="text-decoration:none; display:inline-block;">Open</a>
-            <button class="btn-xs danger" data-act="del-lc" data-id="${c.id}" type="button">Delete</button>
+            ${status === 'LIVE' ? `<button class="btn-xs" data-act="monitor-lc" data-id="${c.id}" type="button">Participants</button><button class="btn-xs danger" data-act="end-lc" data-id="${c.id}" type="button">End for everyone</button><a class="btn-xs" href="${esc(c.meeting_url)}" style="text-decoration:none;display:inline-block">Open room</a>` : ''}
+            ${status === 'SCHEDULED' ? `<button class="btn-xs danger" data-act="del-lc" data-id="${c.id}" type="button">Delete</button>` : ''}
           </td>
         </tr>`;
-    }).join('') || '<tr><td colspan="6" class="empty">No live classes scheduled.</td></tr>';
+    }).join('') || '<tr><td colspan="7" class="empty">No live classes scheduled.</td></tr>';
 
     wireTableActions(tb);
+    tb.querySelectorAll('[data-act="end-lc"]').forEach(button => button.addEventListener('click', async () => {
+      if (!confirm('End this live class and disconnect every participant?')) return;
+      try { await api(`/api/admin/live-classes/${button.dataset.id}/end`, { method: 'POST' }); toast('Class ended for everyone.'); await loadLiveClasses(); }
+      catch (error) { toast(error.message, 'error'); }
+    }));
+    tb.querySelectorAll('tr').forEach(row => {
+      const id = row.querySelector('[data-act="monitor-lc"]')?.dataset.id;
+      if (id) row.insertAdjacentHTML('afterend', `<tr><td data-participants="${id}" colspan="7" hidden></td></tr>`);
+    });
+    tb.querySelectorAll('[data-act="monitor-lc"]').forEach(button => button.addEventListener('click', async () => {
+      const cell = tb.querySelector(`[data-participants="${button.dataset.id}"]`);
+      try {
+        const state = await api(`/api/live-classes/${button.dataset.id}/status`);
+        cell.hidden = false;
+        cell.innerHTML = `<strong>Connected participants:</strong> ${state.participants?.length ? state.participants.map(p => esc(p.name || p.identity)).join(', ') : 'None currently connected'}`;
+      } catch (error) { toast(error.message, 'error'); }
+    }));
+    await loadLiveClassAttendance();
   }
+
+  async function loadLiveClassAttendance() {
+    const table = $('#liveAttendanceTable tbody');
+    if (!table) return;
+    const query = new URLSearchParams();
+    for (const [element, key] of [['liveAttendanceDate','date'],['liveAttendanceCourse','course_id'],['liveAttendanceStudent','student_id'],['liveAttendanceLecturer','lecturer_id']]) {
+      const value = document.getElementById(element)?.value;
+      if (value) query.set(key, value);
+    }
+    try {
+      const [rows, courses, students, lecturers] = await Promise.all([
+        api(`/api/admin/live-class-attendance?${query}`), api('/api/admin/courses'), api('/api/admin/students'), api('/api/admin/lecturers'),
+      ]);
+      const fill = (id, values, label) => {
+        const select = document.getElementById(id);
+        if (!select || select.dataset.loaded) return;
+        select.insertAdjacentHTML('beforeend', values.map(v => `<option value="${esc(v.id)}">${esc(label(v))}</option>`).join(''));
+        select.dataset.loaded = '1';
+      };
+      fill('liveAttendanceCourse', courses, c => `${c.code} — ${c.title}`);
+      fill('liveAttendanceStudent', students, s => `${s.name} (${s.reg_no})`);
+      fill('liveAttendanceLecturer', lecturers.filter(l => Number(l.approved) === 1), l => l.name);
+      table.innerHTML = rows.map(r => `<tr><td>${esc(r.attendance_date)}</td><td>${esc(r.student_name)} (${esc(r.reg_no)})</td><td>${esc(r.code)} — ${esc(r.class_title)}</td><td>${esc(r.lecturer_name)}</td><td>${esc(r.status)}</td><td>${r.first_joined_at ? new Date(r.first_joined_at).toLocaleTimeString() : '—'}</td><td>${r.last_left_at ? new Date(r.last_left_at).toLocaleTimeString() : '—'}</td><td>${Math.floor((r.duration_seconds || 0) / 60)} min</td></tr>`).join('') || '<tr><td colspan="8" class="empty">No attendance records match these filters.</td></tr>';
+    } catch (error) { table.innerHTML = `<tr><td colspan="8" class="empty">${esc(error.message)}</td></tr>`; }
+  }
+  $('#loadLiveAttendanceBtn')?.addEventListener('click', loadLiveClassAttendance);
 
   async function delLiveClass(id) {
     if (!confirm('Delete this live class?')) return;

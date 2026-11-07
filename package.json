@@ -7,8 +7,11 @@
     "node": "22.x"
   },
   "scripts": {
+    "build:classroom": "esbuild public/live-classroom.jsx --bundle --minify --outfile=public/live-classroom-bundle.js --target=es2020",
+    "test:live-classroom": "node --test test/live-classroom.test.js",
+    "prestart": "npm run build:classroom",
     "start": "node server.js",
-    "dev": "nodemon server.js"
+    "dev": "npm run build:classroom && nodemon server.js"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1147.0",
@@ -16,6 +19,8 @@
     "@fontsource/great-vibes": "^5.3.0",
     "@fontsource/unifrakturcook": "^5.3.0",
     "@libsql/client": "^0.18.0",
+    "@livekit/components-react": "^2.9.25",
+    "@livekit/components-styles": "^1.2.0",
     "@turbosmtp/mail": "^0.1.0",
     "adm-zip": "^0.6.1",
     "bcryptjs": "^2.4.3",
@@ -25,6 +30,8 @@
     "fast-xml-parser": "^5.11.2",
     "html-to-image": "^1.11.13",
     "jsonwebtoken": "^9.0.2",
+    "livekit-client": "^2.23.0",
+    "livekit-server-sdk": "^2.19.2",
     "mammoth": "^1.13.0",
     "multer": "^2.4.0",
     "nodemailer": "^10.0.12",
@@ -32,9 +39,12 @@
     "pdfkit": "^0.20.2",
     "pesafy": "^0.2.0",
     "puppeteer": "^25.16.0",
-    "qrcode": "^1.5.4"
+    "qrcode": "^1.5.4",
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1"
   },
   "devDependencies": {
+    "esbuild": "^0.28.2",
     "nodemon": "^1.14.10"
   },
   "allowScripts": {

@@ -548,7 +548,7 @@ async function loadDashboard() {
               <div style="display:flex; justify-content:space-between; align-items:center; gap:12px;">
                 <div>
                   <strong>${esc(r.date)}</strong>
-                  <p>${esc(r.code)} — ${esc(r.title)}</p>
+                  <p>${esc(r.code)} — ${esc(r.live_class_title || r.title)}${r.live_class_id ? ` · ${Math.floor((r.duration_seconds || 0) / 60)} min in live class` : ''}</p>
                 </div>
                 <span class="pill ${r.status === 'present' ? 'pill-green' : r.status === 'absent' ? 'pill-red' : 'pill-amber'}">${esc(r.status)}</span>
               </div>
@@ -570,10 +570,10 @@ async function loadDashboard() {
       const start = new Date(c.scheduled_at);
       document.getElementById('liveClassNoticeLabel').textContent = c.status === 'live' ? '🔴 Live class is happening now' : '📅 Upcoming live class';
       document.getElementById('liveClassNoticeTitle').textContent = c.title;
-      document.getElementById('liveClassNoticeDetails').textContent = `${c.code} — ${c.course_title} · ${start.toLocaleString()} · ${c.duration_minutes} min`;
+      document.getElementById('liveClassNoticeDetails').textContent = `${c.code} — ${c.course_title} · ${start.toLocaleString()} to ${new Date(c.ends_at).toLocaleTimeString()} · ${c.lecturer_name || 'Herald Trainer'}`;
       const join = document.getElementById('liveClassNoticeJoin');
       join.href = c.meeting_url;
-      join.textContent = c.status === 'live' ? 'Join now →' : 'Open class link →';
+      join.textContent = c.status === 'live' ? 'Join live classroom →' : 'Class details →';
       notice.style.display = 'flex';
       if (c.status === 'live') {
         notice.style.background = '#ecfdf5';
@@ -594,11 +594,13 @@ async function loadDashboard() {
                   <div>
                     <strong>${esc(c.title)}</strong>
                     <p>${esc(c.code)} — ${esc(c.course_title)}</p>
-                    <p style="font-size:12px; color:var(--muted);">${start.toLocaleString()} &middot; ${c.duration_minutes} min</p>
+                    <p style="font-size:12px; color:var(--muted);">${start.toLocaleString()} – ${new Date(c.ends_at).toLocaleTimeString()} &middot; ${c.duration_minutes} min</p>
+                    <p style="font-size:12px; color:var(--muted);">Lecturer: ${esc(c.lecturer_name || 'Herald Trainer')}</p>
+                    ${c.description ? `<p style="font-size:12px; color:var(--muted);">${esc(c.description)}</p>` : ''}
                   </div>
                   <div style="text-align:right;">
                     <span class="pill ${pillCls}">${label}</span>
-                    ${c.status !== 'ended' ? `<div style="margin-top:6px;"><a class="btn-enroll" href="${esc(c.meeting_url)}" target="_blank" rel="noopener" style="text-decoration:none; display:inline-block;">Join</a></div>` : ''}
+                    ${c.status !== 'ended' ? `<div style="margin-top:6px;"><a class="btn-enroll" href="${esc(c.meeting_url)}" style="text-decoration:none; display:inline-block;">${c.status === 'live' ? 'Join classroom' : 'Class details'}</a></div>` : ''}
                   </div>
                 </div>
               </li>`;

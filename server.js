@@ -19,6 +19,7 @@ const mammoth = require('mammoth');
 const AdmZip = require('adm-zip');
 const { XMLParser } = require('fast-xml-parser');
 const db = require('./database');
+const setupLiveClassroom = require('./live-classroom-service');
 const courseFeeCatalog = require('./course-fees');
 const partnerPrograms = require('./partner-programs');
 const ADMISSION_FEE = 3000;
@@ -87,7 +88,6 @@ if (R2_ACCOUNT_ID && R2_ACCESS_KEY_ID && R2_SECRET_ACCESS_KEY) {
 }
 
 const app = express();
-const HERALD_LIVE_MEETING_URL = 'https://meet.google.com/vcg-pnuu-oue';
 const PORT = process.env.PORT || 3000;
 const JWT_SECRET = process.env.JWT_SECRET || 'herald-dev-secret-change-me';
 
@@ -463,6 +463,8 @@ function authLecturer(req, res, next) {
     req.lecturer = p; next();
   } catch { res.status(401).json({ error: 'Not authenticated' }); }
 }
+
+setupLiveClassroom({ app, db, authStudent, authLecturer, authAdmin, jwt, jwtSecret: JWT_SECRET });
 
 // ---------- Mailer helper ----------
 let mailer = null;
@@ -1339,8 +1341,10 @@ app.get('/api/submission/:id/file', authStudent, async (req, res) => {
 
 app.get('/api/my-attendance', authStudent, async (req, res) => {
   const records = await db.execute({
-    sql: `SELECT a.id, a.date, a.status, a.notes, c.code, c.title
+    sql: `SELECT a.id, a.date, a.status, a.notes, a.duration_seconds, a.live_class_id,
+            lc.title AS live_class_title, c.code, c.title
           FROM attendance a JOIN courses c ON c.id = a.course_id
+          LEFT JOIN live_classes lc ON lc.id = a.live_class_id
           WHERE a.student_id = ? ORDER BY a.date DESC LIMIT 100`,
     args: [req.user.id],
   });
@@ -1354,26 +1358,6 @@ app.get('/api/my-attendance', authStudent, async (req, res) => {
     args: [req.user.id],
   });
   res.json({ records: records.rows, summary: summary.rows });
-});
-
-app.get('/api/my-live-classes', authStudent, async (req, res) => {
-  const r = await db.execute({
-    sql: `SELECT lc.*, c.code, c.title AS course_title
-          FROM live_classes lc JOIN courses c ON c.id = lc.course_id
-          JOIN enrollments e ON e.course_id = lc.course_id
-          WHERE e.student_id = ? ORDER BY lc.scheduled_at ASC`,
-    args: [req.user.id],
-  });
-  const now = new Date();
-  const enriched = r.rows.map(row => {
-    const start = new Date(row.scheduled_at);
-    const end = new Date(start.getTime() + row.duration_minutes * 60000);
-    let status = 'upcoming';
-    if (now >= start && now <= end) status = 'live';
-    else if (now > end) status = 'ended';
-    return { ...row, meeting_url: HERALD_LIVE_MEETING_URL, status, ends_at: end.toISOString() };
-  });
-  res.json(enriched);
 });
 
 app.get('/api/my-materials', authStudent, async (req, res) => {
@@ -2562,88 +2546,6 @@ app.post('/api/lecturer/materials/upload', authLecturer, materialUpload.single('
   }
 });
 
-// ---------- Live Classes (lecturer) ----------
-app.get('/api/lecturer/live-classes', authLecturer, async (req, res) => {
-  try {
-    const r = await db.execute({
-      sql: `
-        SELECT lc.*, c.code, c.title AS course_title
-        FROM live_classes lc
-        JOIN courses c ON c.id = lc.course_id
-        JOIN lecturer_courses lc2 ON lc2.course_id = c.id
-        WHERE lc2.lecturer_id = ?
-        ORDER BY lc.scheduled_at DESC
-      `,
-      args: [req.lecturer.id],
-    });
-    res.json(r.rows.map(row => ({ ...row, meeting_url: HERALD_LIVE_MEETING_URL })));
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
-app.post('/api/lecturer/live-classes', authLecturer, async (req, res) => {
-  const { course_id, title, description, scheduled_at, duration_minutes, notify } = req.body;
-  if (!course_id || !title || !scheduled_at) {
-    return res.status(400).json({ error: 'course_id, title, scheduled_at required' });
-  }
-  try {
-    const check = await db.execute({
-      sql: 'SELECT 1 FROM lecturer_courses WHERE lecturer_id = ? AND course_id = ?',
-      args: [req.lecturer.id, course_id],
-    });
-    if (check.rows.length === 0) {
-      return res.status(403).json({ error: 'You are not assigned to this course' });
-    }
-
-    const info = await db.execute({
-      sql: `INSERT INTO live_classes (course_id, title, description, meeting_url, scheduled_at, duration_minutes, created_by)
-            VALUES (?, ?, ?, ?, ?, ?, ?)`,
-      args: [course_id, title, description || '', HERALD_LIVE_MEETING_URL, scheduled_at, Number(duration_minutes) || 60, req.lecturer.id],
-    });
-
-    if (notify && mailer && mailer.ENABLED) {
-      try {
-        const sr = await db.execute({
-          sql: `SELECT s.email, s.name FROM students s
-                JOIN enrollments e ON e.student_id = s.id WHERE e.course_id = ?`,
-          args: [course_id],
-        });
-        const cr = await db.execute({ sql: 'SELECT code, title FROM courses WHERE id = ?', args: [course_id] });
-        const course = cr.rows[0];
-        for (const s of sr.rows) {
-          mailer.sendLiveClassNotification({
-            to: s.email, studentName: s.name,
-            courseCode: course.code, courseTitle: course.title,
-            classTitle: title, scheduledAt: new Date(scheduled_at), meetingUrl: HERALD_LIVE_MEETING_URL,
-          }).catch(err => console.error('Class email failed:', err.message));
-        }
-      } catch (e) { console.error('Class notification error:', e.message); }
-    }
-
-    res.json({ ok: true, id: Number(info.lastInsertRowid) });
-  } catch (err) {
-    console.error('Live class create failed:', err);
-    res.status(500).json({ error: err.message });
-  }
-});
-
-app.delete('/api/lecturer/live-classes/:id', authLecturer, async (req, res) => {
-  try {
-    const check = await db.execute({
-      sql: `SELECT 1 FROM live_classes lc
-            JOIN lecturer_courses lc2 ON lc2.course_id = lc.course_id
-            WHERE lc.id = ? AND lc2.lecturer_id = ?`,
-      args: [req.params.id, req.lecturer.id],
-    });
-    if (check.rows.length === 0) return res.status(403).json({ error: 'Not allowed' });
-    await db.execute({ sql: 'DELETE FROM live_classes WHERE id = ?', args: [req.params.id] });
-    res.json({ ok: true });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
 // ==================== ADMIN ROUTES ====================
 app.post('/api/admin/login', async (req, res) => {
   const { username, password } = req.body;
@@ -3775,54 +3677,6 @@ app.delete('/api/admin/attendance/:id', authAdmin, async (req, res) => {
   await db.execute({ sql: 'DELETE FROM attendance WHERE id = ?', args: [req.params.id] });
   res.json({ ok: true });
 });
-
-// ---------- Live Classes (admin) ----------
-app.get('/api/admin/live-classes', authAdmin, async (req, res) => {
-  const r = await db.execute(`
-    SELECT lc.*, c.code, c.title AS course_title
-    FROM live_classes lc JOIN courses c ON c.id = lc.course_id
-    ORDER BY lc.scheduled_at DESC
-  `);
-  res.json(r.rows.map(row => ({ ...row, meeting_url: HERALD_LIVE_MEETING_URL })));
-});
-
-app.post('/api/admin/live-classes', authAdmin, async (req, res) => {
-  const { course_id, title, description, scheduled_at, duration_minutes, notify } = req.body;
-  if (!course_id || !title || !scheduled_at) {
-    return res.status(400).json({ error: 'course_id, title, scheduled_at required' });
-  }
-  const info = await db.execute({
-    sql: `INSERT INTO live_classes (course_id, title, description, meeting_url, scheduled_at, duration_minutes, created_by)
-          VALUES (?, ?, ?, ?, ?, ?, ?)`,
-    args: [course_id, title, description || '', HERALD_LIVE_MEETING_URL, scheduled_at, Number(duration_minutes) || 60, req.admin.id],
-  });
-
-  if (notify && mailer && mailer.ENABLED) {
-    try {
-      const sr = await db.execute({
-        sql: `SELECT s.email, s.name FROM students s
-              JOIN enrollments e ON e.student_id = s.id WHERE e.course_id = ?`,
-        args: [course_id],
-      });
-      const cr = await db.execute({ sql: 'SELECT code, title FROM courses WHERE id = ?', args: [course_id] });
-      const course = cr.rows[0];
-      for (const s of sr.rows) {
-        mailer.sendLiveClassNotification({
-          to: s.email, studentName: s.name, courseCode: course.code, courseTitle: course.title,
-          classTitle: title, scheduledAt: new Date(scheduled_at), meetingUrl: HERALD_LIVE_MEETING_URL,
-        }).catch(err => console.error('Class email failed:', err.message));
-      }
-    } catch (e) { console.error('Class notification error:', e.message); }
-  }
-
-  res.json({ ok: true, id: Number(info.lastInsertRowid) });
-});
-
-app.delete('/api/admin/live-classes/:id', authAdmin, async (req, res) => {
-  await db.execute({ sql: 'DELETE FROM live_classes WHERE id = ?', args: [req.params.id] });
-  res.json({ ok: true });
-});
-
 
 // ---------- Contact form (Brevo + SMS) ----------
 app.post('/api/contact', async (req, res) => {

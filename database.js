@@ -214,6 +214,34 @@ async function initSchema() {
       created_by INTEGER,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP
     )`,
+    `CREATE TABLE IF NOT EXISTS live_class_attendance (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      live_class_id INTEGER NOT NULL REFERENCES live_classes(id) ON DELETE CASCADE,
+      course_id INTEGER NOT NULL REFERENCES courses(id) ON DELETE CASCADE,
+      student_id INTEGER NOT NULL REFERENCES students(id) ON DELETE CASCADE,
+      attendance_date TEXT NOT NULL,
+      first_joined_at TEXT,
+      last_left_at TEXT,
+      duration_seconds INTEGER NOT NULL DEFAULT 0,
+      status TEXT NOT NULL DEFAULT 'absent',
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      UNIQUE(live_class_id, student_id)
+    )`,
+    `CREATE TABLE IF NOT EXISTS live_class_attendance_sessions (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      live_class_id INTEGER NOT NULL REFERENCES live_classes(id) ON DELETE CASCADE,
+      student_id INTEGER NOT NULL REFERENCES students(id) ON DELETE CASCADE,
+      joined_at TEXT NOT NULL,
+      left_at TEXT,
+      duration_seconds INTEGER NOT NULL DEFAULT 0,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    )`,
+    `CREATE TABLE IF NOT EXISTS live_class_webhook_events (
+      event_id TEXT PRIMARY KEY,
+      event_type TEXT NOT NULL,
+      received_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    )`,
     `CREATE TABLE IF NOT EXISTS materials (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       course_id INTEGER NOT NULL,
@@ -358,6 +386,49 @@ async function initSchema() {
   for (const sql of statements) {
     await client.execute(sql);
   }
+  const liveClassColumns = await client.execute('PRAGMA table_info(live_classes)');
+  for (const [name, definition] of [
+    ['room_name', 'TEXT'], ['status', "TEXT NOT NULL DEFAULT 'SCHEDULED'"],
+    ['started_at', 'TEXT'], ['ended_at', 'TEXT'], ['scheduled_end_at', 'TEXT'],
+    ['created_by_type', "TEXT NOT NULL DEFAULT 'lecturer'"],
+  ]) {
+    if (!liveClassColumns.rows.some(column => column.name === name)) {
+      await client.execute(`ALTER TABLE live_classes ADD COLUMN ${name} ${definition}`);
+    }
+  }
+  const classSchedules = await client.execute('SELECT id, scheduled_at, scheduled_end_at, duration_minutes FROM live_classes');
+  const localOffset = Number.isFinite(Number(process.env.LIVE_CLASS_TIMEZONE_OFFSET_MINUTES))
+    ? Number(process.env.LIVE_CLASS_TIMEZONE_OFFSET_MINUTES) : 180;
+  const offsetSign = localOffset < 0 ? '-' : '+';
+  const absoluteOffset = Math.abs(localOffset);
+  const timezoneSuffix = `${offsetSign}${String(Math.floor(absoluteOffset / 60)).padStart(2, '0')}:${String(absoluteOffset % 60).padStart(2, '0')}`;
+  for (const row of classSchedules.rows) {
+    const storedStart = String(row.scheduled_at || '').trim();
+    const zonedStart = /(?:Z|[+-]\d{2}:\d{2})$/i.test(storedStart)
+      ? storedStart : `${storedStart.replace(' ', 'T')}${timezoneSuffix}`;
+    const startTime = new Date(zonedStart);
+    if (!Number.isFinite(startTime.getTime())) continue;
+    const startIso = startTime.toISOString();
+    const endIso = new Date(startTime.getTime() + (Number(row.duration_minutes) || 60) * 60000).toISOString();
+    if (storedStart !== startIso || row.scheduled_end_at !== endIso) {
+      await client.execute({ sql: 'UPDATE live_classes SET scheduled_at = ?, scheduled_end_at = ? WHERE id = ?', args: [startIso, endIso, row.id] });
+    }
+  }
+  const attendanceColumns = await client.execute('PRAGMA table_info(attendance)');
+  for (const [name, definition] of [
+    ['live_class_id', 'INTEGER'], ['first_joined_at', 'TEXT'], ['last_left_at', 'TEXT'],
+    ['duration_seconds', 'INTEGER NOT NULL DEFAULT 0'],
+  ]) {
+    if (!attendanceColumns.rows.some(column => column.name === name)) {
+      await client.execute(`ALTER TABLE attendance ADD COLUMN ${name} ${definition}`);
+    }
+  }
+  await client.execute('CREATE INDEX IF NOT EXISTS idx_live_classes_status_end ON live_classes(status, scheduled_end_at)');
+  await client.execute('CREATE INDEX IF NOT EXISTS idx_live_class_sessions_class_student ON live_class_attendance_sessions(live_class_id, student_id)');
+  await client.execute('CREATE INDEX IF NOT EXISTS idx_live_class_attendance_course_date ON live_class_attendance(course_id, attendance_date)');
+  await client.execute('CREATE UNIQUE INDEX IF NOT EXISTS idx_attendance_live_class_student ON attendance(live_class_id, student_id) WHERE live_class_id IS NOT NULL');
+  await client.execute("UPDATE live_classes SET room_name = 'herald-class-' || id WHERE room_name IS NULL OR room_name = ''");
+  await client.execute("UPDATE live_classes SET scheduled_end_at = datetime(scheduled_at, '+' || COALESCE(duration_minutes, 60) || ' minutes') WHERE scheduled_end_at IS NULL OR scheduled_end_at = ''");
   const studentColumns = await client.execute('PRAGMA table_info(students)');
   for (const [name, definition] of [
     ['passport_photo_key', 'TEXT'], ['passport_photo_storage', 'TEXT'], ['passport_photo_mime', 'TEXT'],
@@ -514,7 +585,7 @@ async function seed() {
 }
 
 // Boot
-(async () => {
+const ready = (async () => {
   try {
     await initSchema();
     await seed();
@@ -526,4 +597,5 @@ async function seed() {
   }
 })();
 
+client.ready = ready;
 module.exports = client;
