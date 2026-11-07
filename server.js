@@ -88,7 +88,6 @@ if (R2_ACCOUNT_ID && R2_ACCESS_KEY_ID && R2_SECRET_ACCESS_KEY) {
 
 const app = express();
 const HERALD_LIVE_MEETING_URL = 'https://meet.google.com/vcg-pnuu-oue';
-const GOOGLE_MEET_REDIRECT_URI = process.env.GOOGLE_OAUTH_REDIRECT_URI || 'https://heraldtrainer.co.ke/api/google-meet/oauth/callback';
 const PORT = process.env.PORT || 3000;
 const JWT_SECRET = process.env.JWT_SECRET || 'herald-dev-secret-change-me';
 
@@ -457,28 +456,6 @@ function authAdmin(req, res, next) {
   } catch { res.status(401).json({ error: 'Not authenticated' }); }
 }
 
-function googleMeetEncryptionKey() {
-  const encoded = process.env.GOOGLE_TOKEN_ENCRYPTION_KEY;
-  if (!encoded) throw new Error('GOOGLE_TOKEN_ENCRYPTION_KEY is not configured');
-  const key = Buffer.from(encoded, 'base64');
-  if (key.length !== 32) throw new Error('GOOGLE_TOKEN_ENCRYPTION_KEY must be a base64-encoded 32-byte key');
-  return key;
-}
-
-function encryptGoogleToken(value) {
-  const iv = crypto.randomBytes(12);
-  const cipher = crypto.createCipheriv('aes-256-gcm', googleMeetEncryptionKey(), iv);
-  const encrypted = Buffer.concat([cipher.update(value, 'utf8'), cipher.final()]);
-  return [iv, cipher.getAuthTag(), encrypted].map(part => part.toString('base64url')).join('.');
-}
-
-function decryptGoogleToken(value) {
-  const [iv, tag, encrypted] = String(value || '').split('.').map(part => Buffer.from(part, 'base64url'));
-  if (!iv || !tag || !encrypted) throw new Error('Stored Google token is invalid');
-  const decipher = crypto.createDecipheriv('aes-256-gcm', googleMeetEncryptionKey(), iv);
-  decipher.setAuthTag(tag);
-  return Buffer.concat([decipher.update(encrypted), decipher.final()]).toString('utf8');
-}
 function authLecturer(req, res, next) {
   try {
     const p = jwt.verify(req.cookies.lecturer_token, JWT_SECRET);
@@ -2668,86 +2645,6 @@ app.delete('/api/lecturer/live-classes/:id', authLecturer, async (req, res) => {
 });
 
 // ==================== ADMIN ROUTES ====================
-app.get('/api/admin/google-meet/connect', authAdmin, (req, res) => {
-  const clientId = process.env.GOOGLE_OAUTH_CLIENT_ID;
-  if (!clientId || !process.env.GOOGLE_OAUTH_CLIENT_SECRET) {
-    return res.status(503).send('Google OAuth client credentials are not configured on the portal server.');
-  }
-  const state = crypto.randomBytes(32).toString('base64url');
-  res.cookie('google_meet_oauth_state', state, {
-    httpOnly: true, secure: true, sameSite: 'lax', maxAge: 10 * 60 * 1000,
-    path: '/api/google-meet/oauth/callback',
-  });
-  const authorizationUrl = new URL('https://accounts.google.com/o/oauth2/v2/auth');
-  authorizationUrl.search = new URLSearchParams({
-    client_id: clientId,
-    redirect_uri: GOOGLE_MEET_REDIRECT_URI,
-    response_type: 'code',
-    access_type: 'offline',
-    prompt: 'consent',
-    scope: [
-      'openid',
-      'email',
-      'https://www.googleapis.com/auth/meetings.space.created',
-      'https://www.googleapis.com/auth/meetings.space.readonly',
-    ].join(' '),
-    state,
-  }).toString();
-  res.redirect(authorizationUrl.toString());
-});
-
-app.get('/api/google-meet/oauth/callback', async (req, res) => {
-  const expectedState = req.cookies.google_meet_oauth_state || '';
-  const receivedState = String(req.query.state || '');
-  res.clearCookie('google_meet_oauth_state', { path: '/api/google-meet/oauth/callback', secure: true, sameSite: 'lax' });
-  if (!expectedState || !receivedState || expectedState.length !== receivedState.length ||
-      !crypto.timingSafeEqual(Buffer.from(expectedState), Buffer.from(receivedState))) {
-    return res.status(400).send('Google authorization could not be verified. Return to the admin portal and try Connect Google Meet again.');
-  }
-  if (req.query.error) return res.status(400).send('Google authorization was cancelled or denied. Return to the admin portal to try again.');
-  const clientId = process.env.GOOGLE_OAUTH_CLIENT_ID;
-  const clientSecret = process.env.GOOGLE_OAUTH_CLIENT_SECRET;
-  const code = String(req.query.code || '');
-  if (!clientId || !clientSecret || !code) return res.status(400).send('Google authorization is not fully configured.');
-
-  try {
-    const tokenResponse = await fetch('https://oauth2.googleapis.com/token', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      body: new URLSearchParams({
-        code, client_id: clientId, client_secret: clientSecret,
-        redirect_uri: GOOGLE_MEET_REDIRECT_URI, grant_type: 'authorization_code',
-      }),
-    });
-    const tokenData = await tokenResponse.json();
-    if (!tokenResponse.ok || !tokenData.refresh_token) {
-      console.error('Google OAuth token exchange failed:', tokenData.error || tokenResponse.status);
-      return res.status(400).send('Google did not provide ongoing access. Check the OAuth client and try again with the Herald account.');
-    }
-
-    const userResponse = await fetch('https://openidconnect.googleapis.com/v1/userinfo', {
-      headers: { Authorization: `Bearer ${tokenData.access_token}` },
-    });
-    const profile = await userResponse.json();
-    if (!userResponse.ok || String(profile.email || '').toLowerCase() !== 'heraldtrainer@gmail.com') {
-      return res.status(403).send('Please authorize with heraldtrainer@gmail.com. No token was stored.');
-    }
-
-    const encryptedToken = encryptGoogleToken(tokenData.refresh_token);
-    await db.execute({
-      sql: `INSERT INTO google_oauth_tokens (provider, refresh_token_ciphertext, updated_at)
-            VALUES ('google_meet', ?, CURRENT_TIMESTAMP)
-            ON CONFLICT(provider) DO UPDATE SET refresh_token_ciphertext = excluded.refresh_token_ciphertext,
-              updated_at = CURRENT_TIMESTAMP`,
-      args: [encryptedToken],
-    });
-    res.send('Google Meet is connected for heraldtrainer@gmail.com. You can close this page and return to the admin portal.');
-  } catch (err) {
-    console.error('Google OAuth callback failed:', err.message);
-    res.status(500).send('Google authorization could not be saved. Check the portal server configuration and try again.');
-  }
-});
-
 app.post('/api/admin/login', async (req, res) => {
   const { username, password } = req.body;
   if (!username || !password) return res.status(400).json({ error: 'Missing credentials' });
