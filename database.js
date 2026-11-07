@@ -214,6 +214,11 @@ async function initSchema() {
       created_by INTEGER,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP
     )`,
+    `CREATE TABLE IF NOT EXISTS google_oauth_tokens (
+      provider TEXT PRIMARY KEY,
+      refresh_token_ciphertext TEXT NOT NULL,
+      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    )`,
     `CREATE TABLE IF NOT EXISTS materials (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       course_id INTEGER NOT NULL,

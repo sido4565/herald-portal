@@ -771,7 +771,6 @@ if (addLectBtn) {
             options: coursesCache.map(c => ({ value: c.id, label: `${c.code} — ${c.title}` })) },
           { name: 'title', label: 'Class Title', required: true },
           { name: 'description', label: 'Description / Agenda', type: 'textarea' },
-          { name: 'meeting_url', label: 'Meeting Link (Google Meet / Zoom / Jitsi)', required: true },
           { name: 'scheduled_at', label: 'Date & Time', type: 'datetime-local', required: true },
           { name: 'duration_minutes', label: 'Duration (minutes)', type: 'number', value: 60, required: true },
           { name: 'notify', label: 'Email enrolled students? (yes/no)', value: 'yes' }
@@ -779,6 +778,7 @@ if (addLectBtn) {
           d.course_id = Number(d.course_id);
           d.duration_minutes = Number(d.duration_minutes);
           d.notify = /^(yes|1|true|y)$/i.test(String(d.notify || '').trim());
+          d.meeting_url = 'https://meet.google.com/vcg-pnuu-oue';
           await api('/api/admin/live-classes', { method: 'POST', body: d });
           await loadLiveClasses();
           toast(d.notify ? 'Class scheduled. Emails queued.' : 'Class scheduled.');

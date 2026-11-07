@@ -87,6 +87,8 @@ if (R2_ACCOUNT_ID && R2_ACCESS_KEY_ID && R2_SECRET_ACCESS_KEY) {
 }
 
 const app = express();
+const HERALD_LIVE_MEETING_URL = 'https://meet.google.com/vcg-pnuu-oue';
+const GOOGLE_MEET_REDIRECT_URI = process.env.GOOGLE_OAUTH_REDIRECT_URI || 'https://heraldtrainer.co.ke/api/google-meet/oauth/callback';
 const PORT = process.env.PORT || 3000;
 const JWT_SECRET = process.env.JWT_SECRET || 'herald-dev-secret-change-me';
 
@@ -453,6 +455,29 @@ function authAdmin(req, res, next) {
     if (p.type !== 'admin') return res.status(403).json({ error: 'Admin only' });
     req.admin = p; next();
   } catch { res.status(401).json({ error: 'Not authenticated' }); }
+}
+
+function googleMeetEncryptionKey() {
+  const encoded = process.env.GOOGLE_TOKEN_ENCRYPTION_KEY;
+  if (!encoded) throw new Error('GOOGLE_TOKEN_ENCRYPTION_KEY is not configured');
+  const key = Buffer.from(encoded, 'base64');
+  if (key.length !== 32) throw new Error('GOOGLE_TOKEN_ENCRYPTION_KEY must be a base64-encoded 32-byte key');
+  return key;
+}
+
+function encryptGoogleToken(value) {
+  const iv = crypto.randomBytes(12);
+  const cipher = crypto.createCipheriv('aes-256-gcm', googleMeetEncryptionKey(), iv);
+  const encrypted = Buffer.concat([cipher.update(value, 'utf8'), cipher.final()]);
+  return [iv, cipher.getAuthTag(), encrypted].map(part => part.toString('base64url')).join('.');
+}
+
+function decryptGoogleToken(value) {
+  const [iv, tag, encrypted] = String(value || '').split('.').map(part => Buffer.from(part, 'base64url'));
+  if (!iv || !tag || !encrypted) throw new Error('Stored Google token is invalid');
+  const decipher = crypto.createDecipheriv('aes-256-gcm', googleMeetEncryptionKey(), iv);
+  decipher.setAuthTag(tag);
+  return Buffer.concat([decipher.update(encrypted), decipher.final()]).toString('utf8');
 }
 function authLecturer(req, res, next) {
   try {
@@ -1369,7 +1394,7 @@ app.get('/api/my-live-classes', authStudent, async (req, res) => {
     let status = 'upcoming';
     if (now >= start && now <= end) status = 'live';
     else if (now > end) status = 'ended';
-    return { ...row, status, ends_at: end.toISOString() };
+    return { ...row, meeting_url: HERALD_LIVE_MEETING_URL, status, ends_at: end.toISOString() };
   });
   res.json(enriched);
 });
@@ -2574,16 +2599,16 @@ app.get('/api/lecturer/live-classes', authLecturer, async (req, res) => {
       `,
       args: [req.lecturer.id],
     });
-    res.json(r.rows);
+    res.json(r.rows.map(row => ({ ...row, meeting_url: HERALD_LIVE_MEETING_URL })));
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
 
 app.post('/api/lecturer/live-classes', authLecturer, async (req, res) => {
-  const { course_id, title, description, meeting_url, scheduled_at, duration_minutes, notify } = req.body;
-  if (!course_id || !title || !meeting_url || !scheduled_at) {
-    return res.status(400).json({ error: 'course_id, title, meeting_url, scheduled_at required' });
+  const { course_id, title, description, scheduled_at, duration_minutes, notify } = req.body;
+  if (!course_id || !title || !scheduled_at) {
+    return res.status(400).json({ error: 'course_id, title, scheduled_at required' });
   }
   try {
     const check = await db.execute({
@@ -2597,7 +2622,7 @@ app.post('/api/lecturer/live-classes', authLecturer, async (req, res) => {
     const info = await db.execute({
       sql: `INSERT INTO live_classes (course_id, title, description, meeting_url, scheduled_at, duration_minutes, created_by)
             VALUES (?, ?, ?, ?, ?, ?, ?)`,
-      args: [course_id, title, description || '', meeting_url, scheduled_at, Number(duration_minutes) || 60, req.lecturer.id],
+      args: [course_id, title, description || '', HERALD_LIVE_MEETING_URL, scheduled_at, Number(duration_minutes) || 60, req.lecturer.id],
     });
 
     if (notify && mailer && mailer.ENABLED) {
@@ -2613,7 +2638,7 @@ app.post('/api/lecturer/live-classes', authLecturer, async (req, res) => {
           mailer.sendLiveClassNotification({
             to: s.email, studentName: s.name,
             courseCode: course.code, courseTitle: course.title,
-            classTitle: title, scheduledAt: new Date(scheduled_at), meetingUrl: meeting_url,
+            classTitle: title, scheduledAt: new Date(scheduled_at), meetingUrl: HERALD_LIVE_MEETING_URL,
           }).catch(err => console.error('Class email failed:', err.message));
         }
       } catch (e) { console.error('Class notification error:', e.message); }
@@ -2643,6 +2668,86 @@ app.delete('/api/lecturer/live-classes/:id', authLecturer, async (req, res) => {
 });
 
 // ==================== ADMIN ROUTES ====================
+app.get('/api/admin/google-meet/connect', authAdmin, (req, res) => {
+  const clientId = process.env.GOOGLE_OAUTH_CLIENT_ID;
+  if (!clientId || !process.env.GOOGLE_OAUTH_CLIENT_SECRET) {
+    return res.status(503).send('Google OAuth client credentials are not configured on the portal server.');
+  }
+  const state = crypto.randomBytes(32).toString('base64url');
+  res.cookie('google_meet_oauth_state', state, {
+    httpOnly: true, secure: true, sameSite: 'lax', maxAge: 10 * 60 * 1000,
+    path: '/api/google-meet/oauth/callback',
+  });
+  const authorizationUrl = new URL('https://accounts.google.com/o/oauth2/v2/auth');
+  authorizationUrl.search = new URLSearchParams({
+    client_id: clientId,
+    redirect_uri: GOOGLE_MEET_REDIRECT_URI,
+    response_type: 'code',
+    access_type: 'offline',
+    prompt: 'consent',
+    scope: [
+      'openid',
+      'email',
+      'https://www.googleapis.com/auth/meetings.space.created',
+      'https://www.googleapis.com/auth/meetings.space.readonly',
+    ].join(' '),
+    state,
+  }).toString();
+  res.redirect(authorizationUrl.toString());
+});
+
+app.get('/api/google-meet/oauth/callback', async (req, res) => {
+  const expectedState = req.cookies.google_meet_oauth_state || '';
+  const receivedState = String(req.query.state || '');
+  res.clearCookie('google_meet_oauth_state', { path: '/api/google-meet/oauth/callback', secure: true, sameSite: 'lax' });
+  if (!expectedState || !receivedState || expectedState.length !== receivedState.length ||
+      !crypto.timingSafeEqual(Buffer.from(expectedState), Buffer.from(receivedState))) {
+    return res.status(400).send('Google authorization could not be verified. Return to the admin portal and try Connect Google Meet again.');
+  }
+  if (req.query.error) return res.status(400).send('Google authorization was cancelled or denied. Return to the admin portal to try again.');
+  const clientId = process.env.GOOGLE_OAUTH_CLIENT_ID;
+  const clientSecret = process.env.GOOGLE_OAUTH_CLIENT_SECRET;
+  const code = String(req.query.code || '');
+  if (!clientId || !clientSecret || !code) return res.status(400).send('Google authorization is not fully configured.');
+
+  try {
+    const tokenResponse = await fetch('https://oauth2.googleapis.com/token', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({
+        code, client_id: clientId, client_secret: clientSecret,
+        redirect_uri: GOOGLE_MEET_REDIRECT_URI, grant_type: 'authorization_code',
+      }),
+    });
+    const tokenData = await tokenResponse.json();
+    if (!tokenResponse.ok || !tokenData.refresh_token) {
+      console.error('Google OAuth token exchange failed:', tokenData.error || tokenResponse.status);
+      return res.status(400).send('Google did not provide ongoing access. Check the OAuth client and try again with the Herald account.');
+    }
+
+    const userResponse = await fetch('https://openidconnect.googleapis.com/v1/userinfo', {
+      headers: { Authorization: `Bearer ${tokenData.access_token}` },
+    });
+    const profile = await userResponse.json();
+    if (!userResponse.ok || String(profile.email || '').toLowerCase() !== 'heraldtrainer@gmail.com') {
+      return res.status(403).send('Please authorize with heraldtrainer@gmail.com. No token was stored.');
+    }
+
+    const encryptedToken = encryptGoogleToken(tokenData.refresh_token);
+    await db.execute({
+      sql: `INSERT INTO google_oauth_tokens (provider, refresh_token_ciphertext, updated_at)
+            VALUES ('google_meet', ?, CURRENT_TIMESTAMP)
+            ON CONFLICT(provider) DO UPDATE SET refresh_token_ciphertext = excluded.refresh_token_ciphertext,
+              updated_at = CURRENT_TIMESTAMP`,
+      args: [encryptedToken],
+    });
+    res.send('Google Meet is connected for heraldtrainer@gmail.com. You can close this page and return to the admin portal.');
+  } catch (err) {
+    console.error('Google OAuth callback failed:', err.message);
+    res.status(500).send('Google authorization could not be saved. Check the portal server configuration and try again.');
+  }
+});
+
 app.post('/api/admin/login', async (req, res) => {
   const { username, password } = req.body;
   if (!username || !password) return res.status(400).json({ error: 'Missing credentials' });
@@ -3781,18 +3886,18 @@ app.get('/api/admin/live-classes', authAdmin, async (req, res) => {
     FROM live_classes lc JOIN courses c ON c.id = lc.course_id
     ORDER BY lc.scheduled_at DESC
   `);
-  res.json(r.rows);
+  res.json(r.rows.map(row => ({ ...row, meeting_url: HERALD_LIVE_MEETING_URL })));
 });
 
 app.post('/api/admin/live-classes', authAdmin, async (req, res) => {
-  const { course_id, title, description, meeting_url, scheduled_at, duration_minutes, notify } = req.body;
-  if (!course_id || !title || !meeting_url || !scheduled_at) {
-    return res.status(400).json({ error: 'course_id, title, meeting_url, scheduled_at required' });
+  const { course_id, title, description, scheduled_at, duration_minutes, notify } = req.body;
+  if (!course_id || !title || !scheduled_at) {
+    return res.status(400).json({ error: 'course_id, title, scheduled_at required' });
   }
   const info = await db.execute({
     sql: `INSERT INTO live_classes (course_id, title, description, meeting_url, scheduled_at, duration_minutes, created_by)
           VALUES (?, ?, ?, ?, ?, ?, ?)`,
-    args: [course_id, title, description || '', meeting_url, scheduled_at, Number(duration_minutes) || 60, req.admin.id],
+    args: [course_id, title, description || '', HERALD_LIVE_MEETING_URL, scheduled_at, Number(duration_minutes) || 60, req.admin.id],
   });
 
   if (notify && mailer && mailer.ENABLED) {
@@ -3807,7 +3912,7 @@ app.post('/api/admin/live-classes', authAdmin, async (req, res) => {
       for (const s of sr.rows) {
         mailer.sendLiveClassNotification({
           to: s.email, studentName: s.name, courseCode: course.code, courseTitle: course.title,
-          classTitle: title, scheduledAt: new Date(scheduled_at), meetingUrl: meeting_url,
+          classTitle: title, scheduledAt: new Date(scheduled_at), meetingUrl: HERALD_LIVE_MEETING_URL,
         }).catch(err => console.error('Class email failed:', err.message));
       }
     } catch (e) { console.error('Class notification error:', e.message); }

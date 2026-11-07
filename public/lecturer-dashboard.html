@@ -523,11 +523,7 @@
               <textarea id="lcDesc" rows="2" placeholder="Topic, agenda, notes..."
                         style="padding:10px; border:1px solid var(--border); border-radius:6px;"></textarea>
             </label>
-            <label style="display:grid; gap:6px; font-size:13px; font-weight:600;">
-              Meeting URL (Zoom, Meet, Teams…)
-              <input id="lcUrl" type="url" required placeholder="https://..."
-                     style="padding:10px; border:1px solid var(--border); border-radius:6px;" />
-            </label>
+            <div style="font-size:13px; color:var(--muted);">Join link: <strong>https://meet.google.com/vcg-pnuu-oue</strong></div>
             <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
               <label style="display:grid; gap:6px; font-size:13px; font-weight:600;">
                 Date & Time
@@ -568,13 +564,12 @@
           course_id: Number(overlay.querySelector('#lcCourse').value),
           title: overlay.querySelector('#lcTitle').value.trim(),
           description: overlay.querySelector('#lcDesc').value.trim(),
-          meeting_url: overlay.querySelector('#lcUrl').value.trim(),
           scheduled_at: when ? new Date(when).toISOString() : '',
           duration_minutes: Number(overlay.querySelector('#lcDur').value) || 60,
           notify: overlay.querySelector('#lcNotify').checked,
         };
 
-        if (!payload.course_id || !payload.title || !payload.meeting_url || !payload.scheduled_at) {
+        if (!payload.course_id || !payload.title || !payload.scheduled_at) {
           toast('Please fill all required fields', 'error');
           btn.disabled = false;
           btn.textContent = 'Schedule';
