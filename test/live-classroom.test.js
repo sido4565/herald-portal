@@ -13,6 +13,20 @@ test('Nairobi datetime-local schedules convert to UTC and keep the Nairobi atten
   assert.equal(setupLiveClassroom.classDate('2027-02-03T22:30:00.000Z'), '2027-02-04');
 });
 
+test('LiveKit URLs normalize websocket and HTTP schemes and reject invalid values', () => {
+  assert.deepEqual(setupLiveClassroom.normalizeLiveKitUrl(' wss://example.livekit.cloud/ '), {
+    websocketUrl: 'wss://example.livekit.cloud', serviceUrl: 'https://example.livekit.cloud',
+  });
+  assert.deepEqual(setupLiveClassroom.normalizeLiveKitUrl('http://localhost:7880'), {
+    websocketUrl: 'ws://localhost:7880', serviceUrl: 'http://localhost:7880',
+  });
+  assert.deepEqual(setupLiveClassroom.normalizeLiveKitUrl('example.livekit.cloud'), {
+    websocketUrl: 'wss://example.livekit.cloud', serviceUrl: 'https://example.livekit.cloud',
+  });
+  assert.equal(setupLiveClassroom.normalizeLiveKitUrl('not a url'), null);
+  assert.equal(setupLiveClassroom.normalizeLiveKitUrl('ftp://example.com'), null);
+});
+
 async function runRequest({ path, method = 'GET', cookie, body, enrollment = true, lecturerAssigned = true }) {
   let insertCalled = false;
   const liveClass = {
@@ -104,4 +118,12 @@ test('authenticated admins can load live classes with their course and lecturer 
   assert.equal(result.data.length, 1);
   assert.equal(result.data[0].id, 41);
   assert.equal(result.data[0].meeting_url, '/live-classroom.html?classId=41');
+});
+
+test('class status accepts the valid lecturer session when an expired student cookie is also present', async () => {
+  const lecturer = jwt.sign({ id: 3, type: 'lecturer' }, JWT_SECRET);
+  const expiredStudent = jwt.sign({ id: 12, type: 'student' }, JWT_SECRET, { expiresIn: -1 });
+  const result = await runRequest({ path: '/api/live-classes/41/status', cookie: `token=${expiredStudent}; lecturer_token=${lecturer}` });
+  assert.equal(result.response.status, 200);
+  assert.equal(result.data.is_lecturer, true);
 });

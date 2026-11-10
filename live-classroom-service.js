@@ -5,9 +5,25 @@ const { AccessToken, RoomServiceClient, WebhookReceiver } = require('livekit-ser
 
 const LIVEKIT_API_KEY = process.env.LIVEKIT_API_KEY;
 const LIVEKIT_API_SECRET = process.env.LIVEKIT_API_SECRET;
-const LIVEKIT_URL = process.env.LIVEKIT_URL;
-const configured = Boolean(LIVEKIT_API_KEY && LIVEKIT_API_SECRET && LIVEKIT_URL);
-const httpUrl = LIVEKIT_URL ? LIVEKIT_URL.replace(/^wss:/, 'https:').replace(/^ws:/, 'http:') : '';
+function normalizeLiveKitUrl(value) {
+  if (typeof value !== 'string' || !value.trim()) return null;
+  try {
+    const raw = value.trim();
+    const parsed = new URL(/^[a-z][a-z\d+.-]*:\/\//i.test(raw) ? raw : `wss://${raw}`);
+    if (!['ws:', 'wss:', 'http:', 'https:'].includes(parsed.protocol) || !parsed.hostname || parsed.username || parsed.password) return null;
+    const secure = parsed.protocol === 'wss:' || parsed.protocol === 'https:';
+    parsed.protocol = secure ? 'wss:' : 'ws:';
+    const websocketUrl = parsed.toString().replace(/\/$/, '');
+    parsed.protocol = secure ? 'https:' : 'http:';
+    return { websocketUrl, serviceUrl: parsed.toString().replace(/\/$/, '') };
+  } catch {
+    return null;
+  }
+}
+const liveKitEndpoints = normalizeLiveKitUrl(process.env.LIVEKIT_URL);
+const LIVEKIT_URL = liveKitEndpoints?.websocketUrl || '';
+const configured = Boolean(LIVEKIT_API_KEY && LIVEKIT_API_SECRET && liveKitEndpoints);
+const httpUrl = liveKitEndpoints?.serviceUrl || '';
 const roomService = configured ? new RoomServiceClient(httpUrl, LIVEKIT_API_KEY, LIVEKIT_API_SECRET) : null;
 const webhookReceiver = configured ? new WebhookReceiver(LIVEKIT_API_KEY, LIVEKIT_API_SECRET) : null;
 const CLASS_END_GRACE_MINUTES = Math.max(0, Number(process.env.LIVE_CLASS_JOIN_GRACE_MINUTES) || 0);
@@ -39,7 +55,10 @@ function webhookTime(event, fallback = Date.now()) {
   return new Date(milliseconds).toISOString();
 }
 function sendConfigError(res) {
-  return res.status(503).json({ error: 'Live classrooms are not configured yet. Add LIVEKIT_URL, LIVEKIT_API_KEY, and LIVEKIT_API_SECRET to the backend environment.' });
+  const invalidUrl = Boolean(process.env.LIVEKIT_URL && !liveKitEndpoints);
+  return res.status(503).json({ error: invalidUrl
+    ? 'Live classrooms are unavailable because LIVEKIT_URL is invalid. Set it to the LiveKit server WebSocket URL (wss://...) and restart the server.'
+    : 'Live classrooms are not configured yet. Add LIVEKIT_URL, LIVEKIT_API_KEY, and LIVEKIT_API_SECRET to the backend environment.' });
 }
 function numericId(value) {
   const id = Number(value);
@@ -206,13 +225,16 @@ async function recoverClassTerminationSchedules(db) {
 
 function setupLiveClassroom({ app, db, authStudent, authLecturer, authAdmin, jwt, jwtSecret }) {
   const authAny = (req, res, next) => {
-    try {
-      const token = req.cookies.token || req.cookies.lecturer_token || req.cookies.admin_token;
-      const payload = jwt.verify(token, jwtSecret);
-      if (!['student', 'lecturer', 'admin'].includes(payload.type)) return res.status(403).json({ error: 'Portal account required.' });
-      req.portalUser = payload;
-      next();
-    } catch { res.status(401).json({ error: 'Not authenticated.' }); }
+    const tokens = [req.cookies.token, req.cookies.lecturer_token, req.cookies.admin_token].filter(Boolean);
+    for (const token of tokens) {
+      try {
+        const payload = jwt.verify(token, jwtSecret);
+        if (!['student', 'lecturer', 'admin'].includes(payload.type)) continue;
+        req.portalUser = payload;
+        return next();
+      } catch { /* Another role cookie may still hold a valid session. */ }
+    }
+    return res.status(401).json({ error: 'Not authenticated.' });
   };
   const requireConfig = (req, res, next) => configured ? next() : sendConfigError(res);
 
@@ -519,4 +541,5 @@ function setupLiveClassroom({ app, db, authStudent, authLecturer, authAdmin, jwt
 
 setupLiveClassroom.asIso = asIso;
 setupLiveClassroom.classDate = classDate;
+setupLiveClassroom.normalizeLiveKitUrl = normalizeLiveKitUrl;
 module.exports = setupLiveClassroom;
