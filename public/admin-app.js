@@ -2163,7 +2163,7 @@ async function openBulkAssignModal() {
       fill('liveAttendanceLecturer', [...new Map(lecturers.map(l => [Number(l.id), l])).values()], l => l.name);
       const formatDuration = seconds => {
         const total = Math.max(0, Math.floor(Number(seconds) || 0));
-        return total >= 3600 ? `${Math.floor(total / 3600)}h ${Math.floor((total % 3600) / 60)}m` : `${Math.floor(total / 60)}m ${total % 60}s`;
+        return `${(total / 60).toFixed(1)} min`;
       };
       const groups = new Map();
       for (const row of rows) {

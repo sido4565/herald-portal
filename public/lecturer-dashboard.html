@@ -477,7 +477,7 @@
           const target = wrap.querySelector(`[data-live-attendance="${btn.dataset.id}"]`);
           const refresh = async () => { try {
             const rows = await api(`/api/lecturer/live-classes/${btn.dataset.id}/attendance`);
-            const formatDuration = seconds => { const total = Math.max(0, Math.floor(Number(seconds) || 0)); return total >= 3600 ? `${Math.floor(total / 3600)}h ${Math.floor((total % 3600) / 60)}m` : `${Math.floor(total / 60)}m ${total % 60}s`; };
+            const formatDuration = seconds => `${(Math.max(0, Number(seconds) || 0) / 60).toFixed(1)} min`;
             target.innerHTML = `<div style="overflow:auto"><table style="width:100%;font-size:12px"><thead><tr><th>Participant</th><th>Status</th><th>Joined</th><th>Time in class</th></tr></thead><tbody>${rows.map(r => `<tr><td>${esc(r.name)}${r.participant_type === 'lecturer' ? ' (Lecturer)' : ` (${esc(r.reg_no)})`}</td><td>${esc(r.status || 'not joined')}</td><td>${r.first_joined_at ? new Date(r.first_joined_at).toLocaleTimeString() : '—'}</td><td>${formatDuration(r.duration_seconds)}${r.active_joined_at ? ' (connected)' : ''}</td></tr>`).join('')}</tbody></table></div>`;
             btn.textContent = 'Live attendance · updates every 5 sec';
             const state = await api(`/api/live-classes/${btn.dataset.id}/status`);

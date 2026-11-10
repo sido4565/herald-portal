@@ -126,7 +126,8 @@ async function closeOpenSessions(db, liveClass, endedAt) {
 async function refreshSummary(db, liveClass, studentId) {
   const stats = await db.execute({
     sql: `SELECT MIN(joined_at) AS first_joined_at, MAX(left_at) AS last_left_at,
-            COALESCE(SUM(duration_seconds), 0) AS duration_seconds,
+            COALESCE(SUM(CASE WHEN duration_seconds > 0 THEN duration_seconds WHEN left_at IS NOT NULL
+              THEN MAX(0, CAST((julianday(left_at) - julianday(joined_at)) * 86400 AS INTEGER)) ELSE 0 END), 0) AS duration_seconds,
             MAX(CASE WHEN left_at IS NULL THEN joined_at END) AS active_joined_at
           FROM live_class_attendance_sessions WHERE live_class_id = ? AND student_id = ?`,
     args: [liveClass.id, studentId],
@@ -602,17 +603,27 @@ function setupLiveClassroom({ app, db, authStudent, authLecturer, authAdmin, jwt
     const item = await getClass(db, numericId(req.params.id));
     if (!item) return res.status(404).json({ error: 'Live class not found.' });
     if (!(await courseAccess(db, 'lecturer', req.lecturer.id, item.course_id))) return res.status(403).json({ error: 'Not allowed.' });
+    if (item.status === 'LIVE') await reconcileRoomParticipants(db, item).catch(error => console.error(`Live class ${item.id} attendance refresh failed:`, error.message));
     const rows = await db.execute({
       sql: `SELECT s.id AS student_id, s.name, s.reg_no, a.status, a.first_joined_at,
-        a.last_left_at, a.duration_seconds,
+        a.last_left_at, a.duration_seconds, ps.first_joined_at AS participant_first_joined_at,
+        ps.last_left_at AS participant_last_left_at, ps.duration_seconds AS participant_duration_seconds,
+        ps.active_joined_at AS participant_active_joined_at,
         (SELECT MAX(joined_at) FROM live_class_attendance_sessions x WHERE x.live_class_id = ? AND x.student_id = s.id AND x.left_at IS NULL) AS active_joined_at
         FROM enrollments e JOIN students s ON s.id = e.student_id
         LEFT JOIN live_class_attendance a ON a.student_id = s.id AND a.live_class_id = ?
-        WHERE e.course_id = ? ORDER BY s.name`, args: [item.id, item.id, item.course_id],
+        LEFT JOIN (SELECT live_class_id, participant_id, MIN(joined_at) AS first_joined_at, MAX(left_at) AS last_left_at,
+            COALESCE(SUM(CASE WHEN duration_seconds > 0 THEN duration_seconds WHEN left_at IS NOT NULL
+              THEN MAX(0, CAST((julianday(left_at) - julianday(joined_at)) * 86400 AS INTEGER)) ELSE 0 END), 0) AS duration_seconds,
+            MAX(CASE WHEN left_at IS NULL THEN joined_at END) AS active_joined_at
+          FROM live_class_participant_sessions WHERE participant_type = 'student' AND live_class_id = ? GROUP BY live_class_id, participant_id) ps
+          ON ps.participant_id = s.id
+        WHERE e.course_id = ? ORDER BY s.name`, args: [item.id, item.id, item.id, item.course_id],
     });
     const lecturerSessions = await db.execute({
       sql: `SELECT MIN(joined_at) AS first_joined_at, MAX(left_at) AS last_left_at,
-            COALESCE(SUM(duration_seconds), 0) AS duration_seconds,
+            COALESCE(SUM(CASE WHEN duration_seconds > 0 THEN duration_seconds WHEN left_at IS NOT NULL
+              THEN MAX(0, CAST((julianday(left_at) - julianday(joined_at)) * 86400 AS INTEGER)) ELSE 0 END), 0) AS duration_seconds,
             MAX(participant_name) AS participant_name,
             MAX(CASE WHEN left_at IS NULL THEN joined_at END) AS active_joined_at
             FROM live_class_participant_sessions
@@ -628,9 +639,16 @@ function setupLiveClassroom({ app, db, authStudent, authLecturer, authAdmin, jwt
         first_joined_at: lecturerPresence.first_joined_at, last_left_at: lecturerPresence.last_left_at,
         duration_seconds: lecturerSeconds, active_joined_at: lecturerPresence.active_joined_at,
       }] : []),
-      ...rows.rows.map(row => ({ ...row, participant_type: 'student', status: row.active_joined_at ? (row.status || 'present') : row.status,
-      duration_seconds: (Number(row.duration_seconds) || 0) + (row.active_joined_at ? Math.max(0, Math.floor((Date.now() - new Date(row.active_joined_at).getTime()) / 1000)) : 0),
-    }))]);
+      ...rows.rows.map(row => {
+        const firstJoinedAt = row.first_joined_at || row.participant_first_joined_at || null;
+        const activeJoinedAt = row.active_joined_at || row.participant_active_joined_at || null;
+        const durationSeconds = Math.max(Number(row.duration_seconds) || 0, Number(row.participant_duration_seconds) || 0);
+        return { ...row, participant_type: 'student', first_joined_at: firstJoinedAt,
+          last_left_at: row.last_left_at || row.participant_last_left_at || null,
+          active_joined_at: activeJoinedAt, status: firstJoinedAt ? 'present' : row.status,
+          duration_seconds: durationSeconds + (activeJoinedAt ? Math.max(0, Math.floor((Date.now() - new Date(activeJoinedAt).getTime()) / 1000)) : 0),
+        };
+      })]);
   });
 
   app.get('/api/admin/live-class-attendance', authAdmin, async (req, res) => {
@@ -646,6 +664,8 @@ function setupLiveClassroom({ app, db, authStudent, authLecturer, authAdmin, jwt
     const report = await db.execute({
       sql: `SELECT a.*, ss.first_joined_at AS session_first_joined_at, ss.last_left_at AS session_last_left_at,
         ss.duration_seconds AS session_duration_seconds, ss.active_joined_at AS session_active_joined_at,
+        ps.first_joined_at AS participant_first_joined_at, ps.last_left_at AS participant_last_left_at,
+        ps.duration_seconds AS participant_duration_seconds, ps.active_joined_at AS participant_active_joined_at,
         'student' AS participant_type, s.name AS student_name, s.reg_no, c.code, c.title AS course_title,
         lc.title AS class_title, lc.scheduled_at, CASE WHEN lc.created_by_type = 'admin' THEN COALESCE(pl.name, 'Unassigned') ELSE COALESCE(l.name, pl.name, c.trainer, 'Herald Trainer') END AS lecturer_name
         FROM live_class_attendance a JOIN students s ON s.id = a.student_id
@@ -653,10 +673,17 @@ function setupLiveClassroom({ app, db, authStudent, authLecturer, authAdmin, jwt
         LEFT JOIN lecturers l ON lc.created_by_type = 'lecturer' AND l.id = lc.created_by
         LEFT JOIN lecturers pl ON pl.id = lc.presenter_lecturer_id
         LEFT JOIN (SELECT live_class_id, student_id, MIN(joined_at) AS first_joined_at, MAX(left_at) AS last_left_at,
-            COALESCE(SUM(duration_seconds), 0) AS duration_seconds,
+            COALESCE(SUM(CASE WHEN duration_seconds > 0 THEN duration_seconds WHEN left_at IS NOT NULL
+              THEN MAX(0, CAST((julianday(left_at) - julianday(joined_at)) * 86400 AS INTEGER)) ELSE 0 END), 0) AS duration_seconds,
             MAX(CASE WHEN left_at IS NULL THEN joined_at END) AS active_joined_at
           FROM live_class_attendance_sessions GROUP BY live_class_id, student_id) ss
           ON ss.live_class_id = a.live_class_id AND ss.student_id = a.student_id
+        LEFT JOIN (SELECT live_class_id, participant_id, MIN(joined_at) AS first_joined_at, MAX(left_at) AS last_left_at,
+            COALESCE(SUM(CASE WHEN duration_seconds > 0 THEN duration_seconds WHEN left_at IS NOT NULL
+              THEN MAX(0, CAST((julianday(left_at) - julianday(joined_at)) * 86400 AS INTEGER)) ELSE 0 END), 0) AS duration_seconds,
+            MAX(CASE WHEN left_at IS NULL THEN joined_at END) AS active_joined_at
+          FROM live_class_participant_sessions WHERE participant_type = 'student' GROUP BY live_class_id, participant_id) ps
+          ON ps.live_class_id = a.live_class_id AND ps.participant_id = a.student_id
         ${where} ORDER BY a.attendance_date DESC, c.code, s.name LIMIT 5000`, args,
     });
     const participantFilters = [];
@@ -686,10 +713,10 @@ function setupLiveClassroom({ app, db, authStudent, authLecturer, authAdmin, jwt
     });
     const now = Date.now();
     const studentRows = report.rows.map(row => {
-      const firstJoinedAt = row.session_first_joined_at || row.first_joined_at;
-      const activeJoinedAt = row.session_active_joined_at || row.active_joined_at;
-      const duration = Number(row.session_duration_seconds ?? row.duration_seconds ?? 0);
-      return { ...row, first_joined_at: firstJoinedAt, last_left_at: row.session_last_left_at || row.last_left_at,
+      const firstJoinedAt = row.session_first_joined_at || row.participant_first_joined_at || row.first_joined_at;
+      const activeJoinedAt = row.session_active_joined_at || row.participant_active_joined_at || row.active_joined_at;
+      const duration = Math.max(Number(row.session_duration_seconds) || 0, Number(row.participant_duration_seconds) || 0, Number(row.duration_seconds) || 0);
+      return { ...row, first_joined_at: firstJoinedAt, last_left_at: row.session_last_left_at || row.participant_last_left_at || row.last_left_at,
         active_joined_at: activeJoinedAt, status: firstJoinedAt ? 'present' : row.status,
         duration_seconds: duration + (activeJoinedAt ? Math.max(0, Math.floor((now - new Date(activeJoinedAt).getTime()) / 1000)) : 0) };
     });
@@ -705,14 +732,16 @@ function setupLiveClassroom({ app, db, authStudent, authLecturer, authAdmin, jwt
       COALESCE(ss.first_joined_at,a.first_joined_at) AS first_joined_at,COALESCE(ss.last_left_at,a.last_left_at) AS last_left_at,
       COALESCE(ss.duration_seconds,a.duration_seconds,0) + CASE WHEN ss.active_joined_at IS NOT NULL THEN MAX(0,CAST((julianday('now')-julianday(ss.active_joined_at))*86400 AS INTEGER)) ELSE 0 END AS duration_seconds
       FROM live_class_attendance a JOIN students s ON s.id=a.student_id JOIN courses c ON c.id=a.course_id JOIN live_classes lc ON lc.id=a.live_class_id
-      LEFT JOIN (SELECT live_class_id,student_id,MIN(joined_at) first_joined_at,MAX(left_at) last_left_at,COALESCE(SUM(duration_seconds),0) duration_seconds,
+      LEFT JOIN (SELECT live_class_id,student_id,MIN(joined_at) first_joined_at,MAX(left_at) last_left_at,
+        COALESCE(SUM(CASE WHEN duration_seconds > 0 THEN duration_seconds WHEN left_at IS NOT NULL THEN MAX(0,CAST((julianday(left_at)-julianday(joined_at))*86400 AS INTEGER)) ELSE 0 END),0) duration_seconds,
         MAX(CASE WHEN left_at IS NULL THEN joined_at END) active_joined_at FROM live_class_attendance_sessions GROUP BY live_class_id,student_id) ss
         ON ss.live_class_id=a.live_class_id AND ss.student_id=a.student_id
       ORDER BY a.attendance_date DESC,s.name LIMIT 10000`);
     const lecturerReport = await db.execute(`SELECT p.attendance_date,'lecturer' AS participant_type,
       COALESCE(MAX(p.participant_name),l.name,'Lecturer') AS name,'' AS reg_no,c.code,c.title AS course_title,lc.title AS class_title,
       'present' AS status,MIN(p.joined_at) AS first_joined_at,MAX(p.left_at) AS last_left_at,
-      COALESCE(SUM(p.duration_seconds),0) + COALESCE(SUM(CASE WHEN p.left_at IS NULL THEN MAX(0,CAST((julianday('now')-julianday(p.joined_at))*86400 AS INTEGER)) ELSE 0 END),0) AS duration_seconds
+      COALESCE(SUM(CASE WHEN p.duration_seconds > 0 THEN p.duration_seconds WHEN p.left_at IS NOT NULL THEN MAX(0,CAST((julianday(p.left_at)-julianday(p.joined_at))*86400 AS INTEGER)) ELSE 0 END),0)
+        + COALESCE(SUM(CASE WHEN p.left_at IS NULL THEN MAX(0,CAST((julianday('now')-julianday(p.joined_at))*86400 AS INTEGER)) ELSE 0 END),0) AS duration_seconds
       FROM live_class_participant_sessions p JOIN live_classes lc ON lc.id=p.live_class_id JOIN courses c ON c.id=lc.course_id
       LEFT JOIN lecturers l ON l.id=p.participant_id WHERE p.participant_type='lecturer'
       GROUP BY p.live_class_id,p.participant_id,p.attendance_date ORDER BY p.attendance_date DESC,name LIMIT 10000`);
