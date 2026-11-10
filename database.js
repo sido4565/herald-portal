@@ -237,6 +237,19 @@ async function initSchema() {
       duration_seconds INTEGER NOT NULL DEFAULT 0,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP
     )`,
+    `CREATE TABLE IF NOT EXISTS live_class_participant_sessions (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      live_class_id INTEGER NOT NULL REFERENCES live_classes(id) ON DELETE CASCADE,
+      participant_type TEXT NOT NULL CHECK(participant_type IN ('student', 'lecturer')),
+      participant_id INTEGER NOT NULL,
+      participant_name TEXT,
+      attendance_date TEXT NOT NULL,
+      identity TEXT NOT NULL,
+      joined_at TEXT NOT NULL,
+      left_at TEXT,
+      duration_seconds INTEGER NOT NULL DEFAULT 0,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    )`,
     `CREATE TABLE IF NOT EXISTS live_class_webhook_events (
       event_id TEXT PRIMARY KEY,
       event_type TEXT NOT NULL,
@@ -425,6 +438,7 @@ async function initSchema() {
   }
   await client.execute('CREATE INDEX IF NOT EXISTS idx_live_classes_status_end ON live_classes(status, scheduled_end_at)');
   await client.execute('CREATE INDEX IF NOT EXISTS idx_live_class_sessions_class_student ON live_class_attendance_sessions(live_class_id, student_id)');
+  await client.execute('CREATE INDEX IF NOT EXISTS idx_live_class_participant_sessions_person ON live_class_participant_sessions(live_class_id, participant_type, participant_id)');
   await client.execute('CREATE INDEX IF NOT EXISTS idx_live_class_attendance_course_date ON live_class_attendance(course_id, attendance_date)');
   await client.execute('CREATE UNIQUE INDEX IF NOT EXISTS idx_attendance_live_class_student ON attendance(live_class_id, student_id) WHERE live_class_id IS NOT NULL');
   await client.execute("UPDATE live_classes SET room_name = 'herald-class-' || id WHERE room_name IS NULL OR room_name = ''");

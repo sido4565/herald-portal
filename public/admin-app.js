@@ -2125,7 +2125,11 @@ async function openBulkAssignModal() {
       fill('liveAttendanceCourse', courses, c => `${c.code} — ${c.title}`);
       fill('liveAttendanceStudent', students, s => `${s.name} (${s.reg_no})`);
       fill('liveAttendanceLecturer', lecturers.filter(l => Number(l.approved) === 1), l => l.name);
-      table.innerHTML = rows.map(r => `<tr><td>${esc(r.attendance_date)}</td><td>${esc(r.student_name)} (${esc(r.reg_no)})</td><td>${esc(r.code)} — ${esc(r.class_title)}</td><td>${esc(r.lecturer_name)}</td><td>${esc(r.status)}</td><td>${r.first_joined_at ? new Date(r.first_joined_at).toLocaleTimeString() : '—'}</td><td>${r.last_left_at ? new Date(r.last_left_at).toLocaleTimeString() : '—'}</td><td>${Math.floor((r.duration_seconds || 0) / 60)} min</td></tr>`).join('') || '<tr><td colspan="8" class="empty">No attendance records match these filters.</td></tr>';
+      const formatDuration = seconds => {
+        const total = Math.max(0, Math.floor(Number(seconds) || 0));
+        return total >= 3600 ? `${Math.floor(total / 3600)}h ${Math.floor((total % 3600) / 60)}m` : `${Math.floor(total / 60)}m ${total % 60}s`;
+      };
+      table.innerHTML = rows.map(r => `<tr><td>${esc(r.attendance_date)}</td><td>${esc(r.student_name)}${r.participant_type === 'lecturer' ? ' (Lecturer)' : ` (${esc(r.reg_no)})`}</td><td>${esc(r.code)} — ${esc(r.class_title)}</td><td>${esc(r.lecturer_name)}</td><td>${esc(r.status)}</td><td>${r.first_joined_at ? new Date(r.first_joined_at).toLocaleTimeString() : '—'}</td><td>${r.active_joined_at ? 'In class' : r.last_left_at ? new Date(r.last_left_at).toLocaleTimeString() : '—'}</td><td>${formatDuration(r.duration_seconds)}${r.active_joined_at ? ' (in class)' : ''}</td></tr>`).join('') || '<tr><td colspan="8" class="empty">No attendance records match these filters.</td></tr>';
     } catch (error) { table.innerHTML = `<tr><td colspan="8" class="empty">${esc(error.message)}</td></tr>`; }
   }
   $('#loadLiveAttendanceBtn')?.addEventListener('click', loadLiveClassAttendance);
