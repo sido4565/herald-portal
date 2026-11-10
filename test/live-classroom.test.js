@@ -25,6 +25,7 @@ async function runRequest({ path, method = 'GET', cookie, body, enrollment = tru
       const sql = typeof statement === 'string' ? statement : statement.sql;
       const args = typeof statement === 'string' ? [] : statement.args || [];
       if (sql.includes('FROM live_classes lc') && sql.includes('WHERE lc.id = ?')) return { rows: [liveClass] };
+      if (sql.includes('FROM live_classes lc') && sql.includes('ORDER BY lc.scheduled_at DESC')) return { rows: [liveClass] };
       if (sql.startsWith('SELECT 1 FROM enrollments')) return { rows: enrollment ? [{ 1: 1 }] : [] };
       if (sql.startsWith('SELECT 1 FROM lecturer_courses')) return { rows: lecturerAssigned ? [{ 1: 1 }] : [] };
       if (sql.startsWith('SELECT 1 FROM courses')) return { rows: [{ 1: 1 }] };
@@ -95,4 +96,12 @@ test('students outside the enrolled course cannot read or join its classroom', a
 test('unverified requests cannot read admin live-class management APIs', async () => {
   const result = await runRequest({ path: '/api/admin/live-classes' });
   assert.equal(result.response.status, 401);
+});
+
+test('authenticated admins can load live classes with their course and lecturer details', async () => {
+  const result = await runRequest({ path: '/api/admin/live-classes', cookie: 'admin_token=valid-admin-session' });
+  assert.equal(result.response.status, 200);
+  assert.equal(result.data.length, 1);
+  assert.equal(result.data[0].id, 41);
+  assert.equal(result.data[0].meeting_url, '/live-classroom.html?classId=41');
 });

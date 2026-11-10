@@ -68,11 +68,16 @@ function toast(msg, type = 'success') {
 
 // ---------- API helper ----------
 async function api(url, opts = {}) {
+  const headers = new Headers(opts.headers || {});
+  const hasBody = opts.body !== undefined && opts.body !== null;
+  if (hasBody && !headers.has('Content-Type')) headers.set('Content-Type', 'application/json');
   const res = await fetch(url, {
-    headers: { 'Content-Type': 'application/json' },
     credentials: 'same-origin',
     ...opts,
-    body: opts.body ? JSON.stringify(opts.body) : undefined
+    headers,
+    body: hasBody
+      ? (typeof opts.body === 'string' ? opts.body : JSON.stringify(opts.body))
+      : undefined
   });
   if (res.status === 401 && !url.includes('/login')) {
     location.href = 'admin-login.html';
