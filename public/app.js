@@ -313,7 +313,7 @@ async function loadDashboard() {
   document.getElementById('userName').textContent = me.name;
 
   const passportGate = document.getElementById('passportPhotoGate');
-  if (Number(me.passport_required) === 1 && !me.passport_photo_key) {
+  if ((Number(me.passport_required) === 1 && !me.passport_photo_key) || Number(me.passport_photo_refresh_required) === 1) {
     for (const child of document.querySelector('main.container').children) {
       if (child !== passportGate) child.style.display = 'none';
     }

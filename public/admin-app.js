@@ -829,6 +829,7 @@ if (addLectBtn) {
         <td>
           <button class="btn-xs" data-act="edit-student" data-id="${s.id}" type="button">Edit</button>
           <button class="btn-xs" data-act="reset-pw"     data-id="${s.id}" type="button">Reset PW</button>
+          <button class="btn-xs" data-act="request-student-photo" data-id="${s.id}" type="button">Request new photo</button>
           <button class="btn-xs danger" data-act="del-student" data-id="${s.id}" type="button">Delete</button>
         </td>
       </tr>`).join('') || '<tr><td colspan="6" class="empty">No students registered.</td></tr>';
@@ -844,6 +845,12 @@ if (addLectBtn) {
       try {
         if (act === 'edit-student')  return editStudent(id);
         if (act === 'reset-pw')      return resetPwd(id);
+        if (act === 'request-student-photo') {
+          if (!confirm('Require this student to upload a new passport photo? Their current photo remains saved until the new upload succeeds.')) return;
+          await api(`/api/admin/students/${id}/request-passport-photo`, { method: 'POST' });
+          toast('Student will be asked to upload a new passport photo.');
+          return;
+        }
         if (act === 'del-student')   return deleteStudent(id);
         if (act === 'edit-course')   return editCourse(id);
         if (act === 'del-course')    return deleteCourse(id);

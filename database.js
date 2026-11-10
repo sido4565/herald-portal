@@ -31,7 +31,9 @@ async function initSchema() {
       passport_photo_key TEXT,
       passport_photo_storage TEXT,
       passport_photo_mime TEXT,
+      passport_photo_data BLOB,
       passport_required INTEGER NOT NULL DEFAULT 0,
+      passport_photo_refresh_required INTEGER NOT NULL DEFAULT 0,
       passport_notice_sent INTEGER NOT NULL DEFAULT 0,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP
     )`,
@@ -445,8 +447,8 @@ async function initSchema() {
   await client.execute("UPDATE live_classes SET scheduled_end_at = datetime(scheduled_at, '+' || COALESCE(duration_minutes, 60) || ' minutes') WHERE scheduled_end_at IS NULL OR scheduled_end_at = ''");
   const studentColumns = await client.execute('PRAGMA table_info(students)');
   for (const [name, definition] of [
-    ['passport_photo_key', 'TEXT'], ['passport_photo_storage', 'TEXT'], ['passport_photo_mime', 'TEXT'],
-    ['passport_required', 'INTEGER NOT NULL DEFAULT 0'], ['passport_notice_sent', 'INTEGER NOT NULL DEFAULT 0'],
+    ['passport_photo_key', 'TEXT'], ['passport_photo_storage', 'TEXT'], ['passport_photo_mime', 'TEXT'], ['passport_photo_data', 'BLOB'],
+    ['passport_required', 'INTEGER NOT NULL DEFAULT 0'], ['passport_photo_refresh_required', 'INTEGER NOT NULL DEFAULT 0'], ['passport_notice_sent', 'INTEGER NOT NULL DEFAULT 0'],
     ['status', "TEXT NOT NULL DEFAULT 'active'"],
   ]) {
     if (!studentColumns.rows.some(column => column.name === name)) await client.execute(`ALTER TABLE students ADD COLUMN ${name} ${definition}`);

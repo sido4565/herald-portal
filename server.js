@@ -192,6 +192,7 @@ async function deliverMaterialFile(material, res) {
 }
 
 async function getPrivateMaterialBytes(material) {
+  if (material.passport_photo_data) return Buffer.from(material.passport_photo_data);
   if (material.storage_type === 'r2' && material.storage_key && r2 && R2_BUCKET) {
     const object = await r2.send(new GetObjectCommand({ Bucket: R2_BUCKET, Key: material.storage_key }));
     return Buffer.from(await object.Body.transformToByteArray());
@@ -435,10 +436,10 @@ function authStudent(req, res, next) {
     if (p.type !== 'student') return res.status(403).json({ error: 'Student only' });
     req.user = p;
     if (req.path !== '/api/me' && req.path !== '/api/student/passport-photo' && req.path !== '/api/logout') {
-      db.execute({ sql: 'SELECT passport_required, passport_photo_key FROM students WHERE id = ?', args: [p.id] })
+      db.execute({ sql: 'SELECT passport_required, passport_photo_refresh_required, passport_photo_key FROM students WHERE id = ?', args: [p.id] })
         .then(result => {
           const student = result.rows[0];
-          if (student && Number(student.passport_required) === 1 && !student.passport_photo_key) {
+          if (student && Number(student.passport_required) === 1 && (!student.passport_photo_key || Number(student.passport_photo_refresh_required) === 1)) {
             return res.status(423).json({ error: 'Upload your passport photo to activate your dashboard.', code: 'PASSPORT_PHOTO_REQUIRED' });
           }
           next();
@@ -480,8 +481,8 @@ async function notifyActiveStudentsMissingPassportPhotos() {
   if (!mailer || !mailer.ENABLED || typeof mailer.sendMail !== 'function') return;
   try {
     const students = await db.execute({ sql: `SELECT id, name, email FROM students
-      WHERE status = 'active' AND active = 1 AND passport_required = 1
-        AND passport_photo_key IS NULL AND passport_notice_sent = 0` });
+      WHERE status = 'active' AND active = 1 AND ((passport_required = 1 AND passport_photo_key IS NULL) OR passport_photo_refresh_required = 1)
+        AND passport_notice_sent = 0` });
     const baseUrl = String(process.env.APP_URL || process.env.PUBLIC_BASE_URL || 'https://heraldtrainer.co.ke').replace(/\/$/, '');
     for (const student of students.rows) {
       const name = String(student.name || 'Student').replace(/[&<>"']/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char]));
@@ -492,7 +493,7 @@ async function notifyActiveStudentsMissingPassportPhotos() {
           text: `Hello ${student.name || 'Student'}, please upload a recent passport photo to your Herald Portal dashboard. Your dashboard functions will remain locked until the photo is uploaded. It is needed for your exam card and certificates. Sign in at ${baseUrl}/login.html.`,
           html: `<p>Hello ${name},</p><p>Please upload a recent passport photo to your Herald Portal dashboard. Your dashboard functions will remain locked until the photo is uploaded. It will appear on your exam card and certificates.</p><p><a href="${baseUrl}/login.html">Sign in to upload your photo</a></p>`,
         });
-        await db.execute({ sql: 'UPDATE students SET passport_notice_sent = 1 WHERE id = ? AND passport_photo_key IS NULL', args: [student.id] });
+        await db.execute({ sql: 'UPDATE students SET passport_notice_sent = 1 WHERE id = ? AND ((passport_required = 1 AND passport_photo_key IS NULL) OR passport_photo_refresh_required = 1)', args: [student.id] });
       } catch (err) {
         console.error(`Passport photo reminder failed for student ${student.id}:`, err.message);
       }
@@ -733,7 +734,7 @@ app.post('/api/logout', (req, res) => { res.clearCookie('token'); res.json({ ok:
 
 app.get('/api/me', authStudent, async (req, res) => {
   const r = await db.execute({
-    sql: 'SELECT id, reg_no, name, email, course, passport_required, passport_photo_key FROM students WHERE id = ?',
+    sql: 'SELECT id, reg_no, name, email, course, passport_required, passport_photo_key, passport_photo_refresh_required FROM students WHERE id = ?',
     args: [req.user.id],
   });
   res.json(r.rows[0]);
@@ -744,8 +745,11 @@ app.post('/api/student/passport-photo', authStudent, passportPhotoUpload.single(
   try {
     const saved = await savePrivateMaterialFile({ ...req.file, originalname: `student-${req.user.id}-passport.${req.file.mimetype === 'image/png' ? 'png' : 'jpg'}` });
     const old = await db.execute({ sql: 'SELECT passport_photo_key, passport_photo_storage FROM students WHERE id = ?', args: [req.user.id] });
-    await db.execute({ sql: 'UPDATE students SET passport_photo_key = ?, passport_photo_storage = ?, passport_photo_mime = ?, passport_required = 0 WHERE id = ?', args: [saved.storage_key, saved.storage_type, req.file.mimetype, req.user.id] });
-    if (old.rows[0]?.passport_photo_key) await deletePrivateMaterialFile(old.rows[0].passport_photo_key, old.rows[0].passport_photo_storage);
+    await db.execute({ sql: 'UPDATE students SET passport_photo_key = ?, passport_photo_storage = ?, passport_photo_mime = ?, passport_photo_data = ?, passport_required = 0, passport_photo_refresh_required = 0, passport_notice_sent = 0 WHERE id = ?', args: [saved.storage_key, saved.storage_type, req.file.mimetype, req.file.buffer, req.user.id] });
+    if (old.rows[0]?.passport_photo_key) {
+      try { await deletePrivateMaterialFile(old.rows[0].passport_photo_key, old.rows[0].passport_photo_storage); }
+      catch (cleanupError) { console.error('Old passport photo cleanup failed:', cleanupError.message); }
+    }
     res.json({ ok: true, passport_required: 0 });
   } catch (err) {
     console.error('Passport photo upload failed:', err.message);
@@ -756,20 +760,25 @@ app.post('/api/student/passport-photo', authStudent, passportPhotoUpload.single(
 async function markPassportPhotoMissing(studentId, photoKey) {
   await db.execute({
     sql: `UPDATE students SET passport_photo_key=NULL, passport_photo_storage=NULL,
-          passport_photo_mime=NULL, passport_required=1, passport_notice_sent=0
+          passport_photo_mime=NULL, passport_photo_data=NULL, passport_required=1, passport_notice_sent=0
           WHERE id=? AND passport_photo_key IS ?`,
     args: [studentId, photoKey || null],
   });
 }
 
 app.get('/api/student/passport-photo', authStudent, async (req, res) => {
-  const result = await db.execute({ sql: 'SELECT passport_photo_key, passport_photo_storage, passport_photo_mime FROM students WHERE id = ?', args: [req.user.id] });
+  const result = await db.execute({ sql: 'SELECT passport_photo_key, passport_photo_storage, passport_photo_mime, passport_photo_data FROM students WHERE id = ?', args: [req.user.id] });
   const photo = result.rows[0];
   if (!photo?.passport_photo_key) {
     await markPassportPhotoMissing(req.user.id, null);
     return res.status(404).json({ error: 'No passport photo uploaded. Upload one from your dashboard.' });
   }
   try {
+    if (photo.passport_photo_data) {
+      res.setHeader('Content-Type', photo.passport_photo_mime || 'image/jpeg');
+      res.setHeader('Cache-Control', 'private, no-store');
+      return res.send(Buffer.from(photo.passport_photo_data));
+    }
     if (photo.passport_photo_storage === 'r2-private' && r2 && R2_PRIVATE_BUCKET) {
       const object = await r2.send(new GetObjectCommand({ Bucket: R2_PRIVATE_BUCKET, Key: photo.passport_photo_key }));
       res.setHeader('Content-Type', photo.passport_photo_mime || 'image/jpeg');
@@ -1617,7 +1626,7 @@ async function getIssuedCredential(studentId,courseId) {
       COALESCE(sc.award_name,'') award_name,COALESCE(sc.qualification_name,'') qualification_name,
       COALESCE(sc.partner_university,'') partner_university,sc.certificate_id,sc.approved_at completion_date,
       COALESCE(sc.approved,0) approved,COALESCE(sc.course_completed,0) course_completed,COALESCE(sc.fees_completed,0) fees_completed,
-      s.passport_photo_key,s.passport_photo_storage,s.passport_photo_mime,
+      s.passport_photo_key,s.passport_photo_storage,s.passport_photo_mime,s.passport_photo_data,
       MAX(CASE WHEN UPPER(COALESCE(r.grade,'')) IN ('A','A-','B+','B','B-','C+','C','D','PASS','PASSED') OR COALESCE(r.marks,0)>=45 THEN 1 ELSE 0 END) academic_complete,
       COALESCE((SELECT SUM(f.amount_due-COALESCE(f.amount_paid,0)) FROM fees f WHERE f.student_id=s.id),0) balance
     FROM enrollments e JOIN students s ON s.id=e.student_id JOIN courses c ON c.id=e.course_id
@@ -2589,6 +2598,15 @@ app.post('/api/admin/students/:id/approve', authAdmin, async (req, res) => {
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
+});
+
+app.post('/api/admin/students/:id/request-passport-photo', authAdmin, async (req, res) => {
+  try {
+    const current = await db.execute({ sql: 'SELECT id FROM students WHERE id = ?', args: [req.params.id] });
+    if (!current.rows[0]) return res.status(404).json({ error: 'Student not found.' });
+    await db.execute({ sql: 'UPDATE students SET passport_photo_refresh_required = 1, passport_notice_sent = 0 WHERE id = ?', args: [req.params.id] });
+    res.json({ ok: true });
+  } catch (error) { res.status(500).json({ error: 'Could not request a replacement photo.' }); }
 });
 
 // Reject a student
@@ -4658,7 +4676,7 @@ app.get('/api/student/exams', authStudent, async (req, res) => {
 app.get('/api/student/exam-card/pdf', authStudent, async (req, res) => {
   try {
     const result = await db.execute({ sql: `SELECT s.id,s.name,s.reg_no,s.course,s.passport_photo_key,s.passport_photo_storage,
-        s.passport_photo_mime,COUNT(f.id) fee_count,COALESCE(SUM(f.amount_due),0) amount_due,
+        s.passport_photo_mime,s.passport_photo_data,COUNT(f.id) fee_count,COALESCE(SUM(f.amount_due),0) amount_due,
         COALESCE(SUM(f.amount_paid),0) amount_paid,
         COALESCE(SUM(f.amount_due-COALESCE(f.amount_paid,0)),0) balance
       FROM students s LEFT JOIN fees f ON f.student_id=s.id WHERE s.id=? GROUP BY s.id`, args: [req.user.id] });
@@ -4668,7 +4686,7 @@ app.get('/api/student/exam-card/pdf', authStudent, async (req, res) => {
       return res.status(403).json({ error: 'Clear all outstanding fees before downloading your exam card.' });
     }
     let photo;
-    try { photo = await getPrivateMaterialBytes({ storage_key: student.passport_photo_key, storage_type: student.passport_photo_storage }); }
+    try { photo = await getPrivateMaterialBytes({ storage_key: student.passport_photo_key, storage_type: student.passport_photo_storage, passport_photo_data: student.passport_photo_data }); }
     catch (err) {
       if (!['NoSuchKey', 'NotFound'].includes(err?.name) && Number(err?.$metadata?.httpStatusCode) !== 404) throw err;
     }

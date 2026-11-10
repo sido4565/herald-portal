@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { createRoot } from 'react-dom/client';
-import { LiveKitRoom, RoomAudioRenderer, VideoConference, useRoomContext } from '@livekit/components-react';
-import { RoomEvent } from 'livekit-client';
+import { Chat, ControlBar, GridLayout, LiveKitRoom, ParticipantTile, RoomAudioRenderer, useRoomContext, useTracks, VideoTrack } from '@livekit/components-react';
+import { RoomEvent, Track } from 'livekit-client';
 import '@livekit/components-styles';
 
 const classId = new URLSearchParams(location.search).get('classId');
@@ -50,6 +50,26 @@ function ClassReactions() {
     </div>
     {toast && <div key={toast.id} className="classroom-reaction-toast" role="status">{toast.emoji} <span>{toast.name} reacted</span></div>}
   </>;
+}
+
+function ClassroomConference() {
+  const [chatOpen, setChatOpen] = useState(false);
+  const screenShares = useTracks([Track.Source.ScreenShare], { onlySubscribed: true });
+  const cameras = useTracks([Track.Source.Camera], { onlySubscribed: true });
+  const hasScreenShare = screenShares.length > 0;
+  return <div className={`classroom-conference ${hasScreenShare ? 'has-screen-share' : ''}`}>
+    {hasScreenShare && <section className="classroom-share-stage" aria-label="Lecturer screen share">
+      <VideoTrack trackRef={screenShares[0]} autoPlay muted playsInline />
+    </section>}
+    <section className="classroom-camera-stage" aria-label="Class participants">
+      <GridLayout tracks={cameras}><ParticipantTile /></GridLayout>
+    </section>
+    <div className="classroom-control-row">
+      <ControlBar controls={{ microphone: true, camera: true, screenShare: true, chat: false, leave: true }} />
+      <button type="button" className="classroom-chat-toggle" onClick={() => setChatOpen(open => !open)} aria-expanded={chatOpen}>{chatOpen ? 'Close chat' : 'Chat'}</button>
+    </div>
+    {chatOpen && <div className="classroom-chat-panel"><Chat /></div>}
+  </div>;
 }
 
 function Classroom() {
@@ -153,7 +173,7 @@ function Classroom() {
             onConnected={() => { setConnected(true); setConnectionMessage('Connected to live class'); }}
             onDisconnected={leaveMessage} onError={e => setError(e.message || 'Could not connect to the classroom.')}>
             <RoomAudioRenderer />
-            <VideoConference />
+            <ClassroomConference />
             <ClassReactions />
           </LiveKitRoom>
           {isLecturer && <button className="classroom-end" onClick={end} disabled={busy}>End class for everyone</button>}
