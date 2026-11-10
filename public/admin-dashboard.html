@@ -352,6 +352,11 @@
         #panel-liveclasses .attendance-progress{display:flex;align-items:center;gap:9px;min-width:130px;font-variant-numeric:tabular-nums}
         #panel-liveclasses .attendance-progress>div{height:8px;flex:1;min-width:55px;overflow:hidden;border-radius:99px;background:#e4e9ee}
         #panel-liveclasses .attendance-progress i{display:block;height:100%;border-radius:inherit;background:#2b9a69}
+        #panel-liveclasses #liveAttendanceTable details summary{cursor:pointer;color:var(--gold-500);font-weight:700;white-space:nowrap}
+        #panel-liveclasses .live-attendance-roster{min-width:360px;max-height:300px;overflow:auto;margin-top:9px;border:1px solid var(--border);border-radius:8px;padding:4px 10px;background:var(--card)}
+        #panel-liveclasses .live-attendance-person{display:grid;grid-template-columns:minmax(140px,1.5fr) auto auto auto;gap:10px;align-items:center;padding:8px 0;border-bottom:1px solid var(--border);font-size:12px}
+        #panel-liveclasses .live-attendance-person:last-child{border-bottom:0}
+        @media(max-width:700px){#panel-liveclasses .live-attendance-person{grid-template-columns:1fr auto}.live-attendance-roster{min-width:260px!important}}
       </style>
       <div class="panel-head">
         <h2>Live Classes</h2>
@@ -372,7 +377,7 @@
           <select id="liveAttendanceLecturer" aria-label="Filter by lecturer"><option value="">All lecturers</option></select>
           <button class="btn-primary" id="loadLiveAttendanceBtn" type="button">Apply filters</button>
         </div>
-        <div class="table-wrap"><table id="liveAttendanceTable"><thead><tr><th>Date</th><th>Participant</th><th>Course / class</th><th>Lecturer</th><th>Status</th><th>Joined</th><th>Left</th><th>Total time</th></tr></thead><tbody></tbody></table></div>
+        <div class="table-wrap"><table id="liveAttendanceTable"><thead><tr><th>Date</th><th>Course / class</th><th>Lecturer</th><th>Attendance</th><th>Roster</th></tr></thead><tbody></tbody></table></div>
       </div>
     </section>
   </main>

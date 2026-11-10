@@ -29,7 +29,6 @@ const webhookReceiver = configured ? new WebhookReceiver(LIVEKIT_API_KEY, LIVEKI
 const CLASS_END_GRACE_MINUTES = Math.max(0, Number(process.env.LIVE_CLASS_JOIN_GRACE_MINUTES) || 0);
 const CLASS_TIMEZONE_OFFSET_MINUTES = Number.isFinite(Number(process.env.LIVE_CLASS_TIMEZONE_OFFSET_MINUTES))
   ? Number(process.env.LIVE_CLASS_TIMEZONE_OFFSET_MINUTES) : 180;
-const PRESENT_LATE_MINUTES = 15;
 const expiryTimers = new Map();
 let notificationMailer = null;
 try { notificationMailer = require('./mailer'); } catch (_) {}
@@ -134,8 +133,7 @@ async function refreshSummary(db, liveClass, studentId) {
   });
   const row = stats.rows[0];
   const first = row.first_joined_at || null;
-  const lateAfter = new Date(new Date(liveClass.scheduled_at).getTime() + PRESENT_LATE_MINUTES * 60000).getTime();
-  const status = !first ? 'absent' : new Date(first).getTime() > lateAfter ? 'late' : 'present';
+  const status = first ? 'present' : 'absent';
   const day = classDate(liveClass.scheduled_at);
   const activeSeconds = row.active_joined_at
     ? Math.max(0, Math.floor((Date.now() - new Date(row.active_joined_at).getTime()) / 1000)) : 0;
@@ -164,6 +162,14 @@ async function refreshSummary(db, liveClass, studentId) {
       sql: `INSERT INTO attendance (course_id, student_id, date, status, marked_by, notes, live_class_id, first_joined_at, last_left_at, duration_seconds)
             VALUES (?, ?, ?, ?, NULL, ?, ?, ?, ?, ?)`,
       args: attendanceArgs,
+    });
+  }
+  // A live class join counts as daily course attendance, including other class
+  // entries for the same course and date.
+  if (first) {
+    await db.execute({
+      sql: `UPDATE attendance SET status = 'present' WHERE course_id = ? AND student_id = ? AND date = ?`,
+      args: [liveClass.course_id, studentId, day],
     });
   }
 }
@@ -209,6 +215,14 @@ async function reconcileRoomParticipants(db, liveClass) {
           WHERE live_class_id = ? AND student_id = ? AND left_at IS NULL LIMIT 1`, args: [liveClass.id, id] });
         if (!openAttendance.rows.length) await db.execute({ sql: 'INSERT INTO live_class_attendance_sessions (live_class_id, student_id, joined_at) VALUES (?, ?, ?)', args: [liveClass.id, id, joinedAt] });
         await refreshSummary(db, liveClass, id);
+      } else {
+        const day = classDate(liveClass.scheduled_at);
+        await db.execute({
+          sql: `INSERT INTO lecturer_attendance (lecturer_id, date, status, notes, marked_by)
+                VALUES (?, ?, 'present', ?, NULL)
+                ON CONFLICT(lecturer_id, date) DO UPDATE SET status = 'present', notes = excluded.notes`,
+          args: [id, day, `Live class ${liveClass.id} (automatic)`],
+        });
       }
     }
 
@@ -275,6 +289,14 @@ async function finalizeClass(db, id, reason = 'scheduled') {
       args: [liveClass.course_id, student.student_id, classDay, attendance.status, `Live class ${id} (${reason})`, id, attendance.first_joined_at, attendance.last_left_at, attendance.duration_seconds],
     });
   }
+  await db.execute({
+    sql: `UPDATE attendance SET status = 'present'
+          WHERE course_id = ? AND date = ? AND student_id IN (
+            SELECT student_id FROM live_class_attendance
+            WHERE course_id = ? AND attendance_date = ? AND first_joined_at IS NOT NULL
+          )`,
+    args: [liveClass.course_id, classDay, liveClass.course_id, classDay],
+  });
   await db.execute({
     sql: "UPDATE live_classes SET status = 'COMPLETED', ended_at = ? WHERE id = ? AND status IN ('LIVE', 'ENDING')",
     args: [endAt, id],
@@ -667,9 +689,8 @@ function setupLiveClassroom({ app, db, authStudent, authLecturer, authAdmin, jwt
       const firstJoinedAt = row.session_first_joined_at || row.first_joined_at;
       const activeJoinedAt = row.session_active_joined_at || row.active_joined_at;
       const duration = Number(row.session_duration_seconds ?? row.duration_seconds ?? 0);
-      const lateAfter = new Date(row.scheduled_at).getTime() + PRESENT_LATE_MINUTES * 60000;
       return { ...row, first_joined_at: firstJoinedAt, last_left_at: row.session_last_left_at || row.last_left_at,
-        active_joined_at: activeJoinedAt, status: firstJoinedAt ? (new Date(firstJoinedAt).getTime() > lateAfter ? 'late' : 'present') : row.status,
+        active_joined_at: activeJoinedAt, status: firstJoinedAt ? 'present' : row.status,
         duration_seconds: duration + (activeJoinedAt ? Math.max(0, Math.floor((now - new Date(activeJoinedAt).getTime()) / 1000)) : 0) };
     });
     const lecturerRows = participants.rows.map(row => ({ ...row, status: 'present',
@@ -680,7 +701,7 @@ function setupLiveClassroom({ app, db, authStudent, authLecturer, authAdmin, jwt
   });
   app.get('/api/admin/live-class-attendance.csv', authAdmin, async (req, res) => {
     const report = await db.execute(`SELECT a.attendance_date,'student' AS participant_type,s.name,s.reg_no,c.code,c.title AS course_title,lc.title AS class_title,
-      CASE WHEN ss.first_joined_at IS NOT NULL THEN CASE WHEN julianday(ss.first_joined_at) > julianday(lc.scheduled_at, '+${PRESENT_LATE_MINUTES} minutes') THEN 'late' ELSE 'present' END ELSE a.status END AS status,
+      CASE WHEN ss.first_joined_at IS NOT NULL THEN 'present' ELSE a.status END AS status,
       COALESCE(ss.first_joined_at,a.first_joined_at) AS first_joined_at,COALESCE(ss.last_left_at,a.last_left_at) AS last_left_at,
       COALESCE(ss.duration_seconds,a.duration_seconds,0) + CASE WHEN ss.active_joined_at IS NOT NULL THEN MAX(0,CAST((julianday('now')-julianday(ss.active_joined_at))*86400 AS INTEGER)) ELSE 0 END AS duration_seconds
       FROM live_class_attendance a JOIN students s ON s.id=a.student_id JOIN courses c ON c.id=a.course_id JOIN live_classes lc ON lc.id=a.live_class_id
@@ -752,6 +773,12 @@ function setupLiveClassroom({ app, db, authStudent, authLecturer, authAdmin, jwt
           }
           await db.batch(statements, 'write');
           if (participantType === 'student') await refreshSummary(db, item, participantId);
+          else await db.execute({
+            sql: `INSERT INTO lecturer_attendance (lecturer_id, date, status, notes, marked_by)
+                  VALUES (?, ?, 'present', ?, NULL)
+                  ON CONFLICT(lecturer_id, date) DO UPDATE SET status = 'present', notes = excluded.notes`,
+            args: [participantId, classDate(item.scheduled_at), `Live class ${item.id} (automatic)`],
+          });
         } else {
           await db.execute(eventInsert);
         }
