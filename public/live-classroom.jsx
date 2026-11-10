@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { createRoot } from 'react-dom/client';
-import { Chat, ControlBar, GridLayout, LiveKitRoom, ParticipantTile, RoomAudioRenderer, useRoomContext, useTracks, VideoTrack } from '@livekit/components-react';
+import { Chat, ControlBar, LiveKitRoom, ParticipantTile, RoomAudioRenderer, TrackLoop, TrackRefContext, useRoomContext, useTracks, VideoTrack } from '@livekit/components-react';
 import { RoomEvent, Track } from 'livekit-client';
 import '@livekit/components-styles';
 
@@ -14,27 +14,9 @@ const api = async (url, options = {}) => {
 const dateLabel = value => value ? new Date(value).toLocaleString('en-KE', { dateStyle: 'medium', timeStyle: 'short' }) : '—';
 const timeLeft = seconds => `${String(Math.floor(seconds / 3600)).padStart(2, '0')}:${String(Math.floor(seconds % 3600 / 60)).padStart(2, '0')}:${String(seconds % 60).padStart(2, '0')}`;
 
-function ClassReactions() {
+function ClassReactions({ hands, setHands, floats, addFloat }) {
   const room = useRoomContext();
-  const [hands, setHands] = useState({});
-  const [toast, setToast] = useState(null);
   const handRaised = Boolean(hands[room.localParticipant.identity]);
-
-  useEffect(() => {
-    const onData = (payload, participant) => {
-      try {
-        const message = JSON.parse(new TextDecoder().decode(payload));
-        if (message.type === 'hand' && participant) setHands(current => ({ ...current, [participant.identity]: message.raised }));
-        else if (message.type === 'reaction' && participant && ['👏', '👍', '❤️', '❓'].includes(message.emoji)) {
-          const id = Date.now();
-          setToast({ id, name: participant.name || 'A student', emoji: message.emoji });
-          setTimeout(() => setToast(current => current?.id === id ? null : current), 2600);
-        }
-      } catch { /* Ignore unrelated room data. */ }
-    };
-    room.on(RoomEvent.DataReceived, onData);
-    return () => room.off(RoomEvent.DataReceived, onData);
-  }, [room]);
 
   const send = message => room.localParticipant.publishData(new TextEncoder().encode(JSON.stringify(message)), { reliable: true });
   const toggleHand = async () => {
@@ -45,14 +27,14 @@ function ClassReactions() {
   return <>
     <div className="classroom-reaction-bar" aria-label="Class reactions">
       <button type="button" className={handRaised ? 'raised' : ''} onClick={toggleHand} aria-pressed={handRaised}>{handRaised ? '✋ Hand raised' : '✋ Raise hand'}</button>
-      {['👏', '👍', '❤️', '❓'].map(emoji => <button type="button" key={emoji} onClick={() => send({ type: 'reaction', emoji }).catch(() => {})} aria-label={`React ${emoji}`}>{emoji}</button>)}
+      {['👏', '👍', '❤️', '❓'].map(emoji => <button type="button" key={emoji} onClick={() => { addFloat(emoji, room.localParticipant.identity); send({ type: 'reaction', emoji }).catch(() => {}); }} aria-label={`React ${emoji}`}>{emoji}</button>)}
       {Object.values(hands).filter(Boolean).length > 0 && <span className="classroom-raised-count">✋ {Object.values(hands).filter(Boolean).length}</span>}
     </div>
-    {toast && <div key={toast.id} className="classroom-reaction-toast" role="status">{toast.emoji} <span>{toast.name} reacted</span></div>}
+    {floats.map(item => <div key={item.id} className="classroom-reaction-float" style={{ left: `${item.left}%` }} aria-hidden="true">{item.emoji}</div>)}
   </>;
 }
 
-function ClassroomConference() {
+function ClassroomConference({ hands }) {
   const [chatOpen, setChatOpen] = useState(false);
   const screenShares = useTracks([Track.Source.ScreenShare], { onlySubscribed: true });
   const cameras = useTracks([Track.Source.Camera], { onlySubscribed: true });
@@ -62,7 +44,7 @@ function ClassroomConference() {
       <VideoTrack trackRef={screenShares[0]} autoPlay muted playsInline />
     </section>}
     <section className="classroom-camera-stage" aria-label="Class participants">
-      <GridLayout tracks={cameras}><ParticipantTile /></GridLayout>
+      <div className="classroom-participant-grid"><TrackLoop tracks={cameras}><TrackRefContext.Consumer>{trackRef => trackRef && <div className="classroom-participant-wrap"><ParticipantTile trackRef={trackRef} />{hands[trackRef.participant.identity] && <span className="classroom-hand-badge" aria-label="Hand raised">✋</span>}</div>}</TrackRefContext.Consumer></TrackLoop></div>
     </section>
     <div className="classroom-control-row">
       <ControlBar controls={{ microphone: true, camera: true, screenShare: true, chat: false, leave: true }} />
@@ -70,6 +52,33 @@ function ClassroomConference() {
     </div>
     {chatOpen && <div className="classroom-chat-panel"><Chat /></div>}
   </div>;
+}
+
+function ClassroomLiveRoom() {
+  const room = useRoomContext();
+  const [hands, setHands] = useState({});
+  const [floats, setFloats] = useState([]);
+  const addFloat = useCallback((emoji, identity) => {
+    const id = `${Date.now()}-${Math.random()}`;
+    setFloats(current => [...current, { id, emoji, identity, left: 12 + Math.random() * 76 }]);
+    setTimeout(() => setFloats(current => current.filter(item => item.id !== id)), 2400);
+  }, []);
+  useEffect(() => {
+    const onData = (payload, participant) => {
+      try {
+        const message = JSON.parse(new TextDecoder().decode(payload));
+        if (message.type === 'hand' && participant) setHands(current => ({ ...current, [participant.identity]: message.raised }));
+        else if (message.type === 'reaction' && participant && ['👏', '👍', '❤️', '❓'].includes(message.emoji)) addFloat(message.emoji, participant.identity);
+      } catch { /* Ignore unrelated room data. */ }
+    };
+    room.on(RoomEvent.DataReceived, onData);
+    return () => room.off(RoomEvent.DataReceived, onData);
+  }, [room, addFloat]);
+  return <>
+    <RoomAudioRenderer />
+    <ClassroomConference hands={hands} />
+    <ClassReactions hands={hands} setHands={setHands} floats={floats} addFloat={addFloat} />
+  </>;
 }
 
 function Classroom() {
@@ -172,9 +181,7 @@ function Classroom() {
           <LiveKitRoom token={tokenInfo.token} serverUrl={tokenInfo.url} connect={true} audio={true} video={true}
             onConnected={() => { setConnected(true); setConnectionMessage('Connected to live class'); }}
             onDisconnected={leaveMessage} onError={e => setError(e.message || 'Could not connect to the classroom.')}>
-            <RoomAudioRenderer />
-            <ClassroomConference />
-            <ClassReactions />
+            <ClassroomLiveRoom />
           </LiveKitRoom>
           {isLecturer && <button className="classroom-end" onClick={end} disabled={busy}>End class for everyone</button>}
         </div>
