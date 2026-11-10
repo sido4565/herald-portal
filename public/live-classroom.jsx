@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { createRoot } from 'react-dom/client';
-import { LiveKitRoom, RoomAudioRenderer, VideoConference } from '@livekit/components-react';
+import { LiveKitRoom, RoomAudioRenderer, VideoConference, useRoomContext } from '@livekit/components-react';
+import { RoomEvent } from 'livekit-client';
 import '@livekit/components-styles';
 
 const classId = new URLSearchParams(location.search).get('classId');
@@ -12,6 +13,44 @@ const api = async (url, options = {}) => {
 };
 const dateLabel = value => value ? new Date(value).toLocaleString('en-KE', { dateStyle: 'medium', timeStyle: 'short' }) : '—';
 const timeLeft = seconds => `${String(Math.floor(seconds / 3600)).padStart(2, '0')}:${String(Math.floor(seconds % 3600 / 60)).padStart(2, '0')}:${String(seconds % 60).padStart(2, '0')}`;
+
+function ClassReactions() {
+  const room = useRoomContext();
+  const [hands, setHands] = useState({});
+  const [toast, setToast] = useState(null);
+  const handRaised = Boolean(hands[room.localParticipant.identity]);
+
+  useEffect(() => {
+    const onData = (payload, participant) => {
+      try {
+        const message = JSON.parse(new TextDecoder().decode(payload));
+        if (message.type === 'hand' && participant) setHands(current => ({ ...current, [participant.identity]: message.raised }));
+        else if (message.type === 'reaction' && participant && ['👏', '👍', '❤️', '❓'].includes(message.emoji)) {
+          const id = Date.now();
+          setToast({ id, name: participant.name || 'A student', emoji: message.emoji });
+          setTimeout(() => setToast(current => current?.id === id ? null : current), 2600);
+        }
+      } catch { /* Ignore unrelated room data. */ }
+    };
+    room.on(RoomEvent.DataReceived, onData);
+    return () => room.off(RoomEvent.DataReceived, onData);
+  }, [room]);
+
+  const send = message => room.localParticipant.publishData(new TextEncoder().encode(JSON.stringify(message)), { reliable: true });
+  const toggleHand = async () => {
+    const raised = !handRaised;
+    setHands(current => ({ ...current, [room.localParticipant.identity]: raised }));
+    try { await send({ type: 'hand', raised }); } catch { /* Connection status is shown by LiveKit. */ }
+  };
+  return <>
+    <div className="classroom-reaction-bar" aria-label="Class reactions">
+      <button type="button" className={handRaised ? 'raised' : ''} onClick={toggleHand} aria-pressed={handRaised}>{handRaised ? '✋ Hand raised' : '✋ Raise hand'}</button>
+      {['👏', '👍', '❤️', '❓'].map(emoji => <button type="button" key={emoji} onClick={() => send({ type: 'reaction', emoji }).catch(() => {})} aria-label={`React ${emoji}`}>{emoji}</button>)}
+      {Object.values(hands).filter(Boolean).length > 0 && <span className="classroom-raised-count">✋ {Object.values(hands).filter(Boolean).length}</span>}
+    </div>
+    {toast && <div key={toast.id} className="classroom-reaction-toast" role="status">{toast.emoji} <span>{toast.name} reacted</span></div>}
+  </>;
+}
 
 function Classroom() {
   const [status, setStatus] = useState(null);
@@ -115,6 +154,7 @@ function Classroom() {
             onDisconnected={leaveMessage} onError={e => setError(e.message || 'Could not connect to the classroom.')}>
             <RoomAudioRenderer />
             <VideoConference />
+            <ClassReactions />
           </LiveKitRoom>
           {isLecturer && <button className="classroom-end" onClick={end} disabled={busy}>End class for everyone</button>}
         </div>

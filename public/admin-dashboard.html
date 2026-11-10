@@ -346,6 +346,13 @@
 
     <!-- Live Classes -->
     <section class="admin-panel" id="panel-liveclasses">
+      <style>
+        #panel-liveclasses .live-class-progress{padding:12px 4px;display:grid;gap:8px}
+        #panel-liveclasses .live-class-progress>span{color:var(--muted);font-size:13px}
+        #panel-liveclasses .attendance-progress{display:flex;align-items:center;gap:9px;min-width:130px;font-variant-numeric:tabular-nums}
+        #panel-liveclasses .attendance-progress>div{height:8px;flex:1;min-width:55px;overflow:hidden;border-radius:99px;background:#e4e9ee}
+        #panel-liveclasses .attendance-progress i{display:block;height:100%;border-radius:inherit;background:#2b9a69}
+      </style>
       <div class="panel-head">
         <h2>Live Classes</h2>
         <button class="btn-primary" id="addLiveClassBtn" type="button">Schedule Live Class</button>

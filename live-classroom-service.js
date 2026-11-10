@@ -304,6 +304,31 @@ function setupLiveClassroom({ app, db, authStudent, authLecturer, authAdmin, jwt
     } catch (error) { res.status(500).json({ error: error.message }); }
   });
 
+  app.get('/api/admin/live-classes/:id/progress', authAdmin, async (req, res) => {
+    try {
+      const item = await getClass(db, numericId(req.params.id));
+      if (!item) return res.status(404).json({ error: 'Live class not found.' });
+      const now = Date.now();
+      const start = new Date(item.started_at || item.scheduled_at).getTime();
+      const end = new Date(item.scheduled_end_at).getTime();
+      const elapsedSeconds = Math.max(0, Math.floor((Math.min(now, end) - start) / 1000));
+      const enrolled = await db.execute({
+        sql: `SELECT s.id AS participant_id, s.name, s.reg_no,
+                COALESCE(SUM(p.duration_seconds), 0) AS completed_seconds,
+                MAX(CASE WHEN p.left_at IS NULL THEN p.joined_at END) AS active_joined_at
+              FROM enrollments e JOIN students s ON s.id = e.student_id
+              LEFT JOIN live_class_participant_sessions p ON p.live_class_id = ? AND p.participant_type = 'student' AND p.participant_id = s.id
+              WHERE e.course_id = ? AND s.status = 'active'
+              GROUP BY s.id, s.name, s.reg_no ORDER BY s.name`, args: [item.id, item.course_id],
+      });
+      const participants = enrolled.rows.map(row => {
+        const seconds = (Number(row.completed_seconds) || 0) + (row.active_joined_at ? Math.max(0, Math.floor((now - new Date(row.active_joined_at).getTime()) / 1000)) : 0);
+        return { name: row.name, reg_no: row.reg_no, duration_seconds: seconds, attendance_percentage: elapsedSeconds ? Math.min(100, Math.round(seconds / elapsedSeconds * 100)) : 0, connected: Boolean(row.active_joined_at) };
+      });
+      res.json({ class_id: item.id, status: item.status, elapsed_seconds: elapsedSeconds, participants });
+    } catch (error) { res.status(500).json({ error: error.message }); }
+  });
+
   async function createClass(req, res, creatorType) {
     const courseId = numericId(req.body.course_id);
     const title = String(req.body.title || '').trim().slice(0, 180);

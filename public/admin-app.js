@@ -2059,7 +2059,10 @@ async function openBulkAssignModal() {
   }
 
   // ---------------- Live Classes ----------------
+  const liveProgressTimers = new Map();
   async function loadLiveClasses() {
+    liveProgressTimers.forEach(timer => clearInterval(timer));
+    liveProgressTimers.clear();
     const rows = await api('/api/admin/live-classes');
     const tb = $('#liveClassesTable tbody');
 
@@ -2095,10 +2098,23 @@ async function openBulkAssignModal() {
     });
     tb.querySelectorAll('[data-act="monitor-lc"]').forEach(button => button.addEventListener('click', async () => {
       const cell = tb.querySelector(`[data-participants="${button.dataset.id}"]`);
+      const id = button.dataset.id;
+      if (liveProgressTimers.has(id)) {
+        clearInterval(liveProgressTimers.get(id)); liveProgressTimers.delete(id);
+        cell.hidden = true; button.textContent = 'Participants'; return;
+      }
+      cell.hidden = false; button.textContent = 'Hide progress';
+      const refreshProgress = async () => {
+       try {
+        const state = await api(`/api/admin/live-classes/${id}/progress`);
+        const participants = state.participants || [];
+        const average = participants.length ? Math.round(participants.reduce((sum, person) => sum + person.attendance_percentage, 0) / participants.length) : 0;
+        cell.innerHTML = `<div class="live-class-progress"><strong>Live attendance progress</strong><span>${average}% average attendance · ${participants.filter(p => p.connected).length}/${participants.length} connected · Based on class time elapsed</span><div class="table-wrap"><table><thead><tr><th>Participant</th><th>Connection</th><th>Time attended</th><th>Attendance</th></tr></thead><tbody>${participants.map(p => `<tr><td>${esc(p.name)} (${esc(p.reg_no)})</td><td>${p.connected ? 'Connected' : 'Not connected'}</td><td>${Math.floor(p.duration_seconds / 60)}m ${p.duration_seconds % 60}s</td><td><div class="attendance-progress"><span>${p.attendance_percentage}%</span><div><i style="width:${p.attendance_percentage}%"></i></div></div></td></tr>`).join('') || '<tr><td colspan="4" class="empty">No active students are enrolled in this course.</td></tr>'}</tbody></table></div></div>`;
+       } catch (error) { cell.innerHTML = `<span>${esc(error.message)}</span>`; }
+      };
       try {
-        const state = await api(`/api/live-classes/${button.dataset.id}/status`);
-        cell.hidden = false;
-        cell.innerHTML = `<strong>Connected participants:</strong> ${state.participants?.length ? state.participants.map(p => esc(p.name || p.identity)).join(', ') : 'None currently connected'}`;
+        await refreshProgress();
+        liveProgressTimers.set(id, setInterval(refreshProgress, 5000));
       } catch (error) { toast(error.message, 'error'); }
     }));
     await loadLiveClassAttendance();
