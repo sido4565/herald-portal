@@ -68,9 +68,12 @@ function numericId(value) {
 async function getClass(db, id) {
   const result = await db.execute({
     sql: `SELECT lc.*, c.code, c.title AS course_title,
-            COALESCE(l.name, c.trainer, a.name, 'Herald Trainer') AS lecturer_name
+            CASE WHEN lc.created_by_type = 'admin' THEN COALESCE(pl.name, (SELECT assigned.name FROM lecturer_courses ax JOIN lecturers assigned ON assigned.id = ax.lecturer_id
+              WHERE ax.course_id = lc.course_id AND assigned.status = 'active' AND assigned.approved = 1 ORDER BY assigned.id LIMIT 1), 'Unassigned')
+              ELSE COALESCE(l.name, pl.name, c.trainer, 'Herald Trainer') END AS lecturer_name
           FROM live_classes lc JOIN courses c ON c.id = lc.course_id
           LEFT JOIN lecturers l ON lc.created_by_type = 'lecturer' AND l.id = lc.created_by
+          LEFT JOIN lecturers pl ON pl.id = lc.presenter_lecturer_id
           LEFT JOIN admins a ON lc.created_by_type = 'admin' AND a.id = lc.created_by
           WHERE lc.id = ?`, args: [id],
   });
@@ -162,6 +165,73 @@ async function refreshSummary(db, liveClass, studentId) {
             VALUES (?, ?, ?, ?, NULL, ?, ?, ?, ?, ?)`,
       args: attendanceArgs,
     });
+  }
+}
+
+const reconcilingRooms = new Set();
+function participantJoinDate(value, liveClass) {
+  const normalizedValue = typeof value === 'bigint' ? Number(value) : value;
+  let timestamp = normalizedValue ? new Date(normalizedValue).getTime() : Date.now();
+  if (typeof normalizedValue === 'number' && normalizedValue > 0 && normalizedValue < 1e12) timestamp *= 1000;
+  if (!Number.isFinite(timestamp)) timestamp = Date.now();
+  timestamp = Math.max(new Date(liveClass.scheduled_at).getTime(), Math.min(timestamp, new Date(liveClass.scheduled_end_at).getTime()));
+  return new Date(timestamp).toISOString();
+}
+
+async function reconcileRoomParticipants(db, liveClass) {
+  if (!configured || liveClass.status !== 'LIVE' || !liveClass.room_name || reconcilingRooms.has(Number(liveClass.id))) return;
+  reconcilingRooms.add(Number(liveClass.id));
+  try {
+    const now = Math.min(Date.now(), new Date(liveClass.scheduled_end_at).getTime());
+    const roomParticipants = await roomService.listParticipants(liveClass.room_name);
+    const active = new Map();
+    for (const participant of roomParticipants) {
+      const match = /^(student|lecturer)-(\d+)$/.exec(String(participant.identity || ''));
+      if (!match) continue;
+      const [, type, rawId] = match;
+      const id = Number(rawId);
+      const allowed = type === 'student'
+        ? await courseAccess(db, 'student', id, liveClass.course_id)
+        : await activeLecturer(db, id) && await courseAccess(db, 'lecturer', id, liveClass.course_id);
+      if (!allowed) continue;
+      const identity = `${type}-${id}`;
+      const joinedAt = participantJoinDate(participant.joinedAt, liveClass);
+      active.set(identity, { type, id });
+      const openParticipant = await db.execute({ sql: `SELECT id FROM live_class_participant_sessions
+        WHERE live_class_id = ? AND participant_type = ? AND participant_id = ? AND left_at IS NULL LIMIT 1`, args: [liveClass.id, type, id] });
+      if (!openParticipant.rows.length) {
+        await db.execute({ sql: `INSERT INTO live_class_participant_sessions
+          (live_class_id, participant_type, participant_id, participant_name, attendance_date, identity, joined_at)
+          VALUES (?, ?, ?, ?, ?, ?, ?)`, args: [liveClass.id, type, id, participant.name || identity, classDate(liveClass.scheduled_at), identity, joinedAt] });
+      }
+      if (type === 'student') {
+        const openAttendance = await db.execute({ sql: `SELECT id FROM live_class_attendance_sessions
+          WHERE live_class_id = ? AND student_id = ? AND left_at IS NULL LIMIT 1`, args: [liveClass.id, id] });
+        if (!openAttendance.rows.length) await db.execute({ sql: 'INSERT INTO live_class_attendance_sessions (live_class_id, student_id, joined_at) VALUES (?, ?, ?)', args: [liveClass.id, id, joinedAt] });
+        await refreshSummary(db, liveClass, id);
+      }
+    }
+
+    const openSessions = await db.execute({ sql: `SELECT id, participant_type, participant_id, joined_at FROM live_class_participant_sessions
+      WHERE live_class_id = ? AND left_at IS NULL`, args: [liveClass.id] });
+    for (const session of openSessions.rows) {
+      const identity = `${session.participant_type}-${session.participant_id}`;
+      if (active.has(identity)) continue;
+      const leftAt = new Date(Math.max(new Date(session.joined_at).getTime(), now)).toISOString();
+      await db.execute({ sql: `UPDATE live_class_participant_sessions SET left_at = ?, duration_seconds = ? WHERE id = ? AND left_at IS NULL`, args: [leftAt, Math.max(0, Math.floor((new Date(leftAt).getTime() - new Date(session.joined_at).getTime()) / 1000)), session.id] });
+      if (session.participant_type === 'student') {
+        const studentSession = await db.execute({ sql: `SELECT id, joined_at FROM live_class_attendance_sessions
+          WHERE live_class_id = ? AND student_id = ? AND left_at IS NULL ORDER BY id DESC LIMIT 1`, args: [liveClass.id, session.participant_id] });
+        if (studentSession.rows[0]) {
+          const joinedAt = new Date(studentSession.rows[0].joined_at);
+          const closedAt = new Date(Math.max(joinedAt.getTime(), new Date(leftAt).getTime()));
+          await db.execute({ sql: 'UPDATE live_class_attendance_sessions SET left_at = ?, duration_seconds = ? WHERE id = ? AND left_at IS NULL', args: [closedAt.toISOString(), Math.floor((closedAt.getTime() - joinedAt.getTime()) / 1000), studentSession.rows[0].id] });
+        }
+        await refreshSummary(db, liveClass, session.participant_id);
+      }
+    }
+  } finally {
+    reconcilingRooms.delete(Number(liveClass.id));
   }
 }
 
@@ -268,10 +338,11 @@ function setupLiveClassroom({ app, db, authStudent, authLecturer, authAdmin, jwt
   app.get('/api/my-live-classes', authStudent, async (req, res) => {
     try {
       const result = await db.execute({
-        sql: `SELECT lc.*, c.code, c.title AS course_title, COALESCE(l.name, c.trainer, 'Herald Trainer') AS lecturer_name
+        sql: `SELECT lc.*, c.code, c.title AS course_title, COALESCE(pl.name, l.name, c.trainer, 'Herald Trainer') AS lecturer_name
               FROM live_classes lc JOIN courses c ON c.id = lc.course_id
               JOIN enrollments e ON e.course_id = lc.course_id
               LEFT JOIN lecturers l ON lc.created_by_type = 'lecturer' AND l.id = lc.created_by
+              LEFT JOIN lecturers pl ON pl.id = lc.presenter_lecturer_id
               WHERE e.student_id = ? ORDER BY lc.scheduled_at`, args: [req.user.id],
       });
       res.json(result.rows.map(row => ({ ...row,
@@ -286,8 +357,12 @@ function setupLiveClassroom({ app, db, authStudent, authLecturer, authAdmin, jwt
     try {
       if (!(await activeLecturer(db, req.lecturer.id))) return res.status(403).json({ error: 'An active, approved lecturer account is required.' });
       const result = await db.execute({
-        sql: `SELECT lc.*, c.code, c.title AS course_title FROM live_classes lc JOIN courses c ON c.id = lc.course_id
-              JOIN lecturer_courses x ON x.course_id = c.id WHERE x.lecturer_id = ? ORDER BY lc.scheduled_at DESC`,
+        sql: `SELECT lc.*, c.code, c.title AS course_title, COALESCE(pl.name, l.name, c.trainer, 'Herald Trainer') AS lecturer_name
+              FROM live_classes lc JOIN courses c ON c.id = lc.course_id
+              JOIN lecturer_courses x ON x.course_id = c.id
+              LEFT JOIN lecturers l ON lc.created_by_type = 'lecturer' AND l.id = lc.created_by
+              LEFT JOIN lecturers pl ON pl.id = lc.presenter_lecturer_id
+              WHERE x.lecturer_id = ? ORDER BY lc.scheduled_at DESC`,
         args: [req.lecturer.id],
       });
       res.json(result.rows.map(row => ({ ...row, meeting_url: classUrl(row.id) })));
@@ -297,10 +372,21 @@ function setupLiveClassroom({ app, db, authStudent, authLecturer, authAdmin, jwt
   app.get('/api/admin/live-classes', authAdmin, async (req, res) => {
     try {
       const result = await db.execute(`SELECT lc.*, c.code, c.title AS course_title,
-        COALESCE(l.name, c.trainer, a.name, 'Herald Trainer') AS lecturer_name FROM live_classes lc JOIN courses c ON c.id = lc.course_id
+        CASE WHEN lc.created_by_type = 'admin' THEN COALESCE(pl.name, (SELECT assigned.name FROM lecturer_courses ax JOIN lecturers assigned ON assigned.id = ax.lecturer_id
+          WHERE ax.course_id = lc.course_id AND assigned.status = 'active' AND assigned.approved = 1 ORDER BY assigned.id LIMIT 1), 'Unassigned')
+          ELSE COALESCE(l.name, pl.name, c.trainer, a.name, 'Herald Trainer') END AS lecturer_name FROM live_classes lc JOIN courses c ON c.id = lc.course_id
         LEFT JOIN lecturers l ON lc.created_by_type = 'lecturer' AND l.id = lc.created_by
+        LEFT JOIN lecturers pl ON pl.id = lc.presenter_lecturer_id
         LEFT JOIN admins a ON lc.created_by_type = 'admin' AND a.id = lc.created_by ORDER BY lc.scheduled_at DESC`);
       res.json(result.rows.map(row => ({ ...row, meeting_url: classUrl(row.id) })));
+    } catch (error) { res.status(500).json({ error: error.message }); }
+  });
+
+  app.get('/api/admin/live-class-lecturers', authAdmin, async (req, res) => {
+    try {
+      const result = await db.execute(`SELECT DISTINCT l.id, l.name, lc.course_id FROM lecturer_courses lc
+        JOIN lecturers l ON l.id = lc.lecturer_id WHERE l.status = 'active' AND l.approved = 1 ORDER BY l.name, lc.course_id`);
+      res.json(result.rows);
     } catch (error) { res.status(500).json({ error: error.message }); }
   });
 
@@ -345,13 +431,20 @@ function setupLiveClassroom({ app, db, authStudent, authLecturer, authAdmin, jwt
     if (!(await courseAccess(db, creatorType, creatorType === 'lecturer' ? req.lecturer.id : req.admin.id, courseId))) {
       return res.status(403).json({ error: 'You are not authorized to schedule a class for this course.' });
     }
+    let presenterLecturerId = creatorType === 'lecturer' ? req.lecturer.id : numericId(req.body.lecturer_id);
+    if (creatorType === 'admin') {
+      if (!presenterLecturerId) return res.status(400).json({ error: 'Choose a lecturer assigned to this course.' });
+      const assignment = await db.execute({ sql: `SELECT 1 FROM lecturer_courses x JOIN lecturers l ON l.id = x.lecturer_id
+        WHERE x.course_id = ? AND x.lecturer_id = ? AND l.status = 'active' AND l.approved = 1 LIMIT 1`, args: [courseId, presenterLecturerId] });
+      if (!assignment.rows.length) return res.status(400).json({ error: 'The selected lecturer is not assigned to this course.' });
+    }
     const endAt = new Date(new Date(scheduledAt).getTime() + duration * 60000).toISOString();
     try {
       const inserted = await db.execute({
         sql: `INSERT INTO live_classes (course_id, title, description, meeting_url, scheduled_at, duration_minutes,
-              created_by, created_by_type, status, scheduled_end_at)
-              VALUES (?, ?, ?, '', ?, ?, ?, ?, 'SCHEDULED', ?)`,
-        args: [courseId, title, description, scheduledAt, duration, creatorType === 'lecturer' ? req.lecturer.id : req.admin.id, creatorType, endAt],
+              created_by, presenter_lecturer_id, created_by_type, status, scheduled_end_at)
+              VALUES (?, ?, ?, '', ?, ?, ?, ?, ?, 'SCHEDULED', ?)`,
+        args: [courseId, title, description, scheduledAt, duration, creatorType === 'lecturer' ? req.lecturer.id : req.admin.id, presenterLecturerId, creatorType, endAt],
       });
       const id = Number(inserted.lastInsertRowid);
       const roomName = `herald-class-${id}`;
@@ -446,6 +539,7 @@ function setupLiveClassroom({ app, db, authStudent, authLecturer, authAdmin, jwt
     const result = { status: item.status, title: item.title, course_title: item.course_title, scheduled_at: item.scheduled_at, ends_at: item.scheduled_end_at, server_time: new Date().toISOString(), lecturer_name: item.lecturer_name, is_lecturer: req.portalUser.type === 'lecturer' };
     if (configured && item.status === 'LIVE') {
       try {
+        await reconcileRoomParticipants(db, item);
         const participants = await roomService.listParticipants(item.room_name);
         result.participants = participants.map(p => ({ identity: p.identity, name: p.name, joined_at: p.joinedAt }));
         result.active_students = participants.filter(p => String(p.identity).startsWith('student-')).length;
@@ -522,25 +616,32 @@ function setupLiveClassroom({ app, db, authStudent, authLecturer, authAdmin, jwt
     const args = [];
     if (numericId(req.query.course_id)) { filters.push('lc.course_id = ?'); args.push(numericId(req.query.course_id)); }
     if (numericId(req.query.student_id)) { filters.push('s.id = ?'); args.push(numericId(req.query.student_id)); }
-    if (numericId(req.query.lecturer_id)) { filters.push("lc.created_by_type = 'lecturer' AND lc.created_by = ?"); args.push(numericId(req.query.lecturer_id)); }
+    if (numericId(req.query.lecturer_id)) { filters.push("COALESCE(lc.presenter_lecturer_id, CASE WHEN lc.created_by_type = 'lecturer' THEN lc.created_by END) = ?"); args.push(numericId(req.query.lecturer_id)); }
     if (req.query.date && /^\d{4}-\d{2}-\d{2}$/.test(req.query.date)) { filters.push('a.attendance_date = ?'); args.push(req.query.date); }
     if (req.query.date_from && /^\d{4}-\d{2}-\d{2}$/.test(req.query.date_from)) { filters.push('a.attendance_date >= ?'); args.push(req.query.date_from); }
     if (req.query.date_to && /^\d{4}-\d{2}-\d{2}$/.test(req.query.date_to)) { filters.push('a.attendance_date <= ?'); args.push(req.query.date_to); }
     const where = filters.length ? `WHERE ${filters.join(' AND ')}` : '';
     const report = await db.execute({
-      sql: `SELECT a.*, 'student' AS participant_type, s.name AS student_name, s.reg_no, c.code, c.title AS course_title,
-        (SELECT MAX(joined_at) FROM live_class_attendance_sessions x WHERE x.live_class_id = a.live_class_id AND x.student_id = a.student_id AND x.left_at IS NULL) AS active_joined_at,
-        lc.title AS class_title, lc.scheduled_at, COALESCE(l.name, c.trainer, 'Herald Trainer') AS lecturer_name
+      sql: `SELECT a.*, ss.first_joined_at AS session_first_joined_at, ss.last_left_at AS session_last_left_at,
+        ss.duration_seconds AS session_duration_seconds, ss.active_joined_at AS session_active_joined_at,
+        'student' AS participant_type, s.name AS student_name, s.reg_no, c.code, c.title AS course_title,
+        lc.title AS class_title, lc.scheduled_at, CASE WHEN lc.created_by_type = 'admin' THEN COALESCE(pl.name, 'Unassigned') ELSE COALESCE(l.name, pl.name, c.trainer, 'Herald Trainer') END AS lecturer_name
         FROM live_class_attendance a JOIN students s ON s.id = a.student_id
         JOIN courses c ON c.id = a.course_id JOIN live_classes lc ON lc.id = a.live_class_id
         LEFT JOIN lecturers l ON lc.created_by_type = 'lecturer' AND l.id = lc.created_by
+        LEFT JOIN lecturers pl ON pl.id = lc.presenter_lecturer_id
+        LEFT JOIN (SELECT live_class_id, student_id, MIN(joined_at) AS first_joined_at, MAX(left_at) AS last_left_at,
+            COALESCE(SUM(duration_seconds), 0) AS duration_seconds,
+            MAX(CASE WHEN left_at IS NULL THEN joined_at END) AS active_joined_at
+          FROM live_class_attendance_sessions GROUP BY live_class_id, student_id) ss
+          ON ss.live_class_id = a.live_class_id AND ss.student_id = a.student_id
         ${where} ORDER BY a.attendance_date DESC, c.code, s.name LIMIT 5000`, args,
     });
     const participantFilters = [];
     const participantArgs = [];
     if (numericId(req.query.course_id)) { participantFilters.push('lc.course_id = ?'); participantArgs.push(numericId(req.query.course_id)); }
     if (numericId(req.query.student_id)) { participantFilters.push("p.participant_type = 'student' AND p.participant_id = ?"); participantArgs.push(numericId(req.query.student_id)); }
-    if (numericId(req.query.lecturer_id)) { participantFilters.push("p.participant_type = 'lecturer' AND p.participant_id = ?"); participantArgs.push(numericId(req.query.lecturer_id)); }
+    if (numericId(req.query.lecturer_id)) { participantFilters.push("COALESCE(lc.presenter_lecturer_id, CASE WHEN lc.created_by_type = 'lecturer' THEN lc.created_by END) = ?"); participantArgs.push(numericId(req.query.lecturer_id)); }
     if (req.query.date && /^\d{4}-\d{2}-\d{2}$/.test(req.query.date)) { participantFilters.push('p.attendance_date = ?'); participantArgs.push(req.query.date); }
     if (req.query.date_from && /^\d{4}-\d{2}-\d{2}$/.test(req.query.date_from)) { participantFilters.push('p.attendance_date >= ?'); participantArgs.push(req.query.date_from); }
     if (req.query.date_to && /^\d{4}-\d{2}-\d{2}$/.test(req.query.date_to)) { participantFilters.push('p.attendance_date <= ?'); participantArgs.push(req.query.date_to); }
@@ -549,22 +650,28 @@ function setupLiveClassroom({ app, db, authStudent, authLecturer, authAdmin, jwt
       sql: `SELECT p.attendance_date, p.live_class_id, p.participant_type, p.participant_id,
             COALESCE(MAX(p.participant_name), l.name, 'Lecturer') AS student_name, 'Lecturer' AS reg_no,
             c.code, c.title AS course_title, lc.title AS class_title,
-            COALESCE(l.name, c.trainer, 'Herald Trainer') AS lecturer_name,
+            CASE WHEN lc.created_by_type = 'admin' THEN COALESCE(pl.name, 'Unassigned') ELSE COALESCE(l.name, pl.name, c.trainer, 'Herald Trainer') END AS lecturer_name,
             MIN(p.joined_at) AS first_joined_at, MAX(p.left_at) AS last_left_at,
             COALESCE(SUM(p.duration_seconds), 0) AS duration_seconds,
             MAX(CASE WHEN p.left_at IS NULL THEN p.joined_at END) AS active_joined_at
             FROM live_class_participant_sessions p JOIN live_classes lc ON lc.id = p.live_class_id
             JOIN courses c ON c.id = lc.course_id
             LEFT JOIN lecturers l ON p.participant_type = 'lecturer' AND l.id = p.participant_id
+            LEFT JOIN lecturers pl ON pl.id = lc.presenter_lecturer_id
             WHERE p.participant_type = 'lecturer' ${participantWhere}
             GROUP BY p.live_class_id, p.participant_type, p.participant_id, p.attendance_date
             ORDER BY p.attendance_date DESC, c.code, student_name LIMIT 5000`, args: participantArgs,
     });
     const now = Date.now();
-    const studentRows = report.rows.map(row => ({ ...row,
-      duration_seconds: Number(row.duration_seconds || 0) + (row.active_joined_at
-        ? Math.max(0, Math.floor((now - new Date(row.active_joined_at).getTime()) / 1000)) : 0),
-    }));
+    const studentRows = report.rows.map(row => {
+      const firstJoinedAt = row.session_first_joined_at || row.first_joined_at;
+      const activeJoinedAt = row.session_active_joined_at || row.active_joined_at;
+      const duration = Number(row.session_duration_seconds ?? row.duration_seconds ?? 0);
+      const lateAfter = new Date(row.scheduled_at).getTime() + PRESENT_LATE_MINUTES * 60000;
+      return { ...row, first_joined_at: firstJoinedAt, last_left_at: row.session_last_left_at || row.last_left_at,
+        active_joined_at: activeJoinedAt, status: firstJoinedAt ? (new Date(firstJoinedAt).getTime() > lateAfter ? 'late' : 'present') : row.status,
+        duration_seconds: duration + (activeJoinedAt ? Math.max(0, Math.floor((now - new Date(activeJoinedAt).getTime()) / 1000)) : 0) };
+    });
     const lecturerRows = participants.rows.map(row => ({ ...row, status: 'present',
       duration_seconds: Number(row.duration_seconds || 0) + (row.active_joined_at
         ? Math.max(0, Math.floor((now - new Date(row.active_joined_at).getTime()) / 1000)) : 0),
@@ -572,8 +679,14 @@ function setupLiveClassroom({ app, db, authStudent, authLecturer, authAdmin, jwt
     res.json([...studentRows, ...lecturerRows].sort((a, b) => String(b.attendance_date).localeCompare(String(a.attendance_date))));
   });
   app.get('/api/admin/live-class-attendance.csv', authAdmin, async (req, res) => {
-    const report = await db.execute(`SELECT a.attendance_date,'student' AS participant_type,s.name,s.reg_no,c.code,c.title AS course_title,lc.title AS class_title,a.status,a.first_joined_at,a.last_left_at,a.duration_seconds
+    const report = await db.execute(`SELECT a.attendance_date,'student' AS participant_type,s.name,s.reg_no,c.code,c.title AS course_title,lc.title AS class_title,
+      CASE WHEN ss.first_joined_at IS NOT NULL THEN CASE WHEN julianday(ss.first_joined_at) > julianday(lc.scheduled_at, '+${PRESENT_LATE_MINUTES} minutes') THEN 'late' ELSE 'present' END ELSE a.status END AS status,
+      COALESCE(ss.first_joined_at,a.first_joined_at) AS first_joined_at,COALESCE(ss.last_left_at,a.last_left_at) AS last_left_at,
+      COALESCE(ss.duration_seconds,a.duration_seconds,0) + CASE WHEN ss.active_joined_at IS NOT NULL THEN MAX(0,CAST((julianday('now')-julianday(ss.active_joined_at))*86400 AS INTEGER)) ELSE 0 END AS duration_seconds
       FROM live_class_attendance a JOIN students s ON s.id=a.student_id JOIN courses c ON c.id=a.course_id JOIN live_classes lc ON lc.id=a.live_class_id
+      LEFT JOIN (SELECT live_class_id,student_id,MIN(joined_at) first_joined_at,MAX(left_at) last_left_at,COALESCE(SUM(duration_seconds),0) duration_seconds,
+        MAX(CASE WHEN left_at IS NULL THEN joined_at END) active_joined_at FROM live_class_attendance_sessions GROUP BY live_class_id,student_id) ss
+        ON ss.live_class_id=a.live_class_id AND ss.student_id=a.student_id
       ORDER BY a.attendance_date DESC,s.name LIMIT 10000`);
     const lecturerReport = await db.execute(`SELECT p.attendance_date,'lecturer' AS participant_type,
       COALESCE(MAX(p.participant_name),l.name,'Lecturer') AS name,'' AS reg_no,c.code,c.title AS course_title,lc.title AS class_title,
@@ -616,17 +729,23 @@ function setupLiveClassroom({ app, db, authStudent, authLecturer, authAdmin, jwt
           ? await courseAccess(db, 'student', participantId, item.course_id)
           : await activeLecturer(db, participantId) && await courseAccess(db, 'lecturer', participantId, item.course_id);
         if (allowed) {
-          const joinedAt = new Date(Math.max(new Date(item.scheduled_at).getTime(), Math.min(new Date(webhookTime(event)).getTime(), new Date(item.scheduled_end_at).getTime()))).toISOString();
-          const statements = [
-            eventInsert,
+          const joinedAt = participantJoinDate(event.participant?.joinedAt || webhookTime(event), item);
+          const statements = [eventInsert];
+          const openParticipant = await db.execute({ sql: `SELECT id, joined_at FROM live_class_participant_sessions
+            WHERE live_class_id = ? AND participant_type = ? AND participant_id = ? AND left_at IS NULL ORDER BY id DESC LIMIT 1`, args: [item.id, participantType, participantId] });
+          const sameOpenParticipant = openParticipant.rows[0] && Math.abs(new Date(openParticipant.rows[0].joined_at).getTime() - new Date(joinedAt).getTime()) < 15000;
+          if (!sameOpenParticipant) statements.push(
             { sql: `UPDATE live_class_participant_sessions SET left_at = ?, duration_seconds = MAX(0, CAST((julianday(?) - julianday(joined_at)) * 86400 AS INTEGER))
                     WHERE live_class_id = ? AND participant_type = ? AND participant_id = ? AND left_at IS NULL`, args: [joinedAt, joinedAt, item.id, participantType, participantId] },
             { sql: `INSERT INTO live_class_participant_sessions
                     (live_class_id, participant_type, participant_id, participant_name, attendance_date, identity, joined_at)
                     VALUES (?, ?, ?, ?, ?, ?, ?)`, args: [item.id, participantType, participantId, event.participant?.name || identity, classDate(item.scheduled_at), identity, joinedAt] },
-          ];
+          );
           if (participantType === 'student') {
-            statements.push(
+            const openAttendance = await db.execute({ sql: `SELECT id, joined_at FROM live_class_attendance_sessions
+              WHERE live_class_id = ? AND student_id = ? AND left_at IS NULL ORDER BY id DESC LIMIT 1`, args: [item.id, participantId] });
+            const sameOpenAttendance = openAttendance.rows[0] && Math.abs(new Date(openAttendance.rows[0].joined_at).getTime() - new Date(joinedAt).getTime()) < 15000;
+            if (!sameOpenAttendance) statements.push(
               { sql: 'UPDATE live_class_attendance_sessions SET left_at = ?, duration_seconds = MAX(0, CAST((julianday(?) - julianday(joined_at)) * 86400 AS INTEGER)) WHERE live_class_id = ? AND student_id = ? AND left_at IS NULL', args: [joinedAt, joinedAt, item.id, participantId] },
               { sql: 'INSERT INTO live_class_attendance_sessions (live_class_id, student_id, joined_at) VALUES (?, ?, ?)', args: [item.id, participantId, joinedAt] },
             );
@@ -681,10 +800,19 @@ function setupLiveClassroom({ app, db, authStudent, authLecturer, authAdmin, jwt
     }
   });
 
-  if (db.ready && typeof db.ready.then === 'function') db.ready.then(() => recoverClassTerminationSchedules(db));
-  else recoverClassTerminationSchedules(db);
+  const reconcileLiveClasses = async () => {
+    if (!configured) return;
+    try {
+      const live = await db.execute("SELECT * FROM live_classes WHERE status = 'LIVE'");
+      for (const item of live.rows) await reconcileRoomParticipants(db, item).catch(error => console.error(`Live class ${item.id} attendance reconciliation failed:`, error.message));
+    } catch (error) { console.error('Live class attendance reconciliation failed:', error.message); }
+  };
+  if (db.ready && typeof db.ready.then === 'function') db.ready.then(() => { recoverClassTerminationSchedules(db); reconcileLiveClasses(); });
+  else { recoverClassTerminationSchedules(db); reconcileLiveClasses(); }
   const recovery = setInterval(() => recoverClassTerminationSchedules(db), 60000);
   recovery.unref();
+  const attendanceReconciliation = setInterval(reconcileLiveClasses, 15000);
+  attendanceReconciliation.unref();
   if (!configured) {
     console.warn('Live classrooms disabled: LIVEKIT_URL, LIVEKIT_API_KEY, and LIVEKIT_API_SECRET are required.');
   }

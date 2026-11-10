@@ -214,6 +214,7 @@ async function initSchema() {
       scheduled_at DATETIME NOT NULL,
       duration_minutes INTEGER DEFAULT 60,
       created_by INTEGER,
+      presenter_lecturer_id INTEGER,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP
     )`,
     `CREATE TABLE IF NOT EXISTS live_class_attendance (
@@ -405,7 +406,7 @@ async function initSchema() {
   for (const [name, definition] of [
     ['room_name', 'TEXT'], ['status', "TEXT NOT NULL DEFAULT 'SCHEDULED'"],
     ['started_at', 'TEXT'], ['ended_at', 'TEXT'], ['scheduled_end_at', 'TEXT'],
-    ['created_by_type', "TEXT NOT NULL DEFAULT 'lecturer'"],
+    ['created_by_type', "TEXT NOT NULL DEFAULT 'lecturer'"], ['presenter_lecturer_id', 'INTEGER'],
   ]) {
     if (!liveClassColumns.rows.some(column => column.name === name)) {
       await client.execute(`ALTER TABLE live_classes ADD COLUMN ${name} ${definition}`);

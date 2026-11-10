@@ -770,10 +770,12 @@ if (addLectBtn) {
     const addLiveBtn = $('#addLiveClassBtn');
     if (addLiveBtn) {
       addLiveBtn.addEventListener('click', async () => {
-        try { await ensureCache(); } catch (e) { return toast(e.message, 'error'); }
+        let assignedLecturers;
+        try { await ensureCache(); assignedLecturers = await api('/api/admin/live-class-lecturers'); } catch (e) { return toast(e.message, 'error'); }
         openModal('Schedule Live Class', [
           { name: 'course_id', label: 'Course', type: 'select', required: true,
             options: coursesCache.map(c => ({ value: c.id, label: `${c.code} — ${c.title}` })) },
+          { name: 'lecturer_id', label: 'Assigned Lecturer', type: 'select', required: true, options: [] },
           { name: 'title', label: 'Class Title', required: true },
           { name: 'description', label: 'Description / Agenda', type: 'textarea' },
           { name: 'scheduled_at', label: 'Date & Time', type: 'datetime-local', required: true },
@@ -781,12 +783,23 @@ if (addLectBtn) {
           { name: 'notify', label: 'Email enrolled students? (yes/no)', value: 'yes' }
         ], async d => {
           d.course_id = Number(d.course_id);
+          d.lecturer_id = Number(d.lecturer_id);
           d.duration_minutes = Number(d.duration_minutes);
           d.notify = /^(yes|1|true|y)$/i.test(String(d.notify || '').trim());
           await api('/api/admin/live-classes', { method: 'POST', body: d });
           await loadLiveClasses();
           toast(d.notify ? 'Class scheduled. Emails queued.' : 'Class scheduled.');
         });
+        const courseSelect = $('#modalForm select[name="course_id"]');
+        const lecturerSelect = $('#modalForm select[name="lecturer_id"]');
+        const updateAssignedLecturers = () => {
+          const courseId = Number(courseSelect.value);
+          const options = assignedLecturers.filter(lecturer => Number(lecturer.course_id) === courseId);
+          lecturerSelect.innerHTML = `<option value="">— Select assigned lecturer —</option>${options.map(lecturer => `<option value="${esc(lecturer.id)}">${esc(lecturer.name)}</option>`).join('')}`;
+          lecturerSelect.disabled = !options.length;
+        };
+        courseSelect.addEventListener('change', updateAssignedLecturers);
+        updateAssignedLecturers();
       });
     }
 
@@ -2137,7 +2150,7 @@ async function openBulkAssignModal() {
     }
     try {
       const [rows, courses, students, lecturers] = await Promise.all([
-        api(`/api/admin/live-class-attendance?${query}`), api('/api/admin/courses'), api('/api/admin/students'), api('/api/admin/lecturers'),
+        api(`/api/admin/live-class-attendance?${query}`), api('/api/admin/courses'), api('/api/admin/students'), api('/api/admin/live-class-lecturers'),
       ]);
       const fill = (id, values, label) => {
         const select = document.getElementById(id);
@@ -2147,7 +2160,7 @@ async function openBulkAssignModal() {
       };
       fill('liveAttendanceCourse', courses, c => `${c.code} — ${c.title}`);
       fill('liveAttendanceStudent', students, s => `${s.name} (${s.reg_no})`);
-      fill('liveAttendanceLecturer', lecturers.filter(l => Number(l.approved) === 1), l => l.name);
+      fill('liveAttendanceLecturer', [...new Map(lecturers.map(l => [Number(l.id), l])).values()], l => l.name);
       const formatDuration = seconds => {
         const total = Math.max(0, Math.floor(Number(seconds) || 0));
         return total >= 3600 ? `${Math.floor(total / 3600)}h ${Math.floor((total % 3600) / 60)}m` : `${Math.floor(total / 60)}m ${total % 60}s`;
