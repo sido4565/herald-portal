@@ -345,7 +345,10 @@ async function recoverClassTerminationSchedules(db) {
 
 function setupLiveClassroom({ app, db, authStudent, authLecturer, authAdmin, jwt, jwtSecret }) {
   const authAny = (req, res, next) => {
-    const tokens = [req.cookies.token, req.cookies.lecturer_token, req.cookies.admin_token].filter(Boolean);
+    // Prefer the most privileged valid portal session when the browser has
+    // cookies from multiple portal roles (for example, a student session plus
+    // the superadmin session used to open the classroom).
+    const tokens = [req.cookies.admin_token, req.cookies.lecturer_token, req.cookies.token].filter(Boolean);
     for (const token of tokens) {
       try {
         const payload = jwt.verify(token, jwtSecret);
