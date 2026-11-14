@@ -40,7 +40,7 @@ function ClassroomConference({ hands }) {
   const cameras = useTracks([Track.Source.Camera], { onlySubscribed: true });
   const hasScreenShare = screenShares.length > 0;
   return <div className={`classroom-conference ${hasScreenShare ? 'has-screen-share' : ''}`}>
-    {hasScreenShare && <section className="classroom-share-stage" aria-label="Lecturer screen share">
+    {hasScreenShare && <section className="classroom-share-stage" aria-label="Participant screen share">
       <VideoTrack trackRef={screenShares[0]} autoPlay muted playsInline />
     </section>}
     <section className="classroom-camera-stage" aria-label="Class participants">
@@ -135,7 +135,7 @@ function Classroom() {
 
   const start = async () => {
     setBusy(true); setError('');
-    try { await api(`/api/lecturer/live-classes/${encodeURIComponent(classId)}/start`, { method: 'POST', body: '{}' }); await loadStatus(); await join(); }
+    try { await api(`/api/${status?.is_admin ? 'admin' : 'lecturer'}/live-classes/${encodeURIComponent(classId)}/start`, { method: 'POST', body: '{}' }); await loadStatus(); await join(); }
     catch (e) { setError(e.message); }
     finally { setBusy(false); }
   };
@@ -144,7 +144,7 @@ function Classroom() {
     if (!confirm('End this class for everyone now?')) return;
     setBusy(true); setError('');
     try {
-      await api(`/api/lecturer/live-classes/${encodeURIComponent(classId)}/end`, { method: 'POST', body: '{}' });
+      await api(`/api/${status?.is_admin ? 'admin' : 'lecturer'}/live-classes/${encodeURIComponent(classId)}/end`, { method: 'POST', body: '{}' });
       setTokenInfo(null); setConnected(false); setClassEnded(true); await loadStatus();
     } catch (e) { setError(e.message); }
     finally { setBusy(false); }
@@ -152,6 +152,7 @@ function Classroom() {
 
   const lowTime = remaining <= 300;
   const isLecturer = Boolean(status?.is_lecturer);
+  const canManageClass = isLecturer || Boolean(status?.is_admin);
   const ended = classEnded || status?.status === 'COMPLETED' || status?.status === 'ENDING';
   const inFiveMinutes = remaining > 0 && remaining <= 300;
   const displayTitle = status?.title || 'Live classroom';
@@ -183,15 +184,15 @@ function Classroom() {
             onDisconnected={leaveMessage} onError={e => setError(e.message || 'Could not connect to the classroom.')}>
             <ClassroomLiveRoom />
           </LiveKitRoom>
-          {isLecturer && <button className="classroom-end" onClick={end} disabled={busy}>End class for everyone</button>}
+          {canManageClass && <button className="classroom-end" onClick={end} disabled={busy}>End class for everyone</button>}
         </div>
         : <div className="classroom-state">
           <div className="classroom-state-icon">{status?.status === 'LIVE' ? '▶' : '◷'}</div>
           <h2>{status?.status === 'LIVE' ? 'Your classroom is ready' : status?.status === 'COMPLETED' ? 'This class has ended' : 'Waiting for the lecturer to start'}</h2>
           <p>{status?.status === 'LIVE' ? 'Join from inside Herald. Allow microphone and camera access when your browser asks.' : status?.status === 'COMPLETED' ? 'Attendance is saved for this class.' : 'The join button becomes available after the scheduled start and when the lecturer opens the room.'}</p>
           {status?.status === 'LIVE' && <button className="classroom-primary" onClick={join} disabled={busy}>{busy ? 'Joining…' : 'Join classroom'}</button>}
-          {isLecturer && status?.status === 'SCHEDULED' && <button className="classroom-primary" onClick={start} disabled={busy}>{busy ? 'Starting…' : 'Start classroom'}</button>}
-          {isLecturer && status?.status === 'LIVE' && <button className="classroom-primary" onClick={join} disabled={busy}>{busy ? 'Joining…' : 'Join classroom'}</button>}
+          {canManageClass && status?.status === 'SCHEDULED' && <button className="classroom-primary" onClick={start} disabled={busy}>{busy ? 'Starting…' : 'Start classroom'}</button>}
+          {canManageClass && status?.status === 'LIVE' && <button className="classroom-primary" onClick={join} disabled={busy}>{busy ? 'Joining…' : 'Join classroom'}</button>}
         </div>}
       <p className="classroom-help">If your camera or microphone is unavailable, check the site permissions in your browser and rejoin.</p>
     </section>

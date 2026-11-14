@@ -559,7 +559,7 @@ function setupLiveClassroom({ app, db, authStudent, authLecturer, authAdmin, jwt
     if (!item) return res.status(404).json({ error: 'Live class not found.' });
     if (req.portalUser.type === 'lecturer' && !(await activeLecturer(db, req.portalUser.id))) return res.status(403).json({ error: 'An active, approved lecturer account is required.' });
     if (!(await courseAccess(db, req.portalUser.type, req.portalUser.id, item.course_id))) return res.status(403).json({ error: 'Course access required.' });
-    const result = { status: item.status, title: item.title, course_title: item.course_title, scheduled_at: item.scheduled_at, ends_at: item.scheduled_end_at, server_time: new Date().toISOString(), lecturer_name: item.lecturer_name, is_lecturer: req.portalUser.type === 'lecturer' };
+    const result = { status: item.status, title: item.title, course_title: item.course_title, scheduled_at: item.scheduled_at, ends_at: item.scheduled_end_at, server_time: new Date().toISOString(), lecturer_name: item.lecturer_name, is_lecturer: req.portalUser.type === 'lecturer', is_admin: req.portalUser.type === 'admin' };
     if (configured && item.status === 'LIVE') {
       try {
         await reconcileRoomParticipants(db, item);
@@ -595,6 +595,8 @@ function setupLiveClassroom({ app, db, authStudent, authLecturer, authAdmin, jwt
     }
     const tokenTtlSeconds = Math.max(1, Math.min(600, Math.ceil((new Date(item.scheduled_end_at).getTime() - Date.now()) / 1000)));
     const token = new AccessToken(LIVEKIT_API_KEY, LIVEKIT_API_SECRET, { identity, name: displayName, ttl: `${tokenTtlSeconds}s` });
+    // Every enrolled participant, lecturer, and admin may publish camera, mic,
+    // and screen share tracks in the room.
     token.addGrant({ roomJoin: true, room: item.room_name, canPublish: true, canSubscribe: true, canPublishData: true });
     res.json({ token: await token.toJwt(), url: LIVEKIT_URL, class: { id, title: item.title, course_title: item.course_title, status: item.status, scheduled_at: item.scheduled_at, ends_at: item.scheduled_end_at, lecturer_name: item.lecturer_name }, server_time: new Date().toISOString() });
   });
